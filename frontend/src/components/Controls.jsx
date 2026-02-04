@@ -127,20 +127,20 @@ export default function Controls({ sendMessage }) {
       let yaw = RC_CENTER;
 
       // WASD controls
-      if (keys.a) roll -= RC_OFFSET;
-      if (keys.d) roll += RC_OFFSET;
+      if (keys.a) yaw -= RC_OFFSET;
+      if (keys.d) yaw += RC_OFFSET;
       if (keys.w) pitch -= RC_OFFSET;
       if (keys.s) pitch += RC_OFFSET;
       if (keys.r) throttle += RC_OFFSET;
       if (keys.f) throttle -= RC_OFFSET;
-      if (keys.q) yaw -= RC_OFFSET;
-      if (keys.e) yaw += RC_OFFSET;
+      if (keys.q) roll -= RC_OFFSET;
+      if (keys.e) roll += RC_OFFSET;
 
       // Arrow keys: up/down = throttle, left/right = roll (strafe)
       if (keys.arrowup) throttle += RC_OFFSET;
       if (keys.arrowdown) throttle -= RC_OFFSET;
-      if (keys.arrowleft) roll -= RC_OFFSET;
-      if (keys.arrowright) roll += RC_OFFSET;
+      if (keys.arrowleft) yaw -= RC_OFFSET;
+      if (keys.arrowright) yaw += RC_OFFSET;
 
       roll = Math.max(RC_MIN, Math.min(RC_MAX, roll));
       pitch = Math.max(RC_MIN, Math.min(RC_MAX, pitch));
@@ -233,12 +233,12 @@ export default function Controls({ sendMessage }) {
           <div className="mt-3 p-2.5 bg-gray-900/60 rounded-md text-[10px] text-gray-500 font-mono border border-gray-700/30">
             <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
               <span>W/S - Pitch</span>
-              <span>A/D - Roll</span>
-              <span>Q/E - Yaw</span>
+              <span>A/D - Yaw</span>
+              <span>Q/E - Roll</span>
               <span>R/F - Throttle</span>
               <span className="col-span-2 border-t border-gray-800/50 pt-0.5 mt-0.5">Arrow keys:</span>
               <span>Up/Down - Throttle</span>
-              <span>Left/Right - Roll</span>
+              <span>Left/Right - Yaw</span>
               <span className="col-span-2 border-t border-gray-800/50 pt-0.5 mt-0.5">Space - Arm/Disarm</span>
             </div>
           </div>

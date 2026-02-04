@@ -25,7 +25,7 @@ function createDroneIcon(yawDeg) {
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="-18 -18 36 36">
       <g transform="rotate(${yawDeg})">
-        <path d="M0,-14 L8,11 L0,5 L-8,11 Z" fill="#06b6d4" stroke="#22d3ee" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="M0,-13 L12,10 L0,3 L-12,10 Z" fill="#06b6d4" stroke="#22d3ee" stroke-width="1.5" stroke-linejoin="round"/>
       </g>
     </svg>`;
   return L.divIcon({
@@ -275,6 +275,95 @@ function FenceVertexMarkers() {
   );
 }
 
+// Drone mission markers with "Start From Here" in fly mode
+function DroneMissionMarkers() {
+  const droneMission = useDroneStore((s) => s.droneMission);
+  const activeTab = useDroneStore((s) => s.activeTab);
+  const addAlert = useDroneStore((s) => s.addAlert);
+
+  const isFlying = activeTab === 'flying';
+  const droneOpacity = isFlying ? 1 : 0.3;
+
+  const droneNavPositions = droneMission
+    .filter((w) => (w.item_type || 'waypoint') !== 'roi')
+    .map((w) => [w.lat, w.lon]);
+
+  const handleStartFrom = useCallback(async (index) => {
+    const seq = index + 1; // seq 0 is home
+    try {
+      const setRes = await fetch('/api/mission/set_current', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seq }),
+      });
+      const setData = await setRes.json();
+      if (setData.status === 'error') {
+        addAlert(setData.error || 'Failed to set waypoint', 'error');
+        return;
+      }
+      const startRes = await fetch('/api/mission/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const startData = await startRes.json();
+      if (startData.status === 'error') {
+        addAlert(startData.error || 'Mission start failed', 'error');
+      } else {
+        addAlert(`Mission starting from WP ${index + 1}`, 'success');
+      }
+    } catch (err) {
+      addAlert('Start from here failed: ' + err.message, 'error');
+    }
+  }, [addAlert]);
+
+  return (
+    <>
+      {droneMission.map((wp, i) => (
+        <Marker
+          key={`dm-${i}`}
+          position={[wp.lat, wp.lon]}
+          icon={createDroneMissionIcon(i, wp.item_type || 'waypoint')}
+          opacity={droneOpacity}
+        >
+          <Popup>
+            <div className="text-sm">
+              <div className="font-semibold">Drone {TYPE_LABELS[wp.item_type] || 'Waypoint'} {i + 1}</div>
+              <div>Alt: {wp.alt}m</div>
+              <div className="text-xs opacity-70">{wp.lat.toFixed(6)}, {wp.lon.toFixed(6)}</div>
+              {isFlying && (
+                <button
+                  onClick={() => handleStartFrom(i)}
+                  style={{
+                    marginTop: '6px',
+                    padding: '4px 10px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    background: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    width: '100%',
+                  }}
+                >
+                  Start From Here
+                </button>
+              )}
+            </div>
+          </Popup>
+        </Marker>
+      ))}
+
+      {droneNavPositions.length > 1 && (
+        <Polyline
+          positions={droneNavPositions}
+          pathOptions={{ color: '#22c55e', weight: 2, opacity: 0.5 * droneOpacity, dashArray: '6 4' }}
+        />
+      )}
+    </>
+  );
+}
+
 // Target icon for fly mode click
 const flyTargetIcon = L.divIcon({
   html: '<div style="width:12px;height:12px;border:2px solid #f97316;border-radius:50%;background:rgba(249,115,22,0.3)"></div>',
@@ -356,7 +445,6 @@ export default function MapView() {
   const yaw = useDroneStore((s) => s.telemetry.yaw);
   const heading = useDroneStore((s) => s.telemetry.heading);
   const trail = useDroneStore((s) => s.trail);
-  const droneMission = useDroneStore((s) => s.droneMission);
   const geofence = useDroneStore((s) => s.geofence);
   const followDrone = useDroneStore((s) => s.followDrone);
   const setFollowDrone = useDroneStore((s) => s.setFollowDrone);
@@ -374,15 +462,8 @@ export default function MapView() {
   const isPlanning = activeTab === 'planning';
   const isConnected = connectionStatus === 'connected';
 
-  // Drone mission polyline
-  const droneNavPositions = droneMission
-    .filter((w) => (w.item_type || 'waypoint') !== 'roi')
-    .map((w) => [w.lat, w.lon]);
-
   const center = hasPosition ? [lat, lon] : [0, 0];
   const zoom = hasPosition ? 17 : 3;
-
-  const droneOpacity = isPlanning ? 0.3 : 1;
 
   return (
     <div className="w-full h-full relative">
@@ -426,31 +507,8 @@ export default function MapView() {
         {/* Planned waypoint markers + polyline (isolated from telemetry re-renders) */}
         <PlannedWaypointMarkers />
 
-        {/* Drone mission markers */}
-        {droneMission.map((wp, i) => (
-          <Marker
-            key={`dm-${i}`}
-            position={[wp.lat, wp.lon]}
-            icon={createDroneMissionIcon(i, wp.item_type || 'waypoint')}
-            opacity={droneOpacity}
-          >
-            <Popup>
-              <div className="text-sm">
-                <div className="font-semibold">Drone {TYPE_LABELS[wp.item_type] || 'Waypoint'} {i + 1}</div>
-                <div>Alt: {wp.alt}m</div>
-                <div className="text-xs opacity-70">{wp.lat.toFixed(6)}, {wp.lon.toFixed(6)}</div>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-
-        {/* Drone mission connecting line */}
-        {droneNavPositions.length > 1 && (
-          <Polyline
-            positions={droneNavPositions}
-            pathOptions={{ color: '#22c55e', weight: 2, opacity: 0.5 * droneOpacity, dashArray: '6 4' }}
-          />
-        )}
+        {/* Drone mission markers + polyline (with Start From Here in fly mode) */}
+        <DroneMissionMarkers />
 
         {/* Geofence circle */}
         {geofence.enabled && geofence.lat !== 0 && geofence.lon !== 0 && (

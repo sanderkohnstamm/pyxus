@@ -82,7 +82,7 @@ export default function App() {
             ) : activeTab === 'video' ? (
               <VideoFeed />
             ) : (
-              <ToolsPanel />
+              <ToolsPanel sendMessage={sendMessage} />
             )}
           </div>
         </div>

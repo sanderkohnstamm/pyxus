@@ -68,6 +68,9 @@ const useDroneStore = create((set, get) => ({
   keyboardEnabled: false,
   keysPressed: {},
 
+  // Gamepad
+  gamepadEnabled: false,
+
   // Sidebar
   sidebarCollapsed: false,
 
@@ -260,6 +263,9 @@ const useDroneStore = create((set, get) => ({
 
   // Keyboard
   setKeyboardEnabled: (enabled) => set({ keyboardEnabled: enabled }),
+
+  // Gamepad
+  setGamepadEnabled: (enabled) => set({ gamepadEnabled: enabled }),
   setKeyPressed: (key, pressed) => {
     const { keysPressed } = get();
     set({ keysPressed: { ...keysPressed, [key.toLowerCase()]: pressed } });

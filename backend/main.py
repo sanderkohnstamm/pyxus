@@ -53,6 +53,10 @@ class PolygonFenceRequest(BaseModel):
     vertices: list[dict]  # [{lat, lon}]
 
 
+class MissionSetCurrentRequest(BaseModel):
+    seq: int
+
+
 class GotoRequest(BaseModel):
     lat: float
     lon: float
@@ -282,6 +286,14 @@ async def api_mission_clear():
         return {"status": "error", "error": "Not connected"}
     success = mission_mgr.clear()
     return {"status": "ok" if success else "error", "command": "mission_clear"}
+
+
+@app.post("/api/mission/set_current")
+async def api_mission_set_current(req: MissionSetCurrentRequest):
+    if not drone.connected:
+        return {"status": "error", "error": "Not connected"}
+    drone.send_mission_cmd("set_current_mission", seq=req.seq)
+    return {"status": "ok", "command": "mission_set_current", "seq": req.seq}
 
 
 # --- Mission Download ---

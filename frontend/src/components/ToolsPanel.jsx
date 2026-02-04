@@ -1,7 +1,8 @@
 import React, { useState, useCallback } from 'react';
-import { SlidersHorizontal, Cog, ChevronDown, ChevronUp } from 'lucide-react';
+import { SlidersHorizontal, Cog, Gamepad2 } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
 import ParamsPanel from './ParamsPanel';
+import GamepadPanel from './GamepadPanel';
 
 function MotorServoPanel() {
   const connectionStatus = useDroneStore((s) => s.connectionStatus);
@@ -233,7 +234,7 @@ function MotorServoPanel() {
   );
 }
 
-export default function ToolsPanel() {
+export default function ToolsPanel({ sendMessage }) {
   const [subTab, setSubTab] = useState('motors');
 
   return (
@@ -241,8 +242,9 @@ export default function ToolsPanel() {
       {/* Subtab toggle */}
       <div className="flex border-b border-gray-800/50 shrink-0">
         {[
-          { id: 'motors', label: 'Motors & Servos', icon: Cog },
-          { id: 'params', label: 'Parameters', icon: SlidersHorizontal },
+          { id: 'motors', label: 'Motors', icon: Cog },
+          { id: 'gamepad', label: 'Controller', icon: Gamepad2 },
+          { id: 'params', label: 'Params', icon: SlidersHorizontal },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -260,7 +262,13 @@ export default function ToolsPanel() {
       </div>
 
       <div className="flex-1 overflow-y-auto min-h-0">
-        {subTab === 'motors' ? <MotorServoPanel /> : <ParamsPanel />}
+        {subTab === 'motors' ? (
+          <MotorServoPanel />
+        ) : subTab === 'gamepad' ? (
+          <GamepadPanel sendMessage={sendMessage} />
+        ) : (
+          <ParamsPanel />
+        )}
       </div>
     </div>
   );
