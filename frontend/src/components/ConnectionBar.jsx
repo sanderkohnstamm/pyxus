@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { Wifi, WifiOff, Plug, Unplug, Heart, Sun, Moon } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
 
@@ -41,6 +41,39 @@ export default function ConnectionBar() {
 
   const setDroneMission = useDroneStore((s) => s.setDroneMission);
   const setDroneFence = useDroneStore((s) => s.setDroneFence);
+
+  // Check backend connection status on mount (handles page refresh)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        if (cancelled) return;
+        if (data.status === 'connected') {
+          setConnectionStatus('connected');
+
+          // Auto-download mission and fence
+          try {
+            const missionRes = await fetch('/api/mission/download');
+            const missionData = await missionRes.json();
+            if (!cancelled && missionData.status === 'ok' && missionData.waypoints?.length > 0) {
+              setDroneMission(missionData.waypoints);
+            }
+          } catch {}
+
+          try {
+            const fenceRes = await fetch('/api/fence/download');
+            const fenceData = await fenceRes.json();
+            if (!cancelled && fenceData.status === 'ok' && fenceData.fence_items?.length > 0) {
+              setDroneFence(fenceData.fence_items);
+            }
+          } catch {}
+        }
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleConnect = useCallback(async () => {
     if (connectionStatus === 'connected') {

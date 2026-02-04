@@ -159,6 +159,17 @@ app = FastAPI(title="Pyxus Drone Control", lifespan=lifespan)
 
 # --- REST Endpoints ---
 
+@app.get("/api/status")
+async def api_status():
+    if drone.connected:
+        telemetry = drone.get_telemetry()
+        return {
+            "status": "connected",
+            "autopilot": telemetry.get("autopilot", "unknown"),
+        }
+    return {"status": "disconnected"}
+
+
 @app.post("/api/connect")
 async def api_connect(req: ConnectRequest):
     success = drone.connect(req.connection_string)
