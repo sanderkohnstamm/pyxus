@@ -1,0 +1,516 @@
+import React, { useEffect, useMemo, useCallback } from 'react';
+import { MapContainer, TileLayer, Polyline, Marker, Popup, Circle, Polygon, useMap, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
+import useDroneStore from '../store/droneStore';
+import MavLog from './MavLog';
+import VideoOverlay from './VideoOverlay';
+
+// Satellite imagery tiles
+const TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+const TILE_ATTR = 'Tiles &copy; Esri';
+
+// Waypoint type config for map markers
+const MARKER_COLORS = {
+  waypoint: { bg: '#0ea5e9', border: '#38bdf8', label: 'WP' },
+  takeoff: { bg: '#10b981', border: '#34d399', label: 'TO' },
+  loiter_unlim: { bg: '#8b5cf6', border: '#a78bfa', label: 'LT' },
+  loiter_turns: { bg: '#8b5cf6', border: '#a78bfa', label: 'LN' },
+  loiter_time: { bg: '#8b5cf6', border: '#a78bfa', label: 'LD' },
+  roi: { bg: '#f59e0b', border: '#fbbf24', label: 'ROI' },
+  land: { bg: '#f97316', border: '#fb923c', label: 'LND' },
+};
+
+// SVG arrow drone icon
+function createDroneIcon(yawDeg) {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="-18 -18 36 36">
+      <g transform="rotate(${yawDeg})">
+        <path d="M0,-14 L8,11 L0,5 L-8,11 Z" fill="#06b6d4" stroke="#22d3ee" stroke-width="1.5" stroke-linejoin="round"/>
+      </g>
+    </svg>`;
+  return L.divIcon({
+    html: svg,
+    className: 'drone-marker-icon',
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+  });
+}
+
+// Waypoint icon with type-based coloring
+function createWaypointIcon(index, type) {
+  const config = MARKER_COLORS[type] || MARKER_COLORS.waypoint;
+  return L.divIcon({
+    html: `<div class="waypoint-marker" style="background-color:${config.bg};border-color:${config.border};box-shadow:0 2px 8px ${config.bg}66">${index + 1}</div>`,
+    className: '',
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+  });
+}
+
+// Drone mission icon (dimmer, smaller)
+function createDroneMissionIcon(index, type) {
+  const config = MARKER_COLORS[type] || MARKER_COLORS.waypoint;
+  return L.divIcon({
+    html: `<div class="drone-mission-marker" style="background-color:${config.bg};border-color:${config.border}">${index + 1}</div>`,
+    className: '',
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  });
+}
+
+// Fence vertex icon
+function createFenceVertexIcon(index) {
+  return L.divIcon({
+    html: `<div class="waypoint-marker" style="background-color:#f59e0b;border-color:#fbbf24;box-shadow:0 2px 8px #f59e0b66;width:22px;height:22px;font-size:9px">${index + 1}</div>`,
+    className: '',
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  });
+}
+
+// Invalidate map size when sidebar collapses/expands
+function MapResizer() {
+  const map = useMap();
+  const sidebarCollapsed = useDroneStore((s) => s.sidebarCollapsed);
+
+  useEffect(() => {
+    const timer = setTimeout(() => map.invalidateSize(), 250);
+    return () => clearTimeout(timer);
+  }, [sidebarCollapsed, map]);
+
+  return null;
+}
+
+// Component to follow drone position
+function DroneFollower() {
+  const map = useMap();
+  const lat = useDroneStore((s) => s.telemetry.lat);
+  const lon = useDroneStore((s) => s.telemetry.lon);
+  const followDrone = useDroneStore((s) => s.followDrone);
+  const setFollowDrone = useDroneStore((s) => s.setFollowDrone);
+
+  useMapEvents({
+    dragstart: () => setFollowDrone(false),
+  });
+
+  useEffect(() => {
+    if (followDrone && lat !== 0 && lon !== 0) {
+      map.setView([lat, lon], map.getZoom(), { animate: true });
+    }
+  }, [lat, lon, followDrone, map]);
+
+  return null;
+}
+
+// Click handler for adding waypoints/fence vertices + fly mode targeting
+function MapClickHandler() {
+  const addWaypoint = useDroneStore((s) => s.addWaypoint);
+  const addFenceVertex = useDroneStore((s) => s.addFenceVertex);
+  const connectionStatus = useDroneStore((s) => s.connectionStatus);
+  const addWaypointMode = useDroneStore((s) => s.addWaypointMode);
+  const activeTab = useDroneStore((s) => s.activeTab);
+  const planSubTab = useDroneStore((s) => s.planSubTab);
+  const setFlyClickTarget = useDroneStore((s) => s.setFlyClickTarget);
+
+  useMapEvents({
+    click: (e) => {
+      if (connectionStatus !== 'connected') return;
+
+      if (activeTab === 'planning' && addWaypointMode) {
+        if (planSubTab === 'fence') {
+          addFenceVertex(e.latlng.lat, e.latlng.lng);
+        } else {
+          addWaypoint(e.latlng.lat, e.latlng.lng);
+        }
+      } else if (activeTab === 'flying') {
+        setFlyClickTarget({ lat: e.latlng.lat, lon: e.latlng.lng });
+      }
+    },
+  });
+
+  return null;
+}
+
+// Set crosshair cursor when in add mode
+function AddModeCursor() {
+  const map = useMap();
+  const addWaypointMode = useDroneStore((s) => s.addWaypointMode);
+  const activeTab = useDroneStore((s) => s.activeTab);
+
+  useEffect(() => {
+    const container = map.getContainer();
+    if (addWaypointMode && activeTab === 'planning') {
+      container.style.cursor = 'crosshair';
+    } else {
+      container.style.cursor = '';
+    }
+    return () => { container.style.cursor = ''; };
+  }, [addWaypointMode, activeTab, map]);
+
+  return null;
+}
+
+const TYPE_LABELS = {
+  waypoint: 'Waypoint',
+  takeoff: 'Takeoff',
+  loiter_unlim: 'Loiter',
+  loiter_turns: 'Loiter Turns',
+  loiter_time: 'Loiter Time',
+  roi: 'ROI',
+  land: 'Land',
+};
+
+// Isolated component for planned waypoint markers - prevents telemetry re-renders from
+// recreating marker DOM (which kills in-progress drags)
+function PlannedWaypointMarkers() {
+  const plannedWaypoints = useDroneStore((s) => s.plannedWaypoints);
+  const activeTab = useDroneStore((s) => s.activeTab);
+  const updateWaypoint = useDroneStore((s) => s.updateWaypoint);
+
+  const isPlanning = activeTab === 'planning';
+  const plannedOpacity = isPlanning ? 1 : 0.3;
+
+  const plannedNavPositions = plannedWaypoints
+    .filter((w) => w.type !== 'roi')
+    .map((w) => [w.lat, w.lon]);
+
+  // Memoize icons so they only change when waypoints change
+  const icons = useMemo(
+    () => plannedWaypoints.map((wp, i) => createWaypointIcon(i, wp.type)),
+    [plannedWaypoints]
+  );
+
+  return (
+    <>
+      {plannedWaypoints.map((wp, i) => (
+        <Marker
+          key={wp.id}
+          position={[wp.lat, wp.lon]}
+          icon={icons[i]}
+          draggable={isPlanning}
+          autoPan={false}
+          opacity={plannedOpacity}
+          eventHandlers={{
+            dragend: (e) => {
+              const pos = e.target.getLatLng();
+              updateWaypoint(wp.id, { lat: pos.lat, lon: pos.lng });
+            },
+          }}
+        >
+          <Popup>
+            <div className="text-sm">
+              <div className="font-semibold">{TYPE_LABELS[wp.type] || 'Waypoint'} {i + 1}</div>
+              <div>Alt: {wp.alt}m</div>
+              <div className="text-xs opacity-70">{wp.lat.toFixed(6)}, {wp.lon.toFixed(6)}</div>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
+
+      {plannedNavPositions.length > 1 && (
+        <Polyline
+          positions={plannedNavPositions}
+          pathOptions={{ color: '#3b82f6', weight: 2, opacity: 0.5 * plannedOpacity, dashArray: '8 4' }}
+        />
+      )}
+    </>
+  );
+}
+
+// Isolated component for fence vertex markers
+function FenceVertexMarkers() {
+  const plannedFence = useDroneStore((s) => s.plannedFence);
+  const activeTab = useDroneStore((s) => s.activeTab);
+  const planSubTab = useDroneStore((s) => s.planSubTab);
+  const updateFenceVertex = useDroneStore((s) => s.updateFenceVertex);
+
+  const isPlanning = activeTab === 'planning';
+  const plannedOpacity = isPlanning ? 1 : 0.3;
+  const fencePositions = plannedFence.map((v) => [v.lat, v.lon]);
+
+  const icons = useMemo(
+    () => plannedFence.map((_, i) => createFenceVertexIcon(i)),
+    [plannedFence]
+  );
+
+  return (
+    <>
+      {fencePositions.length >= 3 && (
+        <Polygon
+          positions={fencePositions}
+          pathOptions={{
+            color: '#f59e0b',
+            weight: 2,
+            opacity: 0.7 * plannedOpacity,
+            fillColor: '#f59e0b',
+            fillOpacity: 0.08,
+            dashArray: '6 4',
+          }}
+        />
+      )}
+
+      {isPlanning && planSubTab === 'fence' && plannedFence.map((v, i) => (
+        <Marker
+          key={v.id}
+          position={[v.lat, v.lon]}
+          icon={icons[i]}
+          draggable={true}
+          autoPan={false}
+          eventHandlers={{
+            dragend: (e) => {
+              const pos = e.target.getLatLng();
+              updateFenceVertex(v.id, { lat: pos.lat, lon: pos.lng });
+            },
+          }}
+        >
+          <Popup>
+            <div className="text-sm">
+              <div className="font-semibold">Fence Vertex {i + 1}</div>
+              <div className="text-xs opacity-70">{v.lat.toFixed(6)}, {v.lon.toFixed(6)}</div>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
+    </>
+  );
+}
+
+// Target icon for fly mode click
+const flyTargetIcon = L.divIcon({
+  html: '<div style="width:12px;height:12px;border:2px solid #f97316;border-radius:50%;background:rgba(249,115,22,0.3)"></div>',
+  className: '',
+  iconSize: [12, 12],
+  iconAnchor: [6, 6],
+});
+
+// Fly mode click target marker with Go To / Look At
+function FlyClickTarget() {
+  const flyClickTarget = useDroneStore((s) => s.flyClickTarget);
+  const clearFlyClickTarget = useDroneStore((s) => s.clearFlyClickTarget);
+  const alt = useDroneStore((s) => s.telemetry.alt);
+  const addAlert = useDroneStore((s) => s.addAlert);
+
+  const handleGoto = useCallback(async () => {
+    const target = useDroneStore.getState().flyClickTarget;
+    if (!target) return;
+    try {
+      const res = await fetch('/api/goto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat: target.lat, lon: target.lon, alt }),
+      });
+      const data = await res.json();
+      if (data.status === 'error') addAlert(data.error || 'Go To failed', 'error');
+    } catch (err) {
+      addAlert('Go To failed: ' + err.message, 'error');
+    }
+    clearFlyClickTarget();
+  }, [alt, addAlert, clearFlyClickTarget]);
+
+  const handleRoi = useCallback(async () => {
+    const target = useDroneStore.getState().flyClickTarget;
+    if (!target) return;
+    try {
+      const res = await fetch('/api/roi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat: target.lat, lon: target.lon }),
+      });
+      const data = await res.json();
+      if (data.status === 'error') addAlert(data.error || 'Look At failed', 'error');
+    } catch (err) {
+      addAlert('Look At failed: ' + err.message, 'error');
+    }
+    clearFlyClickTarget();
+  }, [addAlert, clearFlyClickTarget]);
+
+  if (!flyClickTarget) return null;
+
+  return (
+    <Marker position={[flyClickTarget.lat, flyClickTarget.lon]} icon={flyTargetIcon}>
+      <Popup eventHandlers={{ remove: clearFlyClickTarget }}>
+        <div style={{display:'flex',gap:'6px'}}>
+          <button
+            onClick={handleGoto}
+            style={{padding:'4px 10px',fontSize:'11px',fontWeight:600,background:'#06b6d4',color:'white',border:'none',borderRadius:'4px',cursor:'pointer'}}
+          >
+            Go To
+          </button>
+          <button
+            onClick={handleRoi}
+            style={{padding:'4px 10px',fontSize:'11px',fontWeight:600,background:'#f59e0b',color:'white',border:'none',borderRadius:'4px',cursor:'pointer'}}
+          >
+            Look At
+          </button>
+        </div>
+      </Popup>
+    </Marker>
+  );
+}
+
+export default function MapView() {
+  const lat = useDroneStore((s) => s.telemetry.lat);
+  const lon = useDroneStore((s) => s.telemetry.lon);
+  const alt = useDroneStore((s) => s.telemetry.alt);
+  const groundspeed = useDroneStore((s) => s.telemetry.groundspeed);
+  const yaw = useDroneStore((s) => s.telemetry.yaw);
+  const heading = useDroneStore((s) => s.telemetry.heading);
+  const trail = useDroneStore((s) => s.trail);
+  const droneMission = useDroneStore((s) => s.droneMission);
+  const geofence = useDroneStore((s) => s.geofence);
+  const followDrone = useDroneStore((s) => s.followDrone);
+  const setFollowDrone = useDroneStore((s) => s.setFollowDrone);
+  const connectionStatus = useDroneStore((s) => s.connectionStatus);
+  const activeTab = useDroneStore((s) => s.activeTab);
+  const addWaypointMode = useDroneStore((s) => s.addWaypointMode);
+  const toggleAddWaypointMode = useDroneStore((s) => s.toggleAddWaypointMode);
+  const planSubTab = useDroneStore((s) => s.planSubTab);
+
+  const hasPosition = lat !== 0 && lon !== 0;
+  const yawDeg = heading || (yaw * 180) / Math.PI;
+
+  const droneIcon = useMemo(() => createDroneIcon(yawDeg), [yawDeg]);
+
+  const isPlanning = activeTab === 'planning';
+  const isConnected = connectionStatus === 'connected';
+
+  // Drone mission polyline
+  const droneNavPositions = droneMission
+    .filter((w) => (w.item_type || 'waypoint') !== 'roi')
+    .map((w) => [w.lat, w.lon]);
+
+  const center = hasPosition ? [lat, lon] : [0, 0];
+  const zoom = hasPosition ? 17 : 3;
+
+  const droneOpacity = isPlanning ? 0.3 : 1;
+
+  return (
+    <div className="w-full h-full relative">
+      <MapContainer
+        center={center}
+        zoom={zoom}
+        className="w-full h-full"
+        zoomControl={true}
+        attributionControl={true}
+      >
+        <TileLayer url={TILE_URL} attribution={TILE_ATTR} maxZoom={19} />
+
+        <MapResizer />
+        <DroneFollower />
+        <MapClickHandler />
+        <AddModeCursor />
+
+        {/* Trail */}
+        {trail.length > 1 && (
+          <Polyline
+            positions={trail}
+            pathOptions={{ color: '#06b6d4', weight: 2, opacity: 0.6 }}
+          />
+        )}
+
+        {/* Drone marker */}
+        {hasPosition && (
+          <Marker position={[lat, lon]} icon={droneIcon}>
+            <Popup>
+              <div className="text-xs font-mono space-y-0.5">
+                <div className="font-semibold text-[11px] mb-1" style={{color:'#06b6d4'}}>Vehicle</div>
+                <div><span style={{color:'#94a3b8'}}>ALT</span> <span style={{color:'#e2e8f0'}}>{alt.toFixed(1)}m</span></div>
+                <div><span style={{color:'#94a3b8'}}>GS</span> <span style={{color:'#e2e8f0'}}>{groundspeed.toFixed(1)} m/s</span></div>
+                <div><span style={{color:'#94a3b8'}}>HDG</span> <span style={{color:'#e2e8f0'}}>{Math.round(yawDeg)}&deg;</span></div>
+                <div style={{borderTop:'1px solid rgba(100,116,139,0.3)',marginTop:'4px',paddingTop:'4px',fontSize:'9px',color:'#64748b'}}>{lat.toFixed(6)}, {lon.toFixed(6)}</div>
+              </div>
+            </Popup>
+          </Marker>
+        )}
+
+        {/* Planned waypoint markers + polyline (isolated from telemetry re-renders) */}
+        <PlannedWaypointMarkers />
+
+        {/* Drone mission markers */}
+        {droneMission.map((wp, i) => (
+          <Marker
+            key={`dm-${i}`}
+            position={[wp.lat, wp.lon]}
+            icon={createDroneMissionIcon(i, wp.item_type || 'waypoint')}
+            opacity={droneOpacity}
+          >
+            <Popup>
+              <div className="text-sm">
+                <div className="font-semibold">Drone {TYPE_LABELS[wp.item_type] || 'Waypoint'} {i + 1}</div>
+                <div>Alt: {wp.alt}m</div>
+                <div className="text-xs opacity-70">{wp.lat.toFixed(6)}, {wp.lon.toFixed(6)}</div>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+
+        {/* Drone mission connecting line */}
+        {droneNavPositions.length > 1 && (
+          <Polyline
+            positions={droneNavPositions}
+            pathOptions={{ color: '#22c55e', weight: 2, opacity: 0.5 * droneOpacity, dashArray: '6 4' }}
+          />
+        )}
+
+        {/* Geofence circle */}
+        {geofence.enabled && geofence.lat !== 0 && geofence.lon !== 0 && (
+          <Circle
+            center={[geofence.lat, geofence.lon]}
+            radius={geofence.radius}
+            pathOptions={{
+              color: '#f59e0b',
+              weight: 2,
+              opacity: 0.6,
+              fillColor: '#f59e0b',
+              fillOpacity: 0.05,
+              dashArray: '6 4',
+            }}
+          />
+        )}
+
+        {/* Fence vertex markers + polygon (isolated from telemetry re-renders) */}
+        <FenceVertexMarkers />
+
+        {/* Fly mode click target */}
+        <FlyClickTarget />
+      </MapContainer>
+
+      {/* Follow button */}
+      <button
+        onClick={() => setFollowDrone(!followDrone)}
+        className={`absolute top-3 right-3 z-[1000] px-3 py-1.5 rounded-md text-xs font-semibold transition-all border backdrop-blur-md ${
+          followDrone
+            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+            : 'bg-gray-900/60 text-gray-400 hover:text-gray-200 border-gray-700/40'
+        }`}
+      >
+        {followDrone ? 'Following' : 'Follow'}
+      </button>
+
+      {/* Add waypoints toggle button */}
+      {isConnected && isPlanning && (
+        <button
+          onClick={toggleAddWaypointMode}
+          className={`absolute bottom-3 right-3 z-[1000] px-3 py-1.5 rounded-md text-xs font-semibold transition-all border backdrop-blur-md ${
+            addWaypointMode
+              ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30 shadow-lg shadow-cyan-500/10'
+              : 'bg-gray-900/60 text-gray-400 hover:text-gray-200 border-gray-700/40'
+          }`}
+        >
+          {addWaypointMode
+            ? (planSubTab === 'fence' ? 'Adding Fence Vertices...' : 'Adding Waypoints...')
+            : (planSubTab === 'fence' ? 'Add Fence Vertices' : 'Add Waypoints')
+          }
+        </button>
+      )}
+
+      {/* Bottom-left overlays */}
+      {isConnected && (
+        <div className="absolute bottom-3 left-3 z-[1000] flex items-end gap-1.5">
+          <MavLog />
+          <VideoOverlay />
+        </div>
+      )}
+    </div>
+  );
+}

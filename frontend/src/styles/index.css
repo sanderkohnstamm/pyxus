@@ -1,0 +1,155 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Theme color variables (dark mode = default) */
+:root {
+  --gray-50: 248 250 252;
+  --gray-100: 241 245 249;
+  --gray-200: 226 232 240;
+  --gray-300: 203 213 225;
+  --gray-400: 148 163 184;
+  --gray-500: 100 116 139;
+  --gray-600: 71 85 105;
+  --gray-700: 51 65 85;
+  --gray-800: 30 41 59;
+  --gray-900: 15 23 42;
+  --gray-950: 2 6 23;
+}
+
+/* Light mode: invert the gray scale */
+.light {
+  --gray-50: 2 6 23;
+  --gray-100: 15 23 42;
+  --gray-200: 30 41 59;
+  --gray-300: 51 65 85;
+  --gray-400: 100 116 139;
+  --gray-500: 148 163 184;
+  --gray-600: 203 213 225;
+  --gray-700: 226 232 240;
+  --gray-800: 241 245 249;
+  --gray-900: 248 250 252;
+  --gray-950: 255 255 255;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Leaflet overrides */
+.leaflet-container {
+  background: #0a0f1a;
+}
+
+.leaflet-control-zoom a {
+  background-color: rgba(15, 23, 42, 0.7) !important;
+  color: rgba(148, 163, 184, 0.9) !important;
+  border-color: rgba(51, 65, 85, 0.4) !important;
+  backdrop-filter: blur(8px);
+}
+
+.leaflet-control-zoom a:hover {
+  background-color: rgba(15, 23, 42, 0.85) !important;
+  color: rgba(226, 232, 240, 1) !important;
+}
+
+.leaflet-control-attribution {
+  background-color: rgba(0, 0, 0, 0.25) !important;
+  color: rgba(100, 116, 139, 0.6) !important;
+  font-size: 10px !important;
+  backdrop-filter: blur(4px);
+}
+
+.leaflet-control-attribution a {
+  color: rgba(100, 116, 139, 0.6) !important;
+}
+
+.leaflet-popup-content-wrapper {
+  background-color: rgba(15, 23, 42, 0.85) !important;
+  color: rgb(226, 232, 240) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+  border: 1px solid rgba(51, 65, 85, 0.3) !important;
+  backdrop-filter: blur(12px);
+}
+
+.leaflet-popup-tip {
+  background-color: rgba(15, 23, 42, 0.85) !important;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--gray-700) / 0.5);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--gray-600) / 0.7);
+}
+
+/* Drone marker */
+.drone-marker-icon {
+  background: none !important;
+  border: none !important;
+}
+
+/* Waypoint marker */
+.waypoint-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  border: 2px solid;
+}
+
+/* Drone mission marker (smaller, dimmer) */
+.drone-mission-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  border: 2px solid;
+  opacity: 0.7;
+}
+
+/* DnD drag overlay */
+.dnd-drag-overlay {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  border-radius: 8px;
+}
+
+/* Smooth marker dragging */
+.leaflet-marker-icon {
+  will-change: transform;
+}
+.leaflet-dragging .leaflet-marker-icon,
+.leaflet-marker-draggable {
+  transition: none !important;
+}
+
+/* Select option background fix */
+option {
+  background-color: rgb(var(--gray-800));
+  color: rgb(var(--gray-200));
+}
