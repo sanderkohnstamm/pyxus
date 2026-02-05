@@ -31,10 +31,14 @@ import {
   Shield,
   GripVertical,
   Download,
+  Cloud,
+  Save,
+  FolderOpen,
 } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
 import FenceSubPanel from './FenceSubPanel';
 import ElevationProfile from './ElevationProfile';
+import WeatherPanel from './WeatherPanel';
 
 const ITEM_TYPES = {
   waypoint: { label: 'Waypoint', icon: MapPin, color: 'sky' },
@@ -278,6 +282,7 @@ function MissionSubPanel() {
   const removeWaypoint = useDroneStore((s) => s.removeWaypoint);
   const updateWaypoint = useDroneStore((s) => s.updateWaypoint);
   const clearWaypoints = useDroneStore((s) => s.clearWaypoints);
+  const setPlannedWaypoints = useDroneStore((s) => s.setPlannedWaypoints);
   const reorderWaypoints = useDroneStore((s) => s.reorderWaypoints);
   const defaultAlt = useDroneStore((s) => s.defaultAlt);
   const defaultSpeed = useDroneStore((s) => s.defaultSpeed);
@@ -381,6 +386,95 @@ function MissionSubPanel() {
     }
   }, [setDroneMission, importDroneMission, addAlert]);
 
+  const handleSaveToFile = useCallback(() => {
+    if (plannedWaypoints.length === 0) {
+      addAlert('No waypoints to save', 'warning');
+      return;
+    }
+
+    const missionData = {
+      version: 1,
+      timestamp: new Date().toISOString(),
+      waypoints: plannedWaypoints.map((w) => ({
+        lat: w.lat,
+        lon: w.lon,
+        alt: w.alt,
+        type: w.type,
+        param1: w.param1,
+        param2: w.param2,
+        param3: w.param3,
+        param4: w.param4,
+      })),
+      defaults: {
+        alt: defaultAlt,
+        speed: defaultSpeed,
+      },
+    };
+
+    const blob = new Blob([JSON.stringify(missionData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mission_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    addAlert(`Saved ${plannedWaypoints.length} waypoints to file`, 'success');
+  }, [plannedWaypoints, defaultAlt, defaultSpeed, addAlert]);
+
+  const handleLoadFromFile = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+
+    input.onchange = async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const missionData = JSON.parse(text);
+
+        if (!missionData.waypoints || !Array.isArray(missionData.waypoints)) {
+          addAlert('Invalid mission file format', 'error');
+          return;
+        }
+
+        // Clear existing waypoints
+        clearWaypoints();
+
+        // Import waypoints
+        const imported = missionData.waypoints.map((wp, index) => ({
+          lat: wp.lat,
+          lon: wp.lon,
+          alt: wp.alt || 50,
+          id: Date.now() + Math.random() * 10000 + index,
+          type: wp.type || 'waypoint',
+          param1: wp.param1 || 0,
+          param2: wp.param2 || 2,
+          param3: wp.param3 || 0,
+          param4: wp.param4 || 0,
+        }));
+
+        setPlannedWaypoints(imported);
+
+        // Restore defaults if available
+        if (missionData.defaults) {
+          if (missionData.defaults.alt) setDefaultAlt(missionData.defaults.alt);
+          if (missionData.defaults.speed) setDefaultSpeed(missionData.defaults.speed);
+        }
+
+        addAlert(`Loaded ${imported.length} waypoints from file`, 'success');
+      } catch (err) {
+        addAlert(`Failed to load mission: ${err.message}`, 'error');
+      }
+    };
+
+    input.click();
+  }, [clearWaypoints, setPlannedWaypoints, setDefaultAlt, setDefaultSpeed, addAlert]);
+
   return (
     <>
       {/* Header with status */}
@@ -448,7 +542,7 @@ function MissionSubPanel() {
             <MapPin size={24} className="mb-2 opacity-40" />
             <div className="text-xs italic">Click "Add Waypoints" then click on the map</div>
             <div className="text-[10px] italic mt-1 opacity-60">
-              {isConnected ? 'Map is ready' : 'Connect to a vehicle first'}
+              Plan missions offline, upload when connected
             </div>
           </div>
         ) : (
@@ -476,31 +570,58 @@ function MissionSubPanel() {
       </div>
 
       {/* Action buttons */}
-      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-800/50">
-        <button
-          onClick={handleUpload}
-          disabled={plannedWaypoints.length === 0 || !isConnected}
-          className="flex items-center justify-center gap-1.5 px-2 py-2.5 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 hover:border-cyan-500/40 rounded-md text-xs font-semibold text-cyan-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-cyan-500/10 disabled:hover:border-cyan-500/20"
-        >
-          <Upload size={12} /> Upload
-        </button>
-        <button
-          onClick={handleImport}
-          disabled={!isConnected}
-          className="flex items-center justify-center gap-1.5 px-2 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-500/40 rounded-md text-xs font-semibold text-emerald-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-emerald-500/10 disabled:hover:border-emerald-500/20"
-        >
-          <Download size={12} /> Import
-        </button>
-        <button
-          onClick={() => {
-            if (isConnected) apiCall('clear');
-            clearWaypoints();
-          }}
-          disabled={plannedWaypoints.length === 0}
-          className="flex items-center justify-center gap-1.5 px-2 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 rounded-md text-xs font-semibold text-red-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-red-500/10 disabled:hover:border-red-500/20"
-        >
-          <Trash2 size={12} /> Clear
-        </button>
+      <div className="space-y-2 pt-2 border-t border-gray-800/50">
+        {/* Drone sync buttons (require connection) */}
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            onClick={handleUpload}
+            disabled={plannedWaypoints.length === 0 || !isConnected}
+            title={!isConnected ? 'Connect to drone first' : 'Upload mission to drone'}
+            className="flex items-center justify-center gap-1.5 px-2 py-2.5 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 hover:border-cyan-500/40 rounded-md text-xs font-semibold text-cyan-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-cyan-500/10 disabled:hover:border-cyan-500/20"
+          >
+            <Upload size={12} /> Upload
+          </button>
+          <button
+            onClick={handleImport}
+            disabled={!isConnected}
+            title={!isConnected ? 'Connect to drone first' : 'Import mission from drone'}
+            className="flex items-center justify-center gap-1.5 px-2 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 hover:border-emerald-500/40 rounded-md text-xs font-semibold text-emerald-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-emerald-500/10 disabled:hover:border-emerald-500/20"
+          >
+            <Download size={12} /> Import
+          </button>
+          <button
+            onClick={() => {
+              clearWaypoints();
+              if (isConnected) {
+                apiCall('clear');
+              }
+            }}
+            disabled={plannedWaypoints.length === 0}
+            title="Clear all waypoints"
+            className="flex items-center justify-center gap-1.5 px-2 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 rounded-md text-xs font-semibold text-red-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-red-500/10 disabled:hover:border-red-500/20"
+          >
+            <Trash2 size={12} /> Clear
+          </button>
+        </div>
+
+        {/* File operations (work offline) */}
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={handleSaveToFile}
+            disabled={plannedWaypoints.length === 0}
+            title="Save mission to file"
+            className="flex items-center justify-center gap-1.5 px-2 py-2 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 hover:border-violet-500/40 rounded-md text-xs font-semibold text-violet-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-violet-500/10 disabled:hover:border-violet-500/20"
+          >
+            <Save size={12} /> Save
+          </button>
+          <button
+            onClick={handleLoadFromFile}
+            title="Load mission from file"
+            className="flex items-center justify-center gap-1.5 px-2 py-2 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 hover:border-violet-500/40 rounded-md text-xs font-semibold text-violet-300 transition-all"
+          >
+            <FolderOpen size={12} /> Load
+          </button>
+        </div>
       </div>
 
       {/* Elevation profile */}
@@ -537,10 +658,22 @@ export default function MissionPanel() {
         >
           <Shield size={12} /> Fence
         </button>
+        <button
+          onClick={() => setPlanSubTab('weather')}
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all ${
+            planSubTab === 'weather'
+              ? 'bg-violet-500/15 text-violet-300 border border-violet-500/30'
+              : 'text-gray-500 hover:text-gray-300 border border-transparent'
+          }`}
+        >
+          <Cloud size={12} /> Weather
+        </button>
       </div>
 
       {/* Content */}
-      {planSubTab === 'mission' ? <MissionSubPanel /> : <FenceSubPanel />}
+      {planSubTab === 'mission' ? <MissionSubPanel /> :
+       planSubTab === 'fence' ? <FenceSubPanel /> :
+       <WeatherPanel />}
     </div>
   );
 }

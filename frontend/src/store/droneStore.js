@@ -94,6 +94,20 @@ const useDroneStore = create((set, get) => ({
   // WebSocket
   wsConnected: false,
 
+  // Weather
+  weather: {
+    routeAnalysis: null,           // RouteWeather data from backend
+    pointWeather: null,             // Single point weather
+    platforms: {},                  // Available platform profiles
+    currentPlatform: 'multirotor_medium',
+    loading: false,
+    lastUpdate: null,
+    autoRefresh: true,              // Auto-fetch when waypoints change
+    showWindVectors: true,          // Map visualization toggle
+    showRiskOverlay: true,          // Map risk circles toggle
+    forecastTime: null,             // ISO string for future missions
+  },
+
   // Actions
   setActiveTab: (tab) => set({ activeTab: tab, addWaypointMode: false }),
 
@@ -183,6 +197,8 @@ const useDroneStore = create((set, get) => ({
 
   clearWaypoints: () => set({ plannedWaypoints: [] }),
 
+  setPlannedWaypoints: (waypoints) => set({ plannedWaypoints: waypoints }),
+
   reorderWaypoints: (fromIndex, toIndex) => {
     const { plannedWaypoints } = get();
     const updated = [...plannedWaypoints];
@@ -254,6 +270,43 @@ const useDroneStore = create((set, get) => ({
     const { geofence } = get();
     set({ geofence: { ...geofence, ...updates } });
   },
+
+  // Weather
+  setWeatherRouteAnalysis: (analysis) => set((s) => ({
+    weather: { ...s.weather, routeAnalysis: analysis, lastUpdate: Date.now() }
+  })),
+
+  setWeatherPointData: (point) => set((s) => ({
+    weather: { ...s.weather, pointWeather: point }
+  })),
+
+  setWeatherPlatforms: (platforms, current) => set((s) => ({
+    weather: { ...s.weather, platforms, currentPlatform: current }
+  })),
+
+  setWeatherPlatform: (platformId) => set((s) => ({
+    weather: { ...s.weather, currentPlatform: platformId }
+  })),
+
+  setWeatherLoading: (loading) => set((s) => ({
+    weather: { ...s.weather, loading }
+  })),
+
+  toggleWeatherAutoRefresh: () => set((s) => ({
+    weather: { ...s.weather, autoRefresh: !s.weather.autoRefresh }
+  })),
+
+  toggleWeatherWindVectors: () => set((s) => ({
+    weather: { ...s.weather, showWindVectors: !s.weather.showWindVectors }
+  })),
+
+  toggleWeatherRiskOverlay: () => set((s) => ({
+    weather: { ...s.weather, showRiskOverlay: !s.weather.showRiskOverlay }
+  })),
+
+  setWeatherForecastTime: (time) => set((s) => ({
+    weather: { ...s.weather, forecastTime: time }
+  })),
 
   // Video
   setVideoUrl: (url) => set({ videoUrl: url }),

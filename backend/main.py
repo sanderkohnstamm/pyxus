@@ -12,6 +12,11 @@ from pydantic import BaseModel
 
 from drone import DroneConnection
 from mission import MissionManager, Waypoint
+from weather import (
+    weather_client, route_analyzer, set_platform,
+    PLATFORM_PROFILES, current_platform, MissionAnalyzer
+)
+from datetime import datetime
 
 
 # --- Settings ---
@@ -106,6 +111,15 @@ class ParamSetRequest(BaseModel):
 
 class CalibrationRequest(BaseModel):
     type: str  # gyro | accel | level | compass | pressure
+
+
+class RouteWeatherRequest(BaseModel):
+    waypoints: list[dict]  # [{lat, lon}]
+    mission_start_time: Optional[str] = None  # ISO format
+
+
+class PlatformSelectRequest(BaseModel):
+    platform_id: str
 
 
 # --- Globals ---
@@ -467,6 +481,129 @@ async def api_calibrate(req: CalibrationRequest):
         return {"status": "error", "error": "Not connected"}
     drone.calibrate(req.type)
     return {"status": "ok", "command": "calibrate", "type": req.type}
+
+
+# --- Weather ---
+
+@app.get("/api/weather/point")
+async def api_weather_point(lat: float = Query(...), lon: float = Query(...), forecast_time: Optional[str] = None):
+    """Get weather data for a specific point"""
+    try:
+        time_obj = datetime.fromisoformat(forecast_time) if forecast_time else None
+        weather = await weather_client.fetch_weather(lat, lon, time_obj)
+
+        # Calculate impact
+        analyzer = MissionAnalyzer(current_platform)
+        impact = analyzer.calculate_impact(weather)
+
+        return {
+            "status": "ok",
+            "weather": {
+                "lat": weather.lat,
+                "lon": weather.lon,
+                "time": weather.time.isoformat(),
+                "temperature": weather.temperature,
+                "wind_speed": weather.wind_speed,
+                "wind_direction": weather.wind_direction,
+                "wind_gusts": weather.wind_gusts,
+                "precipitation": weather.precipitation,
+                "visibility": weather.visibility,
+                "cloud_cover": weather.cloud_cover,
+                "cloud_ceiling": weather.cloud_ceiling,
+                "pressure": weather.pressure,
+                "humidity": weather.humidity,
+            },
+            "impact": {
+                "risk_level": impact.risk_level,
+                "risk_score": impact.risk_score,
+                "stability_margin": impact.stability_margin,
+                "energy_penalty": impact.energy_penalty,
+                "isr_degradation": impact.isr_degradation,
+                "link_margin_db": impact.link_margin_db,
+                "violations": impact.violations,
+                "warnings": impact.warnings,
+            }
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+@app.post("/api/weather/route")
+async def api_weather_route(req: RouteWeatherRequest):
+    """Get weather analysis for entire route"""
+    try:
+        start_time = datetime.fromisoformat(req.mission_start_time) if req.mission_start_time else None
+        route_weather = await route_analyzer.analyze_route(req.waypoints, start_time)
+
+        return {
+            "status": "ok",
+            "route_analysis": {
+                "route_risk_level": route_weather.route_risk_level,
+                "route_risk_score": route_weather.route_risk_score,
+                "total_energy_penalty": route_weather.total_energy_penalty,
+                "critical_segments": route_weather.critical_segments,
+                "waypoint_weather": [
+                    {
+                        "waypoint_index": i,
+                        "risk_level": impact.risk_level,
+                        "risk_score": impact.risk_score,
+                        "stability_margin": impact.stability_margin,
+                        "energy_penalty": impact.energy_penalty,
+                        "isr_degradation": impact.isr_degradation,
+                        "link_margin_db": impact.link_margin_db,
+                        "violations": impact.violations,
+                        "warnings": impact.warnings,
+                        "weather": {
+                            "temperature": impact.weather.temperature,
+                            "wind_speed": impact.weather.wind_speed,
+                            "wind_direction": impact.weather.wind_direction,
+                            "precipitation": impact.weather.precipitation,
+                            "cloud_cover": impact.weather.cloud_cover,
+                            "visibility": impact.weather.visibility,
+                        }
+                    }
+                    for i, impact in enumerate(route_weather.waypoint_weather)
+                ]
+            }
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+@app.get("/api/weather/platforms")
+async def api_weather_platforms():
+    """Get available platform profiles"""
+    return {
+        "status": "ok",
+        "platforms": {
+            pid: {
+                "name": p.name,
+                "type": p.platform_type,
+                "max_wind_speed": p.max_wind_speed,
+                "temp_range": [p.temp_min, p.temp_max],
+                "max_precipitation": p.max_precipitation,
+            }
+            for pid, p in PLATFORM_PROFILES.items()
+        },
+        "current_platform": next(
+            (pid for pid, p in PLATFORM_PROFILES.items() if p == current_platform),
+            "multirotor_medium"
+        )
+    }
+
+
+@app.post("/api/weather/platform")
+async def api_weather_platform_set(req: PlatformSelectRequest):
+    """Set active platform profile"""
+    try:
+        set_platform(req.platform_id)
+        return {
+            "status": "ok",
+            "platform": req.platform_id,
+            "name": current_platform.name
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
 
 
 # --- Video stream proxy ---
