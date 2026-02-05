@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Gamepad2, Keyboard, Radio } from 'lucide-react';
+import { Gamepad2, Keyboard, Radio, ChevronDown, ChevronUp } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
 
 const RC_CENTER = 1500;
@@ -83,6 +83,8 @@ export default function ManualControlOverlay() {
   const telemetry = useDroneStore((s) => s.telemetry);
   const keysPressed = useDroneStore((s) => s.keysPressed);
   const connectionStatus = useDroneStore((s) => s.connectionStatus);
+  const collapsed = useDroneStore((s) => s.manualOverlayCollapsed);
+  const toggleCollapsed = useDroneStore((s) => s.toggleManualOverlay);
 
   const isConnected = connectionStatus === 'connected';
   const isManualMode = MANUAL_MODES.includes(telemetry.mode);
@@ -123,8 +125,8 @@ export default function ManualControlOverlay() {
   if (!isConnected || !isActive) return null;
 
   return (
-    <div className="absolute top-3 left-3 z-[1000] flex flex-col gap-2">
-      {/* Manual control status badge */}
+    <div className="absolute top-14 left-3 z-[1000] flex flex-col gap-2">
+      {/* Manual control status badge - always visible */}
       <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border backdrop-blur-md shadow-xl ${
         isSending
           ? 'bg-cyan-950/70 border-cyan-500/40'
@@ -138,7 +140,7 @@ export default function ManualControlOverlay() {
           <Radio size={10} className={isSending ? 'text-cyan-400 animate-pulse' : 'text-gray-600'} />
         </div>
 
-        <div className="flex flex-col">
+        <div className="flex flex-col flex-1">
           <span className={`text-[10px] font-semibold uppercase tracking-wide ${
             isSending ? 'text-cyan-300' : 'text-gray-400'
           }`}>
@@ -148,10 +150,18 @@ export default function ManualControlOverlay() {
             {isManualMode ? `Mode: ${telemetry.mode}` : `${telemetry.mode} - Switch to manual mode`}
           </span>
         </div>
+
+        {/* Collapse toggle */}
+        <button
+          onClick={toggleCollapsed}
+          className="p-1 -mr-1 rounded hover:bg-gray-700/50 text-gray-500 hover:text-gray-300 transition-colors"
+        >
+          {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+        </button>
       </div>
 
-      {/* Input visualization */}
-      {isSending && (
+      {/* Input visualization - collapsible */}
+      {!collapsed && isSending && (
         <div className="bg-gray-900/70 backdrop-blur-md rounded-lg p-3 border border-gray-700/40 shadow-xl">
           {/* Sticks */}
           <div className="flex items-center gap-4 mb-3">
@@ -184,7 +194,7 @@ export default function ManualControlOverlay() {
       )}
 
       {/* Mode warning */}
-      {isActive && !isManualMode && telemetry.armed && (
+      {!collapsed && isActive && !isManualMode && telemetry.armed && (
         <div className="bg-amber-950/70 backdrop-blur-md rounded-lg px-3 py-2 border border-amber-500/30 shadow-xl">
           <span className="text-[10px] text-amber-300">
             RC override may not work in {telemetry.mode} mode

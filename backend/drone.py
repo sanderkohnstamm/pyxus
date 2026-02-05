@@ -621,13 +621,14 @@ class DroneConnection:
         self._enqueue_cmd("set_roi", lat=lat, lon=lon, alt=alt)
 
     def calibrate(self, cal_type: str):
-        """Start a sensor calibration. Types: gyro, accel, level, compass, pressure."""
+        """Start a sensor calibration. Types: gyro, accel, level, compass, pressure, cancel."""
         cal_map = {
             "gyro":     {"param1": 1},
             "compass":  {"param2": 1},
             "pressure": {"param3": 1},
             "accel":    {"param5": 1},
             "level":    {"param5": 2},
+            "cancel":   {"param1": 0, "param2": 0, "param3": 0, "param4": 0, "param5": 0, "param6": 0},  # All zeros = cancel
         }
         params = cal_map.get(cal_type, {})
         if params:

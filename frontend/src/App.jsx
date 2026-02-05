@@ -1,5 +1,5 @@
 import React from 'react';
-import { Map as MapIcon, Plane, Video, Wrench, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { Map as MapIcon, Plane, Video, Wrench, PanelRightClose, PanelRightOpen, AlertTriangle } from 'lucide-react';
 import useWebSocket from './hooks/useWebSocket';
 import useDroneStore from './store/droneStore';
 import ConnectionBar from './components/ConnectionBar';
@@ -12,7 +12,7 @@ import ToolsPanel from './components/ToolsPanel';
 import FlyOverlay from './components/FlyOverlay';
 
 export default function App() {
-  const { sendMessage } = useWebSocket();
+  const { sendMessage, droneChangeDetected, dismissDroneChange, acceptDroneChange } = useWebSocket();
   const alerts = useDroneStore((s) => s.alerts);
   const activeTab = useDroneStore((s) => s.activeTab);
   const setActiveTab = useDroneStore((s) => s.setActiveTab);
@@ -107,6 +107,53 @@ export default function App() {
           </div>
         ))}
       </div>
+
+      {/* Drone change detection modal */}
+      {droneChangeDetected && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-gray-900 border border-amber-500/30 rounded-xl p-6 max-w-md shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                <AlertTriangle size={20} className="text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-100">Different Vehicle Detected</h3>
+                <p className="text-sm text-gray-400">A different vehicle has connected</p>
+              </div>
+            </div>
+
+            <div className="bg-gray-800/50 rounded-lg p-3 mb-4 text-sm space-y-2">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Previous:</span>
+                <span className="text-gray-300">{droneChangeDetected.old.platformType || 'Unknown'} ({droneChangeDetected.old.autopilot})</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">New:</span>
+                <span className="text-amber-300">{droneChangeDetected.new.platformType || 'Unknown'} ({droneChangeDetected.new.autopilot})</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-500 mb-4">
+              Reloading will clear the current mission plan, drone mission, and parameters. You can also keep the current session if this was expected.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={dismissDroneChange}
+                className="flex-1 py-2 px-4 rounded-lg text-sm font-medium bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 transition-colors"
+              >
+                Keep Session
+              </button>
+              <button
+                onClick={acceptDroneChange}
+                className="flex-1 py-2 px-4 rounded-lg text-sm font-medium bg-amber-600 hover:bg-amber-500 text-white transition-colors"
+              >
+                Reload Connection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

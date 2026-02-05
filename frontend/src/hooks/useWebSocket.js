@@ -1,11 +1,25 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import useDroneStore from '../store/droneStore';
 
 const WS_RECONNECT_DELAY = 2000;
 
+// Calibration-related keywords in STATUSTEXT
+const CALIBRATION_KEYWORDS = [
+  'calibrat', 'accel', 'gyro', 'compass', 'mag', 'level', 'baro', 'pressure',
+  'place vehicle', 'hold still', 'rotate', 'level position', 'on its',
+  'left side', 'right side', 'nose down', 'nose up', 'back', 'belly',
+  'complete', 'success', 'failed', 'done', 'finished', 'next'
+];
+
+function isCalibrationMessage(text) {
+  const lower = text.toLowerCase();
+  return CALIBRATION_KEYWORDS.some(kw => lower.includes(kw));
+}
+
 export default function useWebSocket() {
   const wsRef = useRef(null);
   const reconnectTimer = useRef(null);
+  const [droneChangeDetected, setDroneChangeDetected] = useState(null);
   const updateTelemetry = useDroneStore((s) => s.updateTelemetry);
   const addMavMessages = useDroneStore((s) => s.addMavMessages);
   const setWsConnected = useDroneStore((s) => s.setWsConnected);
@@ -30,7 +44,49 @@ export default function useWebSocket() {
           // Extract statustext before passing to telemetry
           if (data.statustext && data.statustext.length > 0) {
             addMavMessages(data.statustext);
+
+            // Route calibration messages
+            const { calibrationStatus, addCalibrationMessage, setCalibrationStep } = useDroneStore.getState();
+            if (calibrationStatus.active) {
+              data.statustext.forEach(msg => {
+                if (isCalibrationMessage(msg.text)) {
+                  addCalibrationMessage(msg);
+
+                  // Detect accel calibration steps
+                  if (calibrationStatus.type === 'accel') {
+                    const text = msg.text.toLowerCase();
+                    if (text.includes('level')) setCalibrationStep(0);
+                    else if (text.includes('left')) setCalibrationStep(1);
+                    else if (text.includes('right')) setCalibrationStep(2);
+                    else if (text.includes('nose down')) setCalibrationStep(3);
+                    else if (text.includes('nose up')) setCalibrationStep(4);
+                    else if (text.includes('back') || text.includes('belly')) setCalibrationStep(5);
+                  }
+                }
+              });
+            }
           }
+
+          // Check for drone identity change
+          const { droneIdentity, checkDroneChange, setDroneIdentity } = useDroneStore.getState();
+          const newIdentity = {
+            sysid: data.system_id || null,
+            autopilot: data.autopilot,
+            platformType: data.platform_type,
+          };
+
+          if (checkDroneChange(newIdentity)) {
+            setDroneChangeDetected({
+              old: droneIdentity,
+              new: newIdentity,
+            });
+          }
+
+          // Update identity if not set
+          if (droneIdentity.sysid === null && newIdentity.autopilot && newIdentity.autopilot !== 'unknown') {
+            setDroneIdentity(newIdentity);
+          }
+
           updateTelemetry(data);
         }
       } catch {
@@ -74,5 +130,20 @@ export default function useWebSocket() {
     return () => disconnect();
   }, [connect, disconnect]);
 
-  return { sendMessage, wsRef };
+  const dismissDroneChange = useCallback(() => {
+    setDroneChangeDetected(null);
+  }, []);
+
+  const acceptDroneChange = useCallback(() => {
+    const { setDroneIdentity, resetState, setConnectionStatus } = useDroneStore.getState();
+    if (droneChangeDetected) {
+      // Reset state and accept the new drone
+      resetState();
+      setDroneIdentity(droneChangeDetected.new);
+      setConnectionStatus('connected');
+    }
+    setDroneChangeDetected(null);
+  }, [droneChangeDetected]);
+
+  return { sendMessage, wsRef, droneChangeDetected, dismissDroneChange, acceptDroneChange };
 }

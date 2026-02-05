@@ -99,6 +99,20 @@ const useDroneStore = create((set, get) => ({
   // Fly click target
   flyClickTarget: null, // {lat, lon}
 
+  // Drone identity (for change detection)
+  droneIdentity: { sysid: null, autopilot: null, platformType: null },
+
+  // Calibration
+  calibrationStatus: {
+    active: false,
+    type: null,
+    step: 0,        // For accel: 0-5 (6 positions)
+    messages: [],   // Recent calibration messages
+  },
+
+  // Manual control overlay
+  manualOverlayCollapsed: false,
+
   // WebSocket
   wsConnected: false,
 
@@ -368,6 +382,40 @@ const useDroneStore = create((set, get) => ({
   setFlyClickTarget: (target) => set({ flyClickTarget: target }),
   clearFlyClickTarget: () => set({ flyClickTarget: null }),
 
+  // Drone identity
+  setDroneIdentity: (identity) => set({ droneIdentity: identity }),
+  checkDroneChange: (newIdentity) => {
+    const { droneIdentity } = get();
+    // If we had a previous identity and it changed
+    if (droneIdentity.sysid !== null &&
+        (droneIdentity.sysid !== newIdentity.sysid ||
+         droneIdentity.autopilot !== newIdentity.autopilot ||
+         droneIdentity.platformType !== newIdentity.platformType)) {
+      return true; // Drone changed
+    }
+    return false;
+  },
+
+  // Calibration
+  setCalibrationActive: (active, type = null) => set((s) => ({
+    calibrationStatus: { ...s.calibrationStatus, active, type, step: 0, messages: active ? [] : s.calibrationStatus.messages }
+  })),
+  setCalibrationStep: (step) => set((s) => ({
+    calibrationStatus: { ...s.calibrationStatus, step }
+  })),
+  addCalibrationMessage: (msg) => set((s) => ({
+    calibrationStatus: {
+      ...s.calibrationStatus,
+      messages: [...s.calibrationStatus.messages.slice(-20), msg]
+    }
+  })),
+  clearCalibrationStatus: () => set({
+    calibrationStatus: { active: false, type: null, step: 0, messages: [] }
+  }),
+
+  // Manual control overlay
+  toggleManualOverlay: () => set((s) => ({ manualOverlayCollapsed: !s.manualOverlayCollapsed })),
+
   // Alerts
   addAlert: (message, type = 'info') => {
     const id = Date.now();
@@ -391,6 +439,8 @@ const useDroneStore = create((set, get) => ({
       droneFence: [],
       addWaypointMode: false,
       mavMessages: [],
+      droneIdentity: { sysid: null, autopilot: null, platformType: null },
+      calibrationStatus: { active: false, type: null, step: 0, messages: [] },
     }),
 }));
 
