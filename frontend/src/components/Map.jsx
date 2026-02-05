@@ -5,6 +5,7 @@ import useDroneStore from '../store/droneStore';
 import MavLog from './MavLog';
 import VideoOverlay from './VideoOverlay';
 import WeatherMapLayer from './WeatherMapLayer';
+import ManualControlOverlay from './ManualControlOverlay';
 
 // Satellite imagery tiles
 const TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -537,6 +538,9 @@ export default function MapView() {
         {/* Weather map overlay */}
         <WeatherMapLayer />
       </MapContainer>
+
+      {/* Manual control overlay */}
+      <ManualControlOverlay />
 
       {/* Follow button */}
       <button

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Gamepad2 } from 'lucide-react';
+import { Gamepad2, Radio } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
 
 const BUTTON_NAMES = [
@@ -8,7 +8,38 @@ const BUTTON_NAMES = [
   'D-Up', 'D-Down', 'D-Left', 'D-Right',
 ];
 
-const AXIS_NAMES = ['Left X', 'Left Y', 'Right X', 'Right Y'];
+// Extended axis names for transmitters with more channels
+const AXIS_NAMES = ['Axis 0', 'Axis 1', 'Axis 2', 'Axis 3', 'Axis 4', 'Axis 5', 'Axis 6', 'Axis 7'];
+
+// Known transmitter/controller patterns for display names
+const DEVICE_PATTERNS = [
+  { match: /tx16s/i, name: 'RadioMaster TX16S', type: 'transmitter' },
+  { match: /tx12/i, name: 'RadioMaster TX12', type: 'transmitter' },
+  { match: /zorro/i, name: 'RadioMaster Zorro', type: 'transmitter' },
+  { match: /boxer/i, name: 'RadioMaster Boxer', type: 'transmitter' },
+  { match: /jumper.*t-?pro/i, name: 'Jumper T-Pro', type: 'transmitter' },
+  { match: /jumper.*t-?lite/i, name: 'Jumper T-Lite', type: 'transmitter' },
+  { match: /taranis/i, name: 'FrSky Taranis', type: 'transmitter' },
+  { match: /qx7/i, name: 'FrSky QX7', type: 'transmitter' },
+  { match: /horus/i, name: 'FrSky Horus', type: 'transmitter' },
+  { match: /spektrum/i, name: 'Spektrum', type: 'transmitter' },
+  { match: /flysky/i, name: 'FlySky', type: 'transmitter' },
+  { match: /xbox/i, name: 'Xbox Controller', type: 'gamepad' },
+  { match: /playstation|dualshock|dualsense/i, name: 'PlayStation Controller', type: 'gamepad' },
+  { match: /nintendo|pro controller/i, name: 'Nintendo Controller', type: 'gamepad' },
+  { match: /logitech/i, name: 'Logitech Controller', type: 'gamepad' },
+];
+
+function getDeviceInfo(rawId) {
+  for (const pattern of DEVICE_PATTERNS) {
+    if (pattern.match.test(rawId)) {
+      return { name: pattern.name, type: pattern.type, raw: rawId };
+    }
+  }
+  // Try to extract a cleaner name from the raw ID
+  const cleanName = rawId.split('(')[0].trim().substring(0, 30);
+  return { name: cleanName || rawId, type: 'unknown', raw: rawId };
+}
 
 const BUTTON_ACTIONS = [
   { value: 'none', label: 'None' },
@@ -77,6 +108,8 @@ export default function GamepadPanel({ sendMessage }) {
   const gamepadEnabled = useDroneStore((s) => s.gamepadEnabled);
   const setGamepadEnabled = useDroneStore((s) => s.setGamepadEnabled);
   const addAlert = useDroneStore((s) => s.addAlert);
+  const updateManualControlRc = useDroneStore((s) => s.updateManualControlRc);
+  const setManualControlActive = useDroneStore((s) => s.setManualControlActive);
   const isConnected = connectionStatus === 'connected';
 
   const [gamepads, setGamepads] = useState([]);
@@ -89,12 +122,22 @@ export default function GamepadPanel({ sendMessage }) {
   const sendIntervalRef = useRef(null);
   const pollFrameRef = useRef(null);
 
-  // Scan for gamepads
+  // Scan for gamepads/transmitters
   const scanGamepads = useCallback(() => {
     const gps = navigator.getGamepads ? navigator.getGamepads() : [];
     const connected = [];
     for (let i = 0; i < gps.length; i++) {
-      if (gps[i]) connected.push({ index: i, id: gps[i].id });
+      if (gps[i]) {
+        const info = getDeviceInfo(gps[i].id);
+        connected.push({
+          index: i,
+          id: gps[i].id,
+          name: info.name,
+          type: info.type,
+          axisCount: gps[i].axes.length,
+          buttonCount: gps[i].buttons.length,
+        });
+      }
     }
     setGamepads(connected);
   }, []);
@@ -231,6 +274,7 @@ export default function GamepadPanel({ sendMessage }) {
         clearInterval(sendIntervalRef.current);
         sendIntervalRef.current = null;
       }
+      setManualControlActive(false);
       return;
     }
 
@@ -259,10 +303,12 @@ export default function GamepadPanel({ sendMessage }) {
         channels[mapping.channel] = Math.max(RC_MIN, Math.min(RC_MAX, rc));
       }
 
+      const rcChannels = [channels.roll, channels.pitch, channels.throttle, channels.yaw];
       sendMessage({
         type: 'rc_override',
-        channels: [channels.roll, channels.pitch, channels.throttle, channels.yaw],
+        channels: rcChannels,
       });
+      updateManualControlRc(rcChannels);
     }, SEND_RATE);
 
     return () => {
@@ -270,8 +316,9 @@ export default function GamepadPanel({ sendMessage }) {
         clearInterval(sendIntervalRef.current);
         sendIntervalRef.current = null;
       }
+      setManualControlActive(false);
     };
-  }, [gamepadEnabled, isConnected, selectedIndex, config.axisMappings, sendMessage]);
+  }, [gamepadEnabled, isConnected, selectedIndex, config.axisMappings, sendMessage, updateManualControlRc, setManualControlActive]);
 
   const inputCls = 'w-full bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-md px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500/50 transition-colors';
 
@@ -303,32 +350,59 @@ export default function GamepadPanel({ sendMessage }) {
             No controller detected — press a button to connect
           </div>
         ) : (
-          <select
-            value={selectedIndex}
-            onChange={(e) => setSelectedIndex(parseInt(e.target.value))}
-            className={inputCls}
-          >
-            {gamepads.map((gp) => (
-              <option key={gp.index} value={gp.index}>
-                {gp.id}
-              </option>
-            ))}
-          </select>
+          <>
+            <select
+              value={selectedIndex}
+              onChange={(e) => setSelectedIndex(parseInt(e.target.value))}
+              className={inputCls}
+            >
+              {gamepads.map((gp) => (
+                <option key={gp.index} value={gp.index}>
+                  {gp.name}
+                </option>
+              ))}
+            </select>
+            {gamepads[selectedIndex] && (
+              <div className="mt-2 flex items-center gap-2 text-[9px]">
+                <span className={`px-1.5 py-0.5 rounded ${
+                  gamepads[selectedIndex].type === 'transmitter'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                }`}>
+                  <Radio size={8} className="inline mr-1" />
+                  {gamepads[selectedIndex].type === 'transmitter' ? 'Transmitter' : 'Gamepad'}
+                </span>
+                <span className="text-gray-500">
+                  {gamepads[selectedIndex].axisCount} axes, {gamepads[selectedIndex].buttonCount} buttons
+                </span>
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {/* Live axes visualization */}
       {liveAxes.length > 0 && (
         <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-800/50">
-          <div className="flex items-center gap-1.5 mb-2">
+          <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Sticks</span>
+            {gamepadEnabled && isConnected && (
+              <span className="flex items-center gap-1 text-[9px] text-cyan-400">
+                <Radio size={9} className="animate-pulse" />
+                Sending RC
+              </span>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             {/* Left stick */}
             <div className="flex flex-col items-center gap-1">
               <div className="relative w-16 h-16 bg-gray-900/60 rounded-full border border-gray-700/30">
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="absolute w-full h-px bg-gray-700/40" />
+                  <div className="absolute h-full w-px bg-gray-700/40" />
+                </div>
                 <div
-                  className="absolute w-3 h-3 bg-cyan-400 rounded-full"
+                  className="absolute w-3 h-3 bg-cyan-400 rounded-full shadow-lg shadow-cyan-500/30 transition-all duration-75"
                   style={{
                     left: `${50 + (liveAxes[0] || 0) * 40}%`,
                     top: `${50 + (liveAxes[1] || 0) * 40}%`,
@@ -341,8 +415,12 @@ export default function GamepadPanel({ sendMessage }) {
             {/* Right stick */}
             <div className="flex flex-col items-center gap-1">
               <div className="relative w-16 h-16 bg-gray-900/60 rounded-full border border-gray-700/30">
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="absolute w-full h-px bg-gray-700/40" />
+                  <div className="absolute h-full w-px bg-gray-700/40" />
+                </div>
                 <div
-                  className="absolute w-3 h-3 bg-cyan-400 rounded-full"
+                  className="absolute w-3 h-3 bg-cyan-400 rounded-full shadow-lg shadow-cyan-500/30 transition-all duration-75"
                   style={{
                     left: `${50 + (liveAxes[2] || 0) * 40}%`,
                     top: `${50 + (liveAxes[3] || 0) * 40}%`,
@@ -353,6 +431,25 @@ export default function GamepadPanel({ sendMessage }) {
               <span className="text-[9px] text-gray-600">Right</span>
             </div>
           </div>
+          {/* Additional axes for transmitters (switches, sliders) */}
+          {liveAxes.length > 4 && (
+            <div className="mt-3 pt-3 border-t border-gray-800/50 space-y-1.5">
+              <span className="text-[9px] text-gray-600">Aux Channels</span>
+              <div className="grid grid-cols-2 gap-2">
+                {liveAxes.slice(4).map((val, i) => (
+                  <div key={i + 4} className="flex items-center gap-1.5">
+                    <span className="text-[9px] text-gray-500 w-6">Ch{i + 5}</span>
+                    <div className="flex-1 h-1.5 bg-gray-800/80 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-cyan-400/70 transition-all"
+                        style={{ width: `${((val + 1) / 2) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -361,12 +458,22 @@ export default function GamepadPanel({ sendMessage }) {
         <div className="flex items-center gap-1.5 mb-2">
           <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Axis Mapping</span>
         </div>
-        <div className="space-y-1.5">
-          {AXIS_NAMES.map((name, i) => {
+        <div className="space-y-1.5 max-h-48 overflow-y-auto">
+          {liveAxes.map((_, i) => {
             const mapping = config.axisMappings[i] || { channel: 'none', inverted: false, deadzone: 0.1 };
+            const axisValue = liveAxes[i] || 0;
+            const isActive = Math.abs(axisValue) > (mapping.deadzone || 0.1);
             return (
               <div key={i} className="flex items-center gap-1.5">
-                <span className="text-[10px] text-gray-400 w-12 shrink-0">{name}</span>
+                <span className={`text-[10px] w-10 shrink-0 font-medium ${isActive ? 'text-cyan-300' : 'text-gray-500'}`}>
+                  {AXIS_NAMES[i] || `Axis ${i}`}
+                </span>
+                <div className="w-8 h-1.5 bg-gray-800/80 rounded-full overflow-hidden shrink-0">
+                  <div
+                    className={`h-full transition-all ${isActive ? 'bg-cyan-400' : 'bg-gray-600'}`}
+                    style={{ width: `${((axisValue + 1) / 2) * 100}%` }}
+                  />
+                </div>
                 <select
                   value={mapping.channel}
                   onChange={(e) => updateAxisMapping(i, 'channel', e.target.value)}
@@ -400,6 +507,11 @@ export default function GamepadPanel({ sendMessage }) {
               </div>
             );
           })}
+          {liveAxes.length === 0 && (
+            <div className="text-[10px] text-gray-600 italic text-center py-2">
+              Connect a controller to configure axes
+            </div>
+          )}
         </div>
       </div>
 

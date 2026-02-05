@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import {
   Gamepad2,
+  Keyboard,
   MapPin,
   Download,
 } from 'lucide-react';
@@ -11,6 +12,12 @@ const RC_OFFSET = 300;
 const RC_MIN = 1000;
 const RC_MAX = 2000;
 const RC_SEND_RATE = 50; // 20Hz
+
+// Modes that accept manual RC input
+const MANUAL_MODES = [
+  'STABILIZE', 'ALT_HOLD', 'ACRO', 'SPORT', 'LOITER', 'POSHOLD',  // ArduPilot
+  'MANUAL', 'ALTCTL', 'POSCTL', 'STABILIZED', 'RATTITUDE',  // PX4
+];
 
 const TYPE_LABELS = {
   waypoint: 'WP',
@@ -31,6 +38,9 @@ export default function Controls({ sendMessage }) {
   const addAlert = useDroneStore((s) => s.addAlert);
   const droneMission = useDroneStore((s) => s.droneMission);
   const setDroneMission = useDroneStore((s) => s.setDroneMission);
+  const updateManualControlRc = useDroneStore((s) => s.updateManualControlRc);
+  const setManualControlActive = useDroneStore((s) => s.setManualControlActive);
+  const gamepadEnabled = useDroneStore((s) => s.gamepadEnabled);
 
   const rcIntervalRef = useRef(null);
   const isConnected = connectionStatus === 'connected';
@@ -147,10 +157,12 @@ export default function Controls({ sendMessage }) {
       throttle = Math.max(RC_MIN, Math.min(RC_MAX, throttle));
       yaw = Math.max(RC_MIN, Math.min(RC_MAX, yaw));
 
+      const channels = [roll, pitch, throttle, yaw];
       sendMessage({
         type: 'rc_override',
-        channels: [roll, pitch, throttle, yaw],
+        channels,
       });
+      updateManualControlRc(channels);
     }, RC_SEND_RATE);
 
     return () => {
@@ -158,8 +170,9 @@ export default function Controls({ sendMessage }) {
         clearInterval(rcIntervalRef.current);
         rcIntervalRef.current = null;
       }
+      setManualControlActive(false);
     };
-  }, [keyboardEnabled, isConnected, sendMessage]);
+  }, [keyboardEnabled, isConnected, sendMessage, updateManualControlRc, setManualControlActive]);
 
   if (!isConnected) {
     return (
@@ -208,42 +221,95 @@ export default function Controls({ sendMessage }) {
         )}
       </div>
 
-      {/* Keyboard control */}
+      {/* Manual Control Section */}
       <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-800/50">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5 mb-3">
+          <Gamepad2 size={11} className="text-gray-600" />
+          <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Manual Control</span>
+        </div>
+
+        {/* Keyboard toggle */}
+        <div className="flex items-center justify-between mb-2 px-2 py-1.5 bg-gray-900/40 rounded-md border border-gray-800/30">
           <div className="flex items-center gap-2">
-            <Gamepad2 size={13} className="text-gray-500" />
-            <span className="text-xs text-gray-400">Keyboard Control</span>
+            <Keyboard size={12} className={keyboardEnabled ? 'text-cyan-400' : 'text-gray-600'} />
+            <span className="text-[11px] text-gray-400">Keyboard</span>
           </div>
           <button
             onClick={() => setKeyboardEnabled(!keyboardEnabled)}
-            className={`relative w-10 h-5 rounded-full transition-colors ${
+            className={`relative w-9 h-5 rounded-full transition-colors ${
               keyboardEnabled ? 'bg-cyan-600' : 'bg-gray-700'
             }`}
           >
             <span
               className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
-                keyboardEnabled ? 'translate-x-5' : ''
+                keyboardEnabled ? 'translate-x-4' : ''
               }`}
             />
           </button>
         </div>
 
+        {/* Gamepad status */}
+        <div className="flex items-center justify-between px-2 py-1.5 bg-gray-900/40 rounded-md border border-gray-800/30">
+          <div className="flex items-center gap-2">
+            <Gamepad2 size={12} className={gamepadEnabled ? 'text-cyan-400' : 'text-gray-600'} />
+            <span className="text-[11px] text-gray-400">Controller</span>
+          </div>
+          <span className={`text-[10px] ${gamepadEnabled ? 'text-cyan-400' : 'text-gray-600'}`}>
+            {gamepadEnabled ? 'Active' : 'Off'} (Tools tab)
+          </span>
+        </div>
+
+        {/* Mode warning */}
+        {(keyboardEnabled || gamepadEnabled) && !MANUAL_MODES.includes(telemetry.mode) && (
+          <div className="mt-2 px-2 py-1.5 bg-amber-950/40 border border-amber-800/30 rounded-md">
+            <span className="text-[10px] text-amber-400">
+              Switch to {telemetry.autopilot === 'ardupilot' ? 'STABILIZE, ALT_HOLD, or LOITER' : 'MANUAL or ALTCTL'} for RC override
+            </span>
+          </div>
+        )}
+
+        {/* Key hints */}
         {keyboardEnabled && (
-          <div className="mt-3 p-2.5 bg-gray-900/60 rounded-md text-[10px] text-gray-500 font-mono border border-gray-700/30">
-            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
-              <span>W/S - Pitch</span>
-              <span>A/D - Yaw</span>
-              <span>Q/E - Roll</span>
-              <span>R/F - Throttle</span>
-              <span className="col-span-2 border-t border-gray-800/50 pt-0.5 mt-0.5">Arrow keys:</span>
-              <span>Up/Down - Throttle</span>
-              <span>Left/Right - Yaw</span>
-              <span className="col-span-2 border-t border-gray-800/50 pt-0.5 mt-0.5">Space - Arm/Disarm</span>
+          <div className="mt-2 p-2 bg-gray-900/40 rounded-md border border-gray-800/30">
+            <div className="grid grid-cols-4 gap-1 text-center mb-2">
+              <div />
+              <KeyHint k="W" label="Pitch-" />
+              <div />
+              <KeyHint k="R" label="Thr+" />
+
+              <KeyHint k="A" label="Yaw-" />
+              <KeyHint k="S" label="Pitch+" />
+              <KeyHint k="D" label="Yaw+" />
+              <KeyHint k="F" label="Thr-" />
+            </div>
+            <div className="flex justify-center gap-1">
+              <KeyHint k="Q" label="Roll-" />
+              <KeyHint k="E" label="Roll+" />
+              <KeyHint k="SPACE" keyName="space" label="Arm" wide />
             </div>
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function KeyHint({ k, keyName, label, wide }) {
+  const keysPressed = useDroneStore((s) => s.keysPressed);
+  const active = keysPressed[keyName?.toLowerCase() || k.toLowerCase()];
+
+  return (
+    <div className={`flex flex-col items-center ${wide ? 'col-span-2' : ''}`}>
+      <span
+        className={`${wide ? 'px-3' : 'w-6'} py-1 rounded text-[10px] font-bold border transition-all ${
+          active
+            ? 'bg-cyan-500/30 border-cyan-500/50 text-cyan-300'
+            : 'bg-gray-800/60 border-gray-700/50 text-gray-500'
+        }`}
+      >
+        {k}
+      </span>
+      <span className="text-[8px] text-gray-600 mt-0.5">{label}</span>
     </div>
   );
 }

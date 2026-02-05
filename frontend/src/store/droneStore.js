@@ -72,6 +72,14 @@ const useDroneStore = create((set, get) => ({
   // Gamepad
   gamepadEnabled: false,
 
+  // Manual control state (shared between keyboard/gamepad)
+  manualControl: {
+    active: false,        // true when any manual input is being sent
+    source: null,         // 'keyboard' | 'gamepad' | null
+    lastRc: [1500, 1500, 1500, 1500], // [roll, pitch, throttle, yaw]
+    lastUpdate: 0,        // timestamp of last RC send
+  },
+
   // Sidebar
   sidebarCollapsed: false,
 
@@ -325,6 +333,14 @@ const useDroneStore = create((set, get) => ({
     const { keysPressed } = get();
     set({ keysPressed: { ...keysPressed, [key.toLowerCase()]: pressed } });
   },
+
+  // Manual control
+  setManualControlActive: (active, source = null) => set((s) => ({
+    manualControl: { ...s.manualControl, active, source: active ? source : null }
+  })),
+  updateManualControlRc: (channels) => set((s) => ({
+    manualControl: { ...s.manualControl, lastRc: channels, lastUpdate: Date.now(), active: true }
+  })),
 
   // Sidebar
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
