@@ -3,3 +3,4 @@ uvicorn[standard]==0.34.0
 pymavlink==2.4.42
 pydantic==2.10.4
 websockets==14.1
+httpx

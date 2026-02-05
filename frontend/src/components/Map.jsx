@@ -4,6 +4,7 @@ import L from 'leaflet';
 import useDroneStore from '../store/droneStore';
 import MavLog from './MavLog';
 import VideoOverlay from './VideoOverlay';
+import WeatherMapLayer from './WeatherMapLayer';
 
 // Satellite imagery tiles
 const TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -114,15 +115,16 @@ function MapClickHandler() {
 
   useMapEvents({
     click: (e) => {
-      if (connectionStatus !== 'connected') return;
-
+      // Planning mode works offline
       if (activeTab === 'planning' && addWaypointMode) {
         if (planSubTab === 'fence') {
           addFenceVertex(e.latlng.lat, e.latlng.lng);
         } else {
           addWaypoint(e.latlng.lat, e.latlng.lng);
         }
-      } else if (activeTab === 'flying') {
+      }
+      // Flying mode requires connection
+      else if (activeTab === 'flying' && connectionStatus === 'connected') {
         setFlyClickTarget({ lat: e.latlng.lat, lon: e.latlng.lng });
       }
     },
@@ -531,6 +533,9 @@ export default function MapView() {
 
         {/* Fly mode click target */}
         <FlyClickTarget />
+
+        {/* Weather map overlay */}
+        <WeatherMapLayer />
       </MapContainer>
 
       {/* Follow button */}
@@ -546,7 +551,7 @@ export default function MapView() {
       </button>
 
       {/* Add waypoints toggle button */}
-      {isConnected && isPlanning && (
+      {isPlanning && (
         <button
           onClick={toggleAddWaypointMode}
           className={`absolute bottom-3 right-3 z-[1000] px-3 py-1.5 rounded-md text-xs font-semibold transition-all border backdrop-blur-md ${
