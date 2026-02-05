@@ -447,6 +447,19 @@ class DroneConnection:
                     kwargs["lon"],
                     kwargs.get("alt", 0),
                 )
+            elif cmd_type == "preflight_calibration":
+                self._mav.mav.command_long_send(
+                    self._target_system, self._target_component,
+                    mavutil.mavlink.MAV_CMD_PREFLIGHT_CALIBRATION,
+                    0,
+                    kwargs.get("param1", 0),  # gyro
+                    kwargs.get("param2", 0),  # mag
+                    kwargs.get("param3", 0),  # pressure
+                    kwargs.get("param4", 0),  # radio
+                    kwargs.get("param5", 0),  # accel (1=accel, 2=level)
+                    kwargs.get("param6", 0),
+                    0,
+                )
             elif cmd_type == "set_param":
                 param_id = kwargs["param_id"]
                 if isinstance(param_id, str):
@@ -606,6 +619,19 @@ class DroneConnection:
 
     def set_roi(self, lat: float, lon: float, alt: float = 0):
         self._enqueue_cmd("set_roi", lat=lat, lon=lon, alt=alt)
+
+    def calibrate(self, cal_type: str):
+        """Start a sensor calibration. Types: gyro, accel, level, compass, pressure."""
+        cal_map = {
+            "gyro":     {"param1": 1},
+            "compass":  {"param2": 1},
+            "pressure": {"param3": 1},
+            "accel":    {"param5": 1},
+            "level":    {"param5": 2},
+        }
+        params = cal_map.get(cal_type, {})
+        if params:
+            self._enqueue_cmd("preflight_calibration", **params)
 
     def send_mission_cmd(self, cmd_type: str, **kwargs):
         self._enqueue_cmd(cmd_type, **kwargs)

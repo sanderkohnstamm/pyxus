@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
 import FenceSubPanel from './FenceSubPanel';
+import ElevationProfile from './ElevationProfile';
 
 const ITEM_TYPES = {
   waypoint: { label: 'Waypoint', icon: MapPin, color: 'sky' },
@@ -501,6 +502,9 @@ function MissionSubPanel() {
           <Trash2 size={12} /> Clear
         </button>
       </div>
+
+      {/* Elevation profile */}
+      <ElevationProfile />
     </>
   );
 }

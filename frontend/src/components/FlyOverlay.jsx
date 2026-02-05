@@ -27,6 +27,7 @@ export default function FlyOverlay() {
   const telemetry = useDroneStore((s) => s.telemetry);
   const missionStatus = useDroneStore((s) => s.missionStatus);
   const addAlert = useDroneStore((s) => s.addAlert);
+  const takeoffAlt = useDroneStore((s) => s.takeoffAlt);
 
   const isConnected = connectionStatus === 'connected';
 
@@ -120,7 +121,7 @@ export default function FlyOverlay() {
         <div className="w-px h-4 bg-gray-700/30 mx-0.5" />
 
         <button
-          onClick={() => apiCall('takeoff', { alt: 10 })}
+          onClick={() => apiCall('takeoff', { alt: takeoffAlt })}
           className={`${btn} bg-gray-800/50 hover:bg-gray-700/50 border-gray-700/30 hover:border-gray-600/40 text-gray-300`}
         >
           <ArrowUp size={10} className="inline -mt-0.5 mr-1" />Takeoff

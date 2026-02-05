@@ -1,6 +1,41 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { SlidersHorizontal, RefreshCw, Search, Check, X } from 'lucide-react';
+import { SlidersHorizontal, RefreshCw, Search, Check, X, Download, Shield, ChevronDown, ChevronUp } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
+
+// Key safety parameters for ArduPilot and PX4
+const SAFETY_PARAMS = {
+  ardupilot: [
+    { id: 'FS_THR_ENABLE', label: 'Throttle Failsafe', desc: '0=Disabled, 1=RTL, 2=Land' },
+    { id: 'FS_THR_VALUE', label: 'Throttle FS PWM', desc: 'PWM below which FS triggers' },
+    { id: 'FS_GCS_ENABLE', label: 'GCS Failsafe', desc: '0=Disabled, 1=RTL, 2=Land' },
+    { id: 'FS_BATT_ENABLE', label: 'Battery Failsafe', desc: '0=Disabled, 1=Land, 2=RTL' },
+    { id: 'FS_BATT_VOLTAGE', label: 'Battery FS Voltage', desc: 'Min voltage before FS' },
+    { id: 'FS_BATT_MAH', label: 'Battery FS mAh', desc: 'Min remaining mAh' },
+    { id: 'RTL_ALT', label: 'RTL Altitude', desc: 'Return altitude in cm' },
+    { id: 'RTL_ALT_FINAL', label: 'RTL Final Altitude', desc: 'Loiter altitude after RTL in cm' },
+    { id: 'FENCE_ENABLE', label: 'Fence Enable', desc: '0=Disabled, 1=Enabled' },
+    { id: 'FENCE_TYPE', label: 'Fence Type', desc: '1=Alt, 2=Circle, 3=Both, 4=Polygon' },
+    { id: 'FENCE_ALT_MAX', label: 'Fence Max Altitude', desc: 'Max altitude in meters' },
+    { id: 'FENCE_RADIUS', label: 'Fence Radius', desc: 'Max radius in meters' },
+    { id: 'FENCE_ACTION', label: 'Fence Action', desc: '0=Report, 1=RTL, 2=Land' },
+    { id: 'ARMING_CHECK', label: 'Arming Checks', desc: '1=All, 0=Disabled' },
+  ],
+  px4: [
+    { id: 'COM_DL_LOSS_T', label: 'Datalink Loss Timeout', desc: 'Seconds before link-loss FS' },
+    { id: 'NAV_DLL_ACT', label: 'Datalink Loss Action', desc: '0=Disabled, 1=Loiter, 2=RTL, 3=Land' },
+    { id: 'NAV_RCL_ACT', label: 'RC Loss Action', desc: '0=Disabled, 1=Loiter, 2=RTL, 3=Land' },
+    { id: 'COM_LOW_BAT_ACT', label: 'Low Battery Action', desc: '0=None, 1=Warning, 2=RTL, 3=Land' },
+    { id: 'BAT_LOW_THR', label: 'Low Battery Threshold', desc: 'Fraction (0-1) for low battery' },
+    { id: 'BAT_CRIT_THR', label: 'Critical Battery Threshold', desc: 'Fraction (0-1) for critical' },
+    { id: 'RTL_RETURN_ALT', label: 'RTL Return Altitude', desc: 'Altitude for RTL in meters' },
+    { id: 'RTL_DESCEND_ALT', label: 'RTL Descend Altitude', desc: 'Descend altitude in meters' },
+    { id: 'GF_ACTION', label: 'Geofence Action', desc: '0=None, 1=Warning, 2=Loiter, 3=RTL, 4=Land' },
+    { id: 'GF_MAX_HOR_DIST', label: 'Geofence Max Horizontal', desc: 'Max horizontal distance in m' },
+    { id: 'GF_MAX_VER_DIST', label: 'Geofence Max Vertical', desc: 'Max vertical distance in m' },
+    { id: 'COM_ARM_WO_GPS', label: 'Arm Without GPS', desc: '0=Require GPS, 1=Allow' },
+    { id: 'CBRK_IO_SAFETY', label: 'IO Safety Breaker', desc: '22027=Disable safety switch' },
+  ],
+};
 
 function ParamRow({ name, param, onSet }) {
   const [editing, setEditing] = useState(false);
@@ -65,6 +100,49 @@ function ParamRow({ name, param, onSet }) {
   );
 }
 
+function SafetySection({ params, autopilot, onSet }) {
+  const [expanded, setExpanded] = useState(true);
+  const safetyDefs = autopilot === 'ardupilot' ? SAFETY_PARAMS.ardupilot : SAFETY_PARAMS.px4;
+
+  // Only show params that exist in the loaded param set
+  const available = safetyDefs.filter((s) => params[s.id] !== undefined);
+  if (available.length === 0) return null;
+
+  return (
+    <div className="border-b border-gray-800/50">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center gap-1.5 px-3 py-2 hover:bg-gray-800/30 transition-colors"
+      >
+        <Shield size={11} className="text-amber-500" />
+        <span className="text-[10px] text-amber-400 uppercase tracking-wider font-semibold">Safety</span>
+        <span className="text-[9px] text-gray-600 ml-1">({available.length})</span>
+        {expanded ? (
+          <ChevronUp size={10} className="text-gray-600 ml-auto" />
+        ) : (
+          <ChevronDown size={10} className="text-gray-600 ml-auto" />
+        )}
+      </button>
+
+      {expanded && (
+        <div className="divide-y divide-gray-800/30">
+          {available.map((def) => {
+            const param = params[def.id];
+            return (
+              <div key={def.id}>
+                <div className="px-3 pt-1 pb-0">
+                  <span className="text-[9px] text-gray-600 truncate">{def.desc}</span>
+                </div>
+                <ParamRow name={def.id} param={param} onSet={onSet} />
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ParamsPanel() {
   const connectionStatus = useDroneStore((s) => s.connectionStatus);
   const params = useDroneStore((s) => s.params);
@@ -73,6 +151,7 @@ export default function ParamsPanel() {
   const setParams = useDroneStore((s) => s.setParams);
   const setParamsLoading = useDroneStore((s) => s.setParamsLoading);
   const addAlert = useDroneStore((s) => s.addAlert);
+  const autopilot = useDroneStore((s) => s.telemetry.autopilot);
 
   const [search, setSearch] = useState('');
   const isConnected = connectionStatus === 'connected';
@@ -134,6 +213,20 @@ export default function ParamsPanel() {
     }
   }, [paramsLoading, paramsTotal, paramCount, setParamsLoading]);
 
+  const handleDownload = useCallback(() => {
+    const entries = Object.entries(params).sort((a, b) => a[0].localeCompare(b[0]));
+    const lines = entries.map(([name, p]) => `${name}\t${p.value}`);
+    const content = lines.join('\n') + '\n';
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `params_${new Date().toISOString().slice(0, 10)}.param`;
+    a.click();
+    URL.revokeObjectURL(url);
+    addAlert(`Downloaded ${entries.length} parameters`, 'success');
+  }, [params, addAlert]);
+
   const filtered = useMemo(() => {
     const entries = Object.entries(params);
     if (!search.trim()) return entries.sort((a, b) => a[0].localeCompare(b[0]));
@@ -165,18 +258,28 @@ export default function ParamsPanel() {
               ({paramCount}{paramsTotal > 0 ? `/${paramsTotal}` : ''})
             </span>
           </div>
-          <button
-            onClick={requestRefresh}
-            disabled={paramsLoading}
-            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold transition-all border ${
-              paramsLoading
-                ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
-                : 'bg-gray-800/60 text-gray-400 hover:text-gray-200 border-gray-700/50 hover:border-gray-600/50'
-            }`}
-          >
-            <RefreshCw size={10} className={paramsLoading ? 'animate-spin' : ''} />
-            {paramsLoading ? 'Loading...' : 'Refresh'}
-          </button>
+          <div className="flex items-center gap-1">
+            {paramCount > 0 && (
+              <button
+                onClick={handleDownload}
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold transition-all border bg-gray-800/60 text-gray-400 hover:text-gray-200 border-gray-700/50 hover:border-gray-600/50"
+              >
+                <Download size={10} />
+              </button>
+            )}
+            <button
+              onClick={requestRefresh}
+              disabled={paramsLoading}
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold transition-all border ${
+                paramsLoading
+                  ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+                  : 'bg-gray-800/60 text-gray-400 hover:text-gray-200 border-gray-700/50 hover:border-gray-600/50'
+              }`}
+            >
+              <RefreshCw size={10} className={paramsLoading ? 'animate-spin' : ''} />
+              {paramsLoading ? 'Loading...' : 'Refresh'}
+            </button>
+          </div>
         </div>
 
         {/* Search */}
@@ -202,6 +305,11 @@ export default function ParamsPanel() {
 
       {/* Param list */}
       <div className="flex-1 overflow-y-auto min-h-0">
+        {/* Safety section */}
+        {paramCount > 0 && (
+          <SafetySection params={params} autopilot={autopilot} onSet={handleSet} />
+        )}
+
         {paramCount === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-gray-600">
             <SlidersHorizontal size={24} className="mb-2 opacity-40" />

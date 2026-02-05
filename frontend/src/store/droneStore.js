@@ -36,6 +36,7 @@ const useDroneStore = create((set, get) => ({
   missionStatus: 'idle',
   defaultAlt: 50,
   defaultSpeed: 5,
+  takeoffAlt: 10,
 
   // Drone mission (downloaded from vehicle, read-only)
   droneMission: [],
@@ -192,6 +193,7 @@ const useDroneStore = create((set, get) => ({
 
   setDefaultAlt: (alt) => set({ defaultAlt: parseFloat(alt) || 50 }),
   setDefaultSpeed: (speed) => set({ defaultSpeed: parseFloat(speed) || 5 }),
+  setTakeoffAlt: (alt) => set({ takeoffAlt: parseFloat(alt) || 10 }),
 
   setMissionStatus: (status) => set({ missionStatus: status }),
 

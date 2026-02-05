@@ -41,11 +41,35 @@ export default function ConnectionBar() {
 
   const setDroneMission = useDroneStore((s) => s.setDroneMission);
   const setDroneFence = useDroneStore((s) => s.setDroneFence);
+  const setDefaultAlt = useDroneStore((s) => s.setDefaultAlt);
+  const setDefaultSpeed = useDroneStore((s) => s.setDefaultSpeed);
+  const setTakeoffAlt = useDroneStore((s) => s.setTakeoffAlt);
+  const setVideoUrl = useDroneStore((s) => s.setVideoUrl);
 
-  // Check backend connection status on mount (handles page refresh)
+  // Load settings + check backend connection on mount
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // Load settings
+      try {
+        const settingsRes = await fetch('/api/settings');
+        const settingsData = await settingsRes.json();
+        if (!cancelled && settingsData.status === 'ok') {
+          const s = settingsData.settings;
+          if (s.connection) {
+            if (s.connection.type) useDroneStore.getState().setConnectionType(s.connection.type);
+            if (s.connection.string) setConnectionString(s.connection.string);
+          }
+          if (s.flight) {
+            if (s.flight.default_alt) setDefaultAlt(s.flight.default_alt);
+            if (s.flight.default_speed) setDefaultSpeed(s.flight.default_speed);
+            if (s.flight.takeoff_alt) setTakeoffAlt(s.flight.takeoff_alt);
+          }
+          if (s.video?.url) setVideoUrl(s.video.url);
+        }
+      } catch {}
+
+      // Check connection status
       try {
         const res = await fetch('/api/status');
         const data = await res.json();
@@ -53,7 +77,6 @@ export default function ConnectionBar() {
         if (data.status === 'connected') {
           setConnectionStatus('connected');
 
-          // Auto-download mission and fence
           try {
             const missionRes = await fetch('/api/mission/download');
             const missionData = await missionRes.json();

@@ -1,8 +1,9 @@
 import React, { useState, useCallback } from 'react';
-import { SlidersHorizontal, Cog, Gamepad2 } from 'lucide-react';
+import { SlidersHorizontal, Cog, Gamepad2, Compass } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
 import ParamsPanel from './ParamsPanel';
 import GamepadPanel from './GamepadPanel';
+import CalibrationPanel from './CalibrationPanel';
 
 function MotorServoPanel() {
   const connectionStatus = useDroneStore((s) => s.connectionStatus);
@@ -244,6 +245,7 @@ export default function ToolsPanel({ sendMessage }) {
         {[
           { id: 'motors', label: 'Motors', icon: Cog },
           { id: 'gamepad', label: 'Controller', icon: Gamepad2 },
+          { id: 'calibration', label: 'Calibrate', icon: Compass },
           { id: 'params', label: 'Params', icon: SlidersHorizontal },
         ].map((tab) => (
           <button
@@ -266,6 +268,8 @@ export default function ToolsPanel({ sendMessage }) {
           <MotorServoPanel />
         ) : subTab === 'gamepad' ? (
           <GamepadPanel sendMessage={sendMessage} />
+        ) : subTab === 'calibration' ? (
+          <CalibrationPanel />
         ) : (
           <ParamsPanel />
         )}

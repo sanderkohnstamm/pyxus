@@ -1,0 +1,23 @@
+{
+  "connection": {
+    "type": "udp",
+    "string": "udpin:0.0.0.0:14550"
+  },
+  "flight": {
+    "default_alt": 50,
+    "default_speed": 5,
+    "takeoff_alt": 10
+  },
+  "gamepad": {
+    "buttonMappings": {},
+    "axisMappings": {
+      "0": { "channel": "yaw", "inverted": false, "deadzone": 0.1 },
+      "1": { "channel": "throttle", "inverted": true, "deadzone": 0.1 },
+      "2": { "channel": "roll", "inverted": false, "deadzone": 0.1 },
+      "3": { "channel": "pitch", "inverted": true, "deadzone": 0.1 }
+    }
+  },
+  "video": {
+    "url": ""
+  }
+}

@@ -14,6 +14,24 @@ from drone import DroneConnection
 from mission import MissionManager, Waypoint
 
 
+# --- Settings ---
+
+SETTINGS_PATH = os.path.join(os.path.dirname(__file__), "settings.json")
+
+
+def load_settings() -> dict:
+    try:
+        with open(SETTINGS_PATH, "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def save_settings(data: dict):
+    with open(SETTINGS_PATH, "w") as f:
+        json.dump(data, f, indent=2)
+
+
 # --- Models ---
 
 class ConnectRequest(BaseModel):
@@ -84,6 +102,10 @@ class ServoTestRequest(BaseModel):
 class ParamSetRequest(BaseModel):
     param_id: str
     value: float
+
+
+class CalibrationRequest(BaseModel):
+    type: str  # gyro | accel | level | compass | pressure
 
 
 # --- Globals ---
@@ -415,6 +437,36 @@ async def api_params_set(req: ParamSetRequest):
         return {"status": "error", "error": "Not connected"}
     drone.set_param(req.param_id, req.value)
     return {"status": "ok", "command": "param_set", "param_id": req.param_id, "value": req.value}
+
+
+# --- Settings ---
+
+@app.get("/api/settings")
+async def api_settings_get():
+    return {"status": "ok", "settings": load_settings()}
+
+
+@app.put("/api/settings")
+async def api_settings_put(req: dict):
+    current = load_settings()
+    # Deep merge top-level keys
+    for key, val in req.items():
+        if isinstance(val, dict) and isinstance(current.get(key), dict):
+            current[key].update(val)
+        else:
+            current[key] = val
+    save_settings(current)
+    return {"status": "ok"}
+
+
+# --- Calibration ---
+
+@app.post("/api/calibrate")
+async def api_calibrate(req: CalibrationRequest):
+    if not drone.connected:
+        return {"status": "error", "error": "Not connected"}
+    drone.calibrate(req.type)
+    return {"status": "ok", "command": "calibrate", "type": req.type}
 
 
 # --- Video stream proxy ---

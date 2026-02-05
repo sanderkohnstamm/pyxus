@@ -64,6 +64,12 @@ function loadConfig() {
 
 function saveConfig(config) {
   localStorage.setItem('pyxus-gamepad-config', JSON.stringify(config));
+  // Also persist to backend settings
+  fetch('/api/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ gamepad: config }),
+  }).catch(() => {});
 }
 
 export default function GamepadPanel({ sendMessage }) {
