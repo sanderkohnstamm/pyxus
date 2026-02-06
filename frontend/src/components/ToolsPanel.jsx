@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { SlidersHorizontal, Cog, Gamepad2, Compass, Keyboard, Zap, Plus, X, Trash2, ChevronDown, ChevronUp, Radio, Activity, ArrowDownToLine, Gauge, Loader2, Check } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
 import ParamsPanel from './ParamsPanel';
+import MavlinkInspector from './MavlinkInspector';
 
 const COMMAND_OPTIONS = [
   { value: 'arm', label: 'Arm' },
@@ -413,19 +414,23 @@ export default function ToolsPanel({ sendMessage }) {
     { id: 'controls', label: 'Controls', icon: Keyboard },
     { id: 'hardware', label: 'Hardware', icon: Cog },
     { id: 'params', label: 'Params', icon: SlidersHorizontal },
+    { id: 'mavlink', label: 'MAVLink', icon: Radio },
   ];
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex border-b border-gray-800/50 shrink-0 overflow-x-auto">
         {tabs.map((tab) => (
-          <button key={tab.id} onClick={() => setSubTab(tab.id)} className={`flex items-center justify-center gap-1 px-4 py-2 text-[9px] font-semibold uppercase tracking-wider transition-colors whitespace-nowrap ${subTab === tab.id ? 'text-cyan-400 bg-cyan-500/5' : 'text-gray-500 hover:text-gray-300'}`}>
+          <button key={tab.id} onClick={() => setSubTab(tab.id)} className={`flex items-center justify-center gap-1 px-3 py-2 text-[9px] font-semibold uppercase tracking-wider transition-colors whitespace-nowrap ${subTab === tab.id ? 'text-cyan-400 bg-cyan-500/5' : 'text-gray-500 hover:text-gray-300'}`}>
             <tab.icon size={10} />{tab.label}
           </button>
         ))}
       </div>
       <div className="flex-1 overflow-y-auto min-h-0">
-        {subTab === 'controls' ? <ControlsPanel sendMessage={sendMessage} /> : subTab === 'hardware' ? <HardwarePanel /> : <ParamsPanel />}
+        {subTab === 'controls' ? <ControlsPanel sendMessage={sendMessage} /> :
+         subTab === 'hardware' ? <HardwarePanel /> :
+         subTab === 'params' ? <ParamsPanel /> :
+         <MavlinkInspector />}
       </div>
     </div>
   );

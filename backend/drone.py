@@ -172,6 +172,12 @@ class DroneConnection:
         # Parameters
         self._params: dict = {}  # name -> {value, type, index}
         self._params_total: int = 0
+
+        # MAVLink message inspector
+        self._msg_stats: dict = {}  # msg_type -> {count, last_time, rate, last_data, src_system, src_component}
+        self._msg_stats_lock = threading.Lock()
+        self._rate_window = 2.0  # Calculate rate over this window (seconds)
+        self._msg_history: dict = {}  # msg_type -> list of timestamps for rate calculation
         self._params_lock = threading.Lock()
         # Status text messages
         self._statustext_queue: list = []
@@ -589,6 +595,10 @@ class DroneConnection:
 
     def _handle_message(self, msg):
         msg_type = msg.get_type()
+        now = time.time()
+
+        # Track message for inspector
+        self._track_message(msg, msg_type, now)
 
         # Route mission protocol messages to dedicated queue (avoids race with _run_loop)
         if msg_type in ("MISSION_REQUEST_INT", "MISSION_REQUEST", "MISSION_ACK",
@@ -671,38 +681,35 @@ class DroneConnection:
 
         with self._lock:
             if msg_type == "HEARTBEAT":
-                # Only process heartbeats from the target system's autopilot (not GCS, gimbals, etc.)
+                # Only process heartbeats from the exact autopilot we connected to
                 src_system = msg.get_srcSystem()
                 src_component = msg.get_srcComponent()
 
-                # Skip if not from our target system
-                if src_system != self._target_system:
+                # Strict filter: only accept from our target system AND target component
+                if src_system != self._target_system or src_component != self._target_component:
                     return
 
-                # Skip GCS heartbeats
+                # Skip GCS heartbeats (shouldn't happen after component filter, but just in case)
                 if msg.type == mavutil.mavlink.MAV_TYPE_GCS:
                     return
 
-                # Only update telemetry from main autopilot component (typically 1)
-                # or if this is the first/only component we've seen
-                if src_component == self._target_component or src_component == 1:
-                    base_mode = msg.base_mode
-                    self._telemetry.armed = bool(base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED)
-                    self._telemetry.system_status = msg.system_status
-                    self._telemetry.last_heartbeat = time.time()
-                    self._telemetry.platform_type = MAV_TYPES.get(msg.type, f"Type {msg.type}")
+                base_mode = msg.base_mode
+                self._telemetry.armed = bool(base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED)
+                self._telemetry.system_status = msg.system_status
+                self._telemetry.last_heartbeat = time.time()
+                self._telemetry.platform_type = MAV_TYPES.get(msg.type, f"Type {msg.type}")
 
-                    # Decode mode
-                    if self._is_ardupilot:
-                        custom = msg.custom_mode
-                        self._telemetry.mode = ARDUPILOT_MODES.get(custom, f"MODE_{custom}")
-                    else:
-                        # PX4 mode decoding - fixed bit positions
-                        main_mode = (msg.custom_mode >> 16) & 0xFF
-                        sub_mode = (msg.custom_mode >> 24) & 0xFF
-                        self._telemetry.mode = PX4_MODES.get(
-                            (main_mode, sub_mode), f"PX4_{main_mode}_{sub_mode}"
-                        )
+                # Decode mode
+                if self._is_ardupilot:
+                    custom = msg.custom_mode
+                    self._telemetry.mode = ARDUPILOT_MODES.get(custom, f"MODE_{custom}")
+                else:
+                    # PX4 mode decoding - fixed bit positions
+                    main_mode = (msg.custom_mode >> 16) & 0xFF
+                    sub_mode = (msg.custom_mode >> 24) & 0xFF
+                    self._telemetry.mode = PX4_MODES.get(
+                        (main_mode, sub_mode), f"PX4_{main_mode}_{sub_mode}"
+                    )
 
             elif msg_type == "ATTITUDE":
                 self._telemetry.roll = msg.roll
@@ -849,6 +856,86 @@ class DroneConnection:
 
     def set_param(self, param_id: str, value: float, param_type: int = 9):
         self._enqueue_cmd("set_param", param_id=param_id, value=value, param_type=param_type)
+
+    def _track_message(self, msg, msg_type: str, now: float):
+        """Track message for the MAVLink inspector."""
+        src_system = msg.get_srcSystem()
+        src_component = msg.get_srcComponent()
+
+        # Create a key that includes source info for unique tracking
+        key = f"{msg_type}:{src_system}:{src_component}"
+
+        with self._msg_stats_lock:
+            # Initialize if new message type
+            if key not in self._msg_stats:
+                self._msg_stats[key] = {
+                    'msg_type': msg_type,
+                    'src_system': src_system,
+                    'src_component': src_component,
+                    'count': 0,
+                    'last_time': 0,
+                    'rate': 0.0,
+                    'last_data': {},
+                }
+                self._msg_history[key] = []
+
+            stats = self._msg_stats[key]
+            stats['count'] += 1
+            stats['last_time'] = now
+
+            # Add timestamp to history for rate calculation
+            history = self._msg_history[key]
+            history.append(now)
+
+            # Remove old timestamps outside the rate window
+            cutoff = now - self._rate_window
+            while history and history[0] < cutoff:
+                history.pop(0)
+
+            # Calculate rate (messages per second)
+            if len(history) >= 2:
+                time_span = history[-1] - history[0]
+                if time_span > 0:
+                    stats['rate'] = round((len(history) - 1) / time_span, 1)
+            else:
+                stats['rate'] = 0.0
+
+            # Extract message data (convert to dict for JSON serialization)
+            try:
+                msg_dict = msg.to_dict()
+                # Remove mavpackettype as it's redundant
+                msg_dict.pop('mavpackettype', None)
+                # Limit size of data stored
+                stats['last_data'] = {k: v for k, v in list(msg_dict.items())[:20]}
+            except Exception:
+                stats['last_data'] = {}
+
+    def get_message_stats(self) -> list:
+        """Return message statistics for the inspector."""
+        with self._msg_stats_lock:
+            now = time.time()
+            result = []
+            for key, stats in self._msg_stats.items():
+                # Include age since last message
+                age = round(now - stats['last_time'], 1) if stats['last_time'] > 0 else -1
+                result.append({
+                    'msg_type': stats['msg_type'],
+                    'src_system': stats['src_system'],
+                    'src_component': stats['src_component'],
+                    'count': stats['count'],
+                    'rate': stats['rate'],
+                    'age': age,
+                    'last_data': stats['last_data'],
+                })
+            # Sort by message type
+            result.sort(key=lambda x: x['msg_type'])
+            return result
+
+    def clear_message_stats(self):
+        """Clear all message statistics."""
+        with self._msg_stats_lock:
+            self._msg_stats.clear()
+            self._msg_history.clear()
 
     def drain_statustext(self) -> list:
         """Return and clear pending STATUSTEXT messages."""

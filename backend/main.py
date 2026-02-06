@@ -503,6 +503,29 @@ async def api_params_set(req: ParamSetRequest):
     return {"status": "ok", "command": "param_set", "param_id": req.param_id, "value": req.value}
 
 
+# --- MAVLink Inspector ---
+
+@app.get("/api/mavlink/stats")
+async def api_mavlink_stats():
+    if not drone.connected:
+        return {"status": "error", "error": "Not connected"}
+    stats = drone.get_message_stats()
+    return {
+        "status": "ok",
+        "messages": stats,
+        "target_system": drone.target_system,
+        "target_component": drone.target_component,
+    }
+
+
+@app.post("/api/mavlink/stats/clear")
+async def api_mavlink_stats_clear():
+    if not drone.connected:
+        return {"status": "error", "error": "Not connected"}
+    drone.clear_message_stats()
+    return {"status": "ok"}
+
+
 # --- Settings ---
 
 @app.get("/api/settings")
