@@ -1,10 +1,23 @@
 import threading
 import time
 import queue
+import math
 from dataclasses import dataclass, field
 from typing import Optional
 
 from pymavlink import mavutil
+
+
+def sanitize_for_json(value):
+    """Convert NaN/Inf floats to None for JSON compatibility."""
+    if isinstance(value, float):
+        if math.isnan(value) or math.isinf(value):
+            return None
+    elif isinstance(value, dict):
+        return {k: sanitize_for_json(v) for k, v in value.items()}
+    elif isinstance(value, (list, tuple)):
+        return [sanitize_for_json(v) for v in value]
+    return value
 
 
 MAV_TYPES = {
@@ -999,8 +1012,8 @@ class DroneConnection:
                 msg_dict = msg.to_dict()
                 # Remove mavpackettype as it's redundant
                 msg_dict.pop('mavpackettype', None)
-                # Limit size of data stored
-                stats['last_data'] = {k: v for k, v in list(msg_dict.items())[:20]}
+                # Limit size of data stored and sanitize NaN/Inf values
+                stats['last_data'] = sanitize_for_json({k: v for k, v in list(msg_dict.items())[:20]})
             except Exception:
                 stats['last_data'] = {}
 
