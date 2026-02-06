@@ -313,6 +313,10 @@ function MissionSubPanel() {
 
   const isConnected = connectionStatus === 'connected';
 
+  // Get active mission name (needed by callbacks below)
+  const activeMission = savedMissions.find(m => m.id === activeMissionId);
+  const activeMissionName = activeMission?.name || 'Unsaved Mission';
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -517,10 +521,6 @@ function MissionSubPanel() {
 
     input.click();
   }, [setPlannedWaypoints, setDefaultAlt, setDefaultSpeed, addAlert]);
-
-  // Get active mission name
-  const activeMission = savedMissions.find(m => m.id === activeMissionId);
-  const activeMissionName = activeMission?.name || 'Unsaved Mission';
 
   const handleSaveMission = useCallback(() => {
     if (!activeMissionId && plannedWaypoints.length === 0) {
