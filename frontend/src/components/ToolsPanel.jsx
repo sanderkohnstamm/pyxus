@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { SlidersHorizontal, Cog, Gamepad2, Compass, Keyboard, Zap, Plus, X, Trash2 } from 'lucide-react';
+import { SlidersHorizontal, Cog, Gamepad2, Compass, Keyboard, Zap, Plus, X, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
 import ParamsPanel from './ParamsPanel';
 import GamepadPanel from './GamepadPanel';
@@ -22,282 +22,101 @@ const COMMAND_OPTIONS = [
   { value: 'mode:LAND', label: 'Mode: Land' },
 ];
 
-function HotkeysPanel() {
+// Merged Controls Panel with Hotkeys and Servo Groups
+function ControlsPanel({ sendMessage }) {
+  const connectionStatus = useDroneStore((s) => s.connectionStatus);
+  const addAlert = useDroneStore((s) => s.addAlert);
+  const isConnected = connectionStatus === 'connected';
+
+  // Hotkeys state
   const commandHotkeys = useDroneStore((s) => s.commandHotkeys);
   const setCommandHotkey = useDroneStore((s) => s.setCommandHotkey);
   const removeCommandHotkey = useDroneStore((s) => s.removeCommandHotkey);
   const clearCommandHotkeys = useDroneStore((s) => s.clearCommandHotkeys);
-  const addAlert = useDroneStore((s) => s.addAlert);
-  const connectionStatus = useDroneStore((s) => s.connectionStatus);
-  const isConnected = connectionStatus === 'connected';
 
-  const [recording, setRecording] = useState(false);
+  // Servo groups state
+  const servoGroups = useDroneStore((s) => s.servoGroups);
+  const addServoGroup = useDroneStore((s) => s.addServoGroup);
+  const removeServoGroup = useDroneStore((s) => s.removeServoGroup);
+
+  // Hotkey recording
+  const [recording, setRecording] = useState(null); // null | 'command' | 'servoOpen' | 'servoClose'
   const [selectedCommand, setSelectedCommand] = useState('arm');
   const [recordedKey, setRecordedKey] = useState('');
 
-  // Global hotkey listener
+  // Servo group form
+  const [servoName, setServoName] = useState('');
+  const [servoList, setServoList] = useState([{ servo: 9, openPwm: 2000, closePwm: 1000 }]);
+  const [openHotkey, setOpenHotkey] = useState('');
+  const [closeHotkey, setCloseHotkey] = useState('');
+
+  // Collapsible sections
+  const [hotkeysExpanded, setHotkeysExpanded] = useState(true);
+  const [servosExpanded, setServosExpanded] = useState(true);
+
+  // Key recording effect
   useEffect(() => {
-    if (!isConnected) return;
+    if (!recording) return;
 
     const handleKeyDown = (e) => {
-      // Don't trigger if typing in input
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
-
+      e.preventDefault();
       const key = e.key.toLowerCase();
 
-      // If recording, capture the key
-      if (recording) {
-        e.preventDefault();
+      if (recording === 'command') {
         setRecordedKey(key);
-        setRecording(false);
-        return;
+      } else if (recording === 'servoOpen') {
+        setOpenHotkey(key);
+      } else if (recording === 'servoClose') {
+        setCloseHotkey(key);
       }
-
-      // Check if key has a command mapped
-      const command = commandHotkeys[key];
-      if (command) {
-        e.preventDefault();
-        executeCommand(command);
-      }
+      setRecording(null);
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isConnected, recording, commandHotkeys]); // eslint-disable-line
-
-  const executeCommand = async (command) => {
-    if (!isConnected) return;
-
-    try {
-      if (command.startsWith('mode:')) {
-        const mode = command.slice(5);
-        await fetch('/api/mode', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode }),
-        });
-        addAlert(`Mode: ${mode}`, 'info');
-      } else {
-        const endpoints = {
-          arm: 'arm',
-          disarm: 'disarm',
-          takeoff: 'takeoff',
-          land: 'land',
-          rtl: 'rtl',
-          mission_start: 'mission/start',
-          mission_pause: 'mission/pause',
-        };
-        const ep = endpoints[command];
-        if (ep) {
-          await fetch(`/api/${ep}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(command === 'takeoff' ? { alt: 10 } : {}),
-          });
-          addAlert(`Command: ${command}`, 'info');
-        }
-      }
-    } catch (err) {
-      addAlert(`Command failed: ${err.message}`, 'error');
-    }
-  };
+  }, [recording]);
 
   const handleAddHotkey = () => {
     if (recordedKey && selectedCommand) {
       setCommandHotkey(recordedKey, selectedCommand);
-      addAlert(`Hotkey '${recordedKey.toUpperCase()}' assigned to ${selectedCommand}`, 'info');
+      addAlert(`Hotkey '${recordedKey.toUpperCase()}' → ${selectedCommand}`, 'info');
       setRecordedKey('');
     }
   };
 
-  const inputCls = 'w-full bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-cyan-500/50 transition-colors';
+  const addServoToList = () => {
+    setServoList([...servoList, { servo: 9, openPwm: 2000, closePwm: 1000 }]);
+  };
 
-  return (
-    <div className="p-4 space-y-3">
-      <div className="text-[10px] text-gray-600 mb-2">
-        Assign keyboard hotkeys to flight commands. Press the key when not typing to trigger.
-      </div>
+  const updateServoInList = (index, field, value) => {
+    const updated = [...servoList];
+    updated[index] = { ...updated[index], [field]: parseInt(value) || 0 };
+    setServoList(updated);
+  };
 
-      {/* Add new hotkey */}
-      <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-800/50">
-        <div className="flex items-center gap-1.5 mb-2.5">
-          <Plus size={11} className="text-gray-600" />
-          <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Add Hotkey</span>
-        </div>
+  const removeServoFromList = (index) => {
+    if (servoList.length > 1) {
+      setServoList(servoList.filter((_, i) => i !== index));
+    }
+  };
 
-        <div className="space-y-2">
-          <div>
-            <label className="text-[10px] text-gray-500 block mb-1">Command</label>
-            <select
-              value={selectedCommand}
-              onChange={(e) => setSelectedCommand(e.target.value)}
-              className={inputCls}
-            >
-              {COMMAND_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="text-[10px] text-gray-500 block mb-1">Key</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={recordedKey ? recordedKey.toUpperCase() : ''}
-                readOnly
-                placeholder={recording ? 'Press a key...' : 'Click Record'}
-                className={`${inputCls} ${recording ? 'border-cyan-500/50 bg-cyan-500/10' : ''}`}
-              />
-              <button
-                onClick={() => setRecording(!recording)}
-                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all border ${
-                  recording
-                    ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
-                    : 'bg-gray-800/60 text-gray-400 border-gray-700/50 hover:text-gray-200'
-                }`}
-              >
-                {recording ? 'Recording...' : 'Record'}
-              </button>
-            </div>
-          </div>
-
-          <button
-            onClick={handleAddHotkey}
-            disabled={!recordedKey}
-            className="w-full py-2 rounded-md text-xs font-semibold transition-all border bg-cyan-500/10 hover:bg-cyan-500/20 border-cyan-500/20 hover:border-cyan-500/40 text-cyan-300 disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            Add Hotkey
-          </button>
-        </div>
-      </div>
-
-      {/* Current hotkeys */}
-      <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-800/50">
-        <div className="flex items-center justify-between mb-2.5">
-          <div className="flex items-center gap-1.5">
-            <Keyboard size={11} className="text-gray-600" />
-            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Active Hotkeys</span>
-          </div>
-          {Object.keys(commandHotkeys).length > 0 && (
-            <button
-              onClick={() => {
-                clearCommandHotkeys();
-                addAlert('All hotkeys cleared', 'info');
-              }}
-              className="text-[9px] text-red-400 hover:text-red-300"
-            >
-              Clear All
-            </button>
-          )}
-        </div>
-
-        {Object.keys(commandHotkeys).length === 0 ? (
-          <div className="text-[10px] text-gray-600 italic text-center py-2">
-            No hotkeys configured
-          </div>
-        ) : (
-          <div className="space-y-1">
-            {Object.entries(commandHotkeys).map(([key, command]) => (
-              <div key={key} className="flex items-center justify-between px-2 py-1.5 bg-gray-900/40 rounded-md">
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-300 text-[10px] font-mono font-bold rounded border border-cyan-500/30">
-                    {key.toUpperCase()}
-                  </span>
-                  <span className="text-[10px] text-gray-400">
-                    {COMMAND_OPTIONS.find(c => c.value === command)?.label || command}
-                  </span>
-                </div>
-                <button
-                  onClick={() => removeCommandHotkey(key)}
-                  className="p-1 text-gray-600 hover:text-red-400 transition-colors"
-                >
-                  <X size={10} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ServoGroupsPanel() {
-  const servoGroups = useDroneStore((s) => s.servoGroups);
-  const addServoGroup = useDroneStore((s) => s.addServoGroup);
-  const removeServoGroup = useDroneStore((s) => s.removeServoGroup);
-  const addAlert = useDroneStore((s) => s.addAlert);
-  const connectionStatus = useDroneStore((s) => s.connectionStatus);
-  const isConnected = connectionStatus === 'connected';
-
-  const [name, setName] = useState('');
-  const [servo, setServo] = useState(9);
-  const [openPwm, setOpenPwm] = useState(2000);
-  const [closePwm, setClosePwm] = useState(1000);
-  const [hotkey, setHotkey] = useState('');
-  const [recordingHotkey, setRecordingHotkey] = useState(false);
-
-  // Record hotkey
-  useEffect(() => {
-    if (!recordingHotkey) return;
-
-    const handleKeyDown = (e) => {
-      e.preventDefault();
-      setHotkey(e.key.toLowerCase());
-      setRecordingHotkey(false);
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [recordingHotkey]);
-
-  // Listen for servo group hotkeys
-  useEffect(() => {
-    if (!isConnected) return;
-
-    const handleKeyDown = async (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
-
-      const key = e.key.toLowerCase();
-      const group = servoGroups.find(g => g.hotkey === key);
-      if (group) {
-        e.preventDefault();
-        // Toggle between open and close
-        const isOpen = group.state === 'open';
-        const pwm = isOpen ? group.closePwm : group.openPwm;
-        try {
-          await fetch('/api/servo/test', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ servo: group.servo, pwm }),
-          });
-          // Update state (this won't persist, but UI will show toggle)
-          addAlert(`${group.name}: ${isOpen ? 'Closed' : 'Opened'}`, 'info');
-        } catch {}
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isConnected, servoGroups, addAlert]);
-
-  const handleAdd = () => {
-    if (!name.trim()) {
+  const handleAddServoGroup = () => {
+    if (!servoName.trim()) {
       addAlert('Enter a name for the servo group', 'warning');
       return;
     }
     addServoGroup({
-      name: name.trim(),
-      servo,
-      openPwm,
-      closePwm,
-      hotkey: hotkey || null,
+      name: servoName.trim(),
+      servos: servoList,
+      openHotkey: openHotkey || null,
+      closeHotkey: closeHotkey || null,
       state: 'closed',
     });
-    addAlert(`Servo group "${name}" added`, 'success');
-    setName('');
-    setHotkey('');
+    addAlert(`Servo group "${servoName}" added`, 'success');
+    setServoName('');
+    setServoList([{ servo: 9, openPwm: 2000, closePwm: 1000 }]);
+    setOpenHotkey('');
+    setCloseHotkey('');
   };
 
   const inputCls = 'w-full bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-cyan-500/50 transition-colors';
@@ -305,119 +124,210 @@ function ServoGroupsPanel() {
   return (
     <div className="p-4 space-y-3">
       <div className="text-[10px] text-gray-600 mb-2">
-        Create servo groups for quick actuation (e.g., gripper, payload release). Groups appear as buttons on the map.
+        Configure keyboard hotkeys for commands and servo groups. Hotkeys work globally when connected.
       </div>
 
-      {/* Add new group */}
-      <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-800/50">
-        <div className="flex items-center gap-1.5 mb-2.5">
-          <Plus size={11} className="text-gray-600" />
-          <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Add Servo Group</span>
-        </div>
-
-        <div className="space-y-2">
-          <div>
-            <label className="text-[10px] text-gray-500 block mb-1">Name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., Gripper, Drop"
-              className={inputCls}
-            />
+      {/* Command Hotkeys Section */}
+      <div className="bg-gray-800/40 rounded-lg border border-gray-800/50 overflow-hidden">
+        <button
+          onClick={() => setHotkeysExpanded(!hotkeysExpanded)}
+          className="w-full flex items-center justify-between p-3 hover:bg-gray-800/20 transition-colors"
+        >
+          <div className="flex items-center gap-1.5">
+            <Keyboard size={11} className="text-cyan-500" />
+            <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Command Hotkeys</span>
+            <span className="text-[9px] text-gray-600">({Object.keys(commandHotkeys).length})</span>
           </div>
+          {hotkeysExpanded ? <ChevronUp size={12} className="text-gray-500" /> : <ChevronDown size={12} className="text-gray-500" />}
+        </button>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-[10px] text-gray-500 block mb-1">Servo</label>
-              <select value={servo} onChange={(e) => setServo(parseInt(e.target.value))} className={inputCls}>
-                {[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].map((n) => (
-                  <option key={n} value={n}>Servo {n}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-500 block mb-1">Hotkey (optional)</label>
-              <div className="flex gap-1">
+        {hotkeysExpanded && (
+          <div className="p-3 pt-0 space-y-2">
+            {/* Add new hotkey */}
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <label className="text-[9px] text-gray-500 block mb-1">Command</label>
+                <select value={selectedCommand} onChange={(e) => setSelectedCommand(e.target.value)} className={inputCls}>
+                  {COMMAND_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="w-16">
+                <label className="text-[9px] text-gray-500 block mb-1">Key</label>
                 <input
                   type="text"
-                  value={hotkey ? hotkey.toUpperCase() : ''}
+                  value={recordedKey ? recordedKey.toUpperCase() : ''}
                   readOnly
-                  placeholder={recordingHotkey ? 'Press...' : ''}
-                  className={`${inputCls} ${recordingHotkey ? 'border-cyan-500/50' : ''}`}
+                  placeholder={recording === 'command' ? '...' : ''}
+                  onClick={() => setRecording('command')}
+                  className={`${inputCls} cursor-pointer text-center ${recording === 'command' ? 'border-cyan-500/50 bg-cyan-500/10' : ''}`}
                 />
-                <button
-                  onClick={() => setRecordingHotkey(!recordingHotkey)}
-                  className="px-2 text-[9px] bg-gray-800/60 text-gray-400 border border-gray-700/50 rounded hover:text-gray-200"
-                >
-                  {recordingHotkey ? '...' : 'Set'}
-                </button>
               </div>
+              <button
+                onClick={handleAddHotkey}
+                disabled={!recordedKey}
+                className="px-3 py-1.5 rounded-md text-xs font-semibold bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 text-cyan-300 disabled:opacity-30"
+              >
+                Add
+              </button>
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-[10px] text-gray-500 block mb-1">Open PWM</label>
-              <input
-                type="number"
-                value={openPwm}
-                onChange={(e) => setOpenPwm(parseInt(e.target.value) || 2000)}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-500 block mb-1">Close PWM</label>
-              <input
-                type="number"
-                value={closePwm}
-                onChange={(e) => setClosePwm(parseInt(e.target.value) || 1000)}
-                className={inputCls}
-              />
-            </div>
+            {/* Active hotkeys */}
+            {Object.keys(commandHotkeys).length > 0 && (
+              <div className="space-y-1 pt-1">
+                {Object.entries(commandHotkeys).map(([key, command]) => (
+                  <div key={key} className="flex items-center justify-between px-2 py-1 bg-gray-900/40 rounded">
+                    <div className="flex items-center gap-2">
+                      <span className="px-1.5 py-0.5 bg-cyan-500/20 text-cyan-300 text-[9px] font-mono font-bold rounded">
+                        {key.toUpperCase()}
+                      </span>
+                      <span className="text-[9px] text-gray-400">
+                        {COMMAND_OPTIONS.find(c => c.value === command)?.label || command}
+                      </span>
+                    </div>
+                    <button onClick={() => removeCommandHotkey(key)} className="p-0.5 text-gray-600 hover:text-red-400">
+                      <X size={10} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-
-          <button
-            onClick={handleAdd}
-            className="w-full py-2 rounded-md text-xs font-semibold transition-all border bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/20 hover:border-emerald-500/40 text-emerald-300"
-          >
-            Add Group
-          </button>
-        </div>
+        )}
       </div>
 
-      {/* Existing groups */}
-      <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-800/50">
-        <div className="flex items-center gap-1.5 mb-2.5">
-          <Zap size={11} className="text-gray-600" />
-          <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Servo Groups</span>
-        </div>
-
-        {servoGroups.length === 0 ? (
-          <div className="text-[10px] text-gray-600 italic text-center py-2">
-            No servo groups configured
+      {/* Servo Groups Section */}
+      <div className="bg-gray-800/40 rounded-lg border border-gray-800/50 overflow-hidden">
+        <button
+          onClick={() => setServosExpanded(!servosExpanded)}
+          className="w-full flex items-center justify-between p-3 hover:bg-gray-800/20 transition-colors"
+        >
+          <div className="flex items-center gap-1.5">
+            <Zap size={11} className="text-amber-500" />
+            <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Servo Groups</span>
+            <span className="text-[9px] text-gray-600">({servoGroups.length})</span>
           </div>
-        ) : (
-          <div className="space-y-1.5">
-            {servoGroups.map((group) => (
-              <div key={group.id} className="flex items-center justify-between px-2 py-1.5 bg-gray-900/40 rounded-md">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-semibold text-gray-300">{group.name}</span>
-                  <span className="text-[9px] text-gray-500">S{group.servo}</span>
-                  {group.hotkey && (
-                    <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 text-[9px] font-mono rounded border border-amber-500/30">
-                      {group.hotkey.toUpperCase()}
-                    </span>
-                  )}
-                </div>
-                <button
-                  onClick={() => removeServoGroup(group.id)}
-                  className="p-1 text-gray-600 hover:text-red-400 transition-colors"
-                >
-                  <Trash2 size={10} />
-                </button>
+          {servosExpanded ? <ChevronUp size={12} className="text-gray-500" /> : <ChevronDown size={12} className="text-gray-500" />}
+        </button>
+
+        {servosExpanded && (
+          <div className="p-3 pt-0 space-y-3">
+            {/* Add new group */}
+            <div className="space-y-2 p-2 bg-gray-900/30 rounded-md border border-gray-800/30">
+              <div>
+                <label className="text-[9px] text-gray-500 block mb-1">Group Name</label>
+                <input
+                  type="text"
+                  value={servoName}
+                  onChange={(e) => setServoName(e.target.value)}
+                  placeholder="e.g., Gripper, Payload"
+                  className={inputCls}
+                />
               </div>
-            ))}
+
+              {/* Servos list */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[9px] text-gray-500">Servos</label>
+                  <button onClick={addServoToList} className="text-[9px] text-cyan-400 hover:text-cyan-300">+ Add Servo</button>
+                </div>
+                {servoList.map((s, i) => (
+                  <div key={i} className="flex gap-1.5 items-center">
+                    <select
+                      value={s.servo}
+                      onChange={(e) => updateServoInList(i, 'servo', e.target.value)}
+                      className="w-16 bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded px-1.5 py-1 text-[10px]"
+                    >
+                      {[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].map((n) => (
+                        <option key={n} value={n}>S{n}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      value={s.openPwm}
+                      onChange={(e) => updateServoInList(i, 'openPwm', e.target.value)}
+                      className="w-16 bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded px-1.5 py-1 text-[10px]"
+                      placeholder="Open"
+                    />
+                    <input
+                      type="number"
+                      value={s.closePwm}
+                      onChange={(e) => updateServoInList(i, 'closePwm', e.target.value)}
+                      className="w-16 bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded px-1.5 py-1 text-[10px]"
+                      placeholder="Close"
+                    />
+                    {servoList.length > 1 && (
+                      <button onClick={() => removeServoFromList(i)} className="p-1 text-gray-600 hover:text-red-400">
+                        <X size={10} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Hotkeys */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[9px] text-gray-500 block mb-1">Open Hotkey</label>
+                  <input
+                    type="text"
+                    value={openHotkey ? openHotkey.toUpperCase() : ''}
+                    readOnly
+                    placeholder={recording === 'servoOpen' ? '...' : 'Click'}
+                    onClick={() => setRecording('servoOpen')}
+                    className={`${inputCls} cursor-pointer text-center ${recording === 'servoOpen' ? 'border-emerald-500/50 bg-emerald-500/10' : ''}`}
+                  />
+                </div>
+                <div>
+                  <label className="text-[9px] text-gray-500 block mb-1">Close Hotkey</label>
+                  <input
+                    type="text"
+                    value={closeHotkey ? closeHotkey.toUpperCase() : ''}
+                    readOnly
+                    placeholder={recording === 'servoClose' ? '...' : 'Click'}
+                    onClick={() => setRecording('servoClose')}
+                    className={`${inputCls} cursor-pointer text-center ${recording === 'servoClose' ? 'border-red-500/50 bg-red-500/10' : ''}`}
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={handleAddServoGroup}
+                className="w-full py-1.5 rounded-md text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-300"
+              >
+                Add Servo Group
+              </button>
+            </div>
+
+            {/* Existing groups */}
+            {servoGroups.length > 0 && (
+              <div className="space-y-1.5">
+                {servoGroups.map((group) => (
+                  <div key={group.id} className="flex items-center justify-between px-2 py-1.5 bg-gray-900/40 rounded">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] font-semibold text-gray-300">{group.name}</span>
+                      <span className="text-[9px] text-gray-500">
+                        {group.servos ? group.servos.map(s => `S${s.servo}`).join(', ') : `S${group.servo}`}
+                      </span>
+                      {group.openHotkey && (
+                        <span className="px-1 py-0.5 bg-emerald-500/20 text-emerald-300 text-[8px] font-mono rounded">
+                          {group.openHotkey.toUpperCase()}=Open
+                        </span>
+                      )}
+                      {group.closeHotkey && (
+                        <span className="px-1 py-0.5 bg-red-500/20 text-red-300 text-[8px] font-mono rounded">
+                          {group.closeHotkey.toUpperCase()}=Close
+                        </span>
+                      )}
+                    </div>
+                    <button onClick={() => removeServoGroup(group.id)} className="p-1 text-gray-600 hover:text-red-400">
+                      <Trash2 size={10} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -430,14 +340,12 @@ function MotorServoPanel() {
   const addAlert = useDroneStore((s) => s.addAlert);
   const isConnected = connectionStatus === 'connected';
 
-  // Motor test state
   const [motor, setMotor] = useState(1);
   const [throttle, setThrottle] = useState(5);
   const [duration, setDuration] = useState(2);
   const [allMotors, setAllMotors] = useState(false);
   const [motorRunning, setMotorRunning] = useState(false);
 
-  // Servo test state
   const [servo, setServo] = useState(1);
   const [pwm, setPwm] = useState(1500);
 
@@ -447,23 +355,13 @@ function MotorServoPanel() {
       const res = await fetch('/api/motor/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          motor: allMotors ? 1 : motor,
-          throttle,
-          duration,
-          all_motors: allMotors,
-        }),
+        body: JSON.stringify({ motor: allMotors ? 1 : motor, throttle, duration, all_motors: allMotors }),
       });
       const data = await res.json();
       if (data.status === 'error') {
         addAlert(data.error || 'Motor test failed', 'error');
       } else {
-        addAlert(
-          allMotors
-            ? `All motors: ${throttle}% for ${duration}s`
-            : `Motor ${motor}: ${throttle}% for ${duration}s`,
-          'info'
-        );
+        addAlert(allMotors ? `All motors: ${throttle}% for ${duration}s` : `Motor ${motor}: ${throttle}% for ${duration}s`, 'info');
       }
       setTimeout(() => setMotorRunning(false), duration * 1000);
     } catch (err) {
@@ -512,29 +410,21 @@ function MotorServoPanel() {
         </div>
 
         <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <label className="flex items-center gap-1.5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={allMotors}
-                onChange={(e) => setAllMotors(e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-gray-600 bg-gray-800 text-cyan-500 focus:ring-0 focus:ring-offset-0"
-              />
-              <span className="text-[11px] text-gray-400">All motors</span>
-            </label>
-          </div>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={allMotors}
+              onChange={(e) => setAllMotors(e.target.checked)}
+              className="w-3.5 h-3.5 rounded border-gray-600 bg-gray-800 text-cyan-500 focus:ring-0"
+            />
+            <span className="text-[11px] text-gray-400">All motors</span>
+          </label>
 
           {!allMotors && (
             <div>
               <label className="text-[10px] text-gray-500 block mb-1">Motor Number</label>
-              <select
-                value={motor}
-                onChange={(e) => setMotor(parseInt(e.target.value))}
-                className={inputCls}
-              >
-                {[1,2,3,4,5,6,7,8].map((n) => (
-                  <option key={n} value={n}>Motor {n}</option>
-                ))}
+              <select value={motor} onChange={(e) => setMotor(parseInt(e.target.value))} className={inputCls}>
+                {[1,2,3,4,5,6,7,8].map((n) => (<option key={n} value={n}>Motor {n}</option>))}
               </select>
             </div>
           )}
@@ -545,10 +435,7 @@ function MotorServoPanel() {
               <span className="text-[10px] font-mono text-cyan-300">{throttle}%</span>
             </div>
             <input
-              type="range"
-              min={1}
-              max={100}
-              value={throttle}
+              type="range" min={1} max={100} value={throttle}
               onChange={(e) => setThrottle(parseInt(e.target.value))}
               className="w-full h-1.5 bg-gray-700 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:rounded-full"
             />
@@ -556,24 +443,14 @@ function MotorServoPanel() {
 
           <div>
             <label className="text-[10px] text-gray-500 block mb-1">Duration (seconds)</label>
-            <input
-              type="number"
-              min={0.5}
-              max={30}
-              step={0.5}
-              value={duration}
-              onChange={(e) => setDuration(parseFloat(e.target.value) || 2)}
-              className={inputCls}
-            />
+            <input type="number" min={0.5} max={30} step={0.5} value={duration} onChange={(e) => setDuration(parseFloat(e.target.value) || 2)} className={inputCls} />
           </div>
 
           <button
             onClick={testMotor}
             disabled={motorRunning}
             className={`w-full py-2 rounded-md text-xs font-semibold transition-all border ${
-              motorRunning
-                ? 'bg-amber-500/20 text-amber-300 border-amber-500/30 cursor-not-allowed'
-                : 'bg-red-500/10 hover:bg-red-500/20 border-red-500/20 hover:border-red-500/40 text-red-300'
+              motorRunning ? 'bg-amber-500/20 text-amber-300 border-amber-500/30 cursor-not-allowed' : 'bg-red-500/10 hover:bg-red-500/20 border-red-500/20 hover:border-red-500/40 text-red-300'
             }`}
           >
             {motorRunning ? 'Running...' : 'Test Motor'}
@@ -591,14 +468,8 @@ function MotorServoPanel() {
         <div className="space-y-2">
           <div>
             <label className="text-[10px] text-gray-500 block mb-1">Servo Output</label>
-            <select
-              value={servo}
-              onChange={(e) => setServo(parseInt(e.target.value))}
-              className={inputCls}
-            >
-              {[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].map((n) => (
-                <option key={n} value={n}>Servo {n}</option>
-              ))}
+            <select value={servo} onChange={(e) => setServo(parseInt(e.target.value))} className={inputCls}>
+              {[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].map((n) => (<option key={n} value={n}>Servo {n}</option>))}
             </select>
           </div>
 
@@ -608,45 +479,20 @@ function MotorServoPanel() {
               <span className="text-[10px] font-mono text-cyan-300">{pwm}</span>
             </div>
             <input
-              type="range"
-              min={800}
-              max={2200}
-              value={pwm}
+              type="range" min={800} max={2200} value={pwm}
               onChange={(e) => setPwm(parseInt(e.target.value))}
               className="w-full h-1.5 bg-gray-700 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:rounded-full"
             />
-            <div className="flex justify-between text-[9px] text-gray-600 mt-0.5">
-              <span>800</span>
-              <span>1500</span>
-              <span>2200</span>
-            </div>
+            <div className="flex justify-between text-[9px] text-gray-600 mt-0.5"><span>800</span><span>1500</span><span>2200</span></div>
           </div>
 
           <div className="grid grid-cols-3 gap-1.5">
-            <button
-              onClick={() => { setPwm(1000); }}
-              className="py-1 rounded text-[10px] font-semibold bg-gray-800/60 text-gray-400 hover:text-gray-200 border border-gray-700/50 hover:border-gray-600/50 transition-all"
-            >
-              Min
-            </button>
-            <button
-              onClick={() => { setPwm(1500); }}
-              className="py-1 rounded text-[10px] font-semibold bg-gray-800/60 text-gray-400 hover:text-gray-200 border border-gray-700/50 hover:border-gray-600/50 transition-all"
-            >
-              Center
-            </button>
-            <button
-              onClick={() => { setPwm(2000); }}
-              className="py-1 rounded text-[10px] font-semibold bg-gray-800/60 text-gray-400 hover:text-gray-200 border border-gray-700/50 hover:border-gray-600/50 transition-all"
-            >
-              Max
-            </button>
+            {[{ v: 1000, l: 'Min' }, { v: 1500, l: 'Center' }, { v: 2000, l: 'Max' }].map((p) => (
+              <button key={p.v} onClick={() => setPwm(p.v)} className="py-1 rounded text-[10px] font-semibold bg-gray-800/60 text-gray-400 hover:text-gray-200 border border-gray-700/50">{p.l}</button>
+            ))}
           </div>
 
-          <button
-            onClick={testServo}
-            className="w-full py-2 rounded-md text-xs font-semibold transition-all border bg-sky-500/10 hover:bg-sky-500/20 border-sky-500/20 hover:border-sky-500/40 text-sky-300"
-          >
+          <button onClick={testServo} className="w-full py-2 rounded-md text-xs font-semibold transition-all border bg-sky-500/10 hover:bg-sky-500/20 border-sky-500/20 hover:border-sky-500/40 text-sky-300">
             Set Servo
           </button>
         </div>
@@ -656,29 +502,25 @@ function MotorServoPanel() {
 }
 
 export default function ToolsPanel({ sendMessage }) {
-  const [subTab, setSubTab] = useState('motors');
+  const [subTab, setSubTab] = useState('controls');
 
   const tabs = [
+    { id: 'controls', label: 'Controls', icon: Keyboard },
     { id: 'motors', label: 'Motors', icon: Cog },
-    { id: 'gamepad', label: 'Control', icon: Gamepad2 },
-    { id: 'hotkeys', label: 'Hotkeys', icon: Keyboard },
-    { id: 'servos', label: 'Servos', icon: Zap },
-    { id: 'calibration', label: 'Cal', icon: Compass },
+    { id: 'gamepad', label: 'Gamepad', icon: Gamepad2 },
+    { id: 'calibration', label: 'Calibrate', icon: Compass },
     { id: 'params', label: 'Params', icon: SlidersHorizontal },
   ];
 
   return (
     <div className="flex flex-col h-full">
-      {/* Subtab toggle */}
       <div className="flex border-b border-gray-800/50 shrink-0 overflow-x-auto">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setSubTab(tab.id)}
-            className={`flex items-center justify-center gap-1 px-2 py-2 text-[9px] font-semibold uppercase tracking-wider transition-colors whitespace-nowrap ${
-              subTab === tab.id
-                ? 'text-cyan-400 bg-cyan-500/5'
-                : 'text-gray-500 hover:text-gray-300'
+            className={`flex items-center justify-center gap-1 px-3 py-2 text-[9px] font-semibold uppercase tracking-wider transition-colors whitespace-nowrap ${
+              subTab === tab.id ? 'text-cyan-400 bg-cyan-500/5' : 'text-gray-500 hover:text-gray-300'
             }`}
           >
             <tab.icon size={10} />
@@ -688,14 +530,12 @@ export default function ToolsPanel({ sendMessage }) {
       </div>
 
       <div className="flex-1 overflow-y-auto min-h-0">
-        {subTab === 'motors' ? (
+        {subTab === 'controls' ? (
+          <ControlsPanel sendMessage={sendMessage} />
+        ) : subTab === 'motors' ? (
           <MotorServoPanel />
         ) : subTab === 'gamepad' ? (
           <GamepadPanel sendMessage={sendMessage} />
-        ) : subTab === 'hotkeys' ? (
-          <HotkeysPanel />
-        ) : subTab === 'servos' ? (
-          <ServoGroupsPanel />
         ) : subTab === 'calibration' ? (
           <CalibrationPanel />
         ) : (

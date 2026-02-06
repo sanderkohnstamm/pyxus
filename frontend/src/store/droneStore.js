@@ -125,7 +125,11 @@ const useDroneStore = create((set, get) => ({
   commandHotkeys: JSON.parse(localStorage.getItem('pyxus-command-hotkeys') || '{}'),
 
   // Servo groups (for quick actuation buttons)
+  // Each group: { id, name, servos: [{servo, openPwm, closePwm}], openHotkey, closeHotkey, state }
   servoGroups: JSON.parse(localStorage.getItem('pyxus-servo-groups') || '[]'),
+
+  // Home position
+  homePosition: null, // {lat, lon, alt}
 
   // WebSocket
   wsConnected: false,
@@ -477,6 +481,15 @@ const useDroneStore = create((set, get) => ({
     localStorage.setItem('pyxus-servo-groups', JSON.stringify(updated));
     set({ servoGroups: updated });
   },
+  setServoGroupState: (id, state) => {
+    const { servoGroups } = get();
+    const updated = servoGroups.map(g => g.id === id ? { ...g, state } : g);
+    localStorage.setItem('pyxus-servo-groups', JSON.stringify(updated));
+    set({ servoGroups: updated });
+  },
+
+  // Home position
+  setHomePosition: (pos) => set({ homePosition: pos }),
 
   // Alerts
   addAlert: (message, type = 'info') => {

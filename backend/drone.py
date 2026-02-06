@@ -443,6 +443,20 @@ class DroneConnection:
                     0, 0, 0,  # afx, afy, afz
                     0, 0,     # yaw, yaw_rate
                 )
+            elif cmd_type == "set_home":
+                # MAV_CMD_DO_SET_HOME: param1=1 uses specified location, 0=use current
+                use_current = kwargs.get("use_current", 0)
+                lat = kwargs.get("lat", 0)
+                lon = kwargs.get("lon", 0)
+                alt = kwargs.get("alt", 0)
+                self._mav.mav.command_long_send(
+                    self._target_system, self._target_component,
+                    mavutil.mavlink.MAV_CMD_DO_SET_HOME,
+                    0,
+                    1 if not use_current else 0,  # param1: 1=use specified, 0=current
+                    0, 0, 0,  # params 2-4 unused
+                    lat, lon, alt  # lat, lon, alt
+                )
             elif cmd_type == "set_roi":
                 self._mav.mav.command_long_send(
                     self._target_system, self._target_component,
@@ -687,6 +701,10 @@ class DroneConnection:
 
     def set_roi(self, lat: float, lon: float, alt: float = 0):
         self._enqueue_cmd("set_roi", lat=lat, lon=lon, alt=alt)
+
+    def set_home(self, lat: float, lon: float, alt: float = 0):
+        """Set home/return position to specified coordinates."""
+        self._enqueue_cmd("set_home", lat=lat, lon=lon, alt=alt)
 
     def calibrate(self, cal_type: str):
         """Start a sensor calibration. Types: gyro, accel, level, compass, pressure, cancel, next_step."""

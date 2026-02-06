@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { Map as MapIcon, Plane, Video, Wrench, PanelRightClose, PanelRightOpen, AlertTriangle } from 'lucide-react';
 import useWebSocket from './hooks/useWebSocket';
 import useDroneStore from './store/droneStore';
@@ -13,6 +13,118 @@ import FlyOverlay from './components/FlyOverlay';
 
 export default function App() {
   const { sendMessage, droneChangeDetected, dismissDroneChange, acceptDroneChange } = useWebSocket();
+  const connectionStatus = useDroneStore((s) => s.connectionStatus);
+  const commandHotkeys = useDroneStore((s) => s.commandHotkeys);
+  const servoGroups = useDroneStore((s) => s.servoGroups);
+  const setServoGroupState = useDroneStore((s) => s.setServoGroupState);
+  const addAlertStore = useDroneStore((s) => s.addAlert);
+  const telemetry = useDroneStore((s) => s.telemetry);
+  const homePosition = useDroneStore((s) => s.homePosition);
+  const setHomePosition = useDroneStore((s) => s.setHomePosition);
+  const isConnected = connectionStatus === 'connected';
+
+  // Set home position from first valid GPS position
+  useEffect(() => {
+    if (isConnected && !homePosition && telemetry.lat !== 0 && telemetry.lon !== 0) {
+      setHomePosition({ lat: telemetry.lat, lon: telemetry.lon, alt: telemetry.alt_msl });
+    }
+  }, [isConnected, homePosition, telemetry.lat, telemetry.lon, telemetry.alt_msl, setHomePosition]);
+
+  // Execute command helper
+  const executeCommand = useCallback(async (command) => {
+    if (!isConnected) return;
+    try {
+      if (command.startsWith('mode:')) {
+        const mode = command.slice(5);
+        await fetch('/api/mode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode }),
+        });
+        addAlertStore(`Mode: ${mode}`, 'info');
+      } else {
+        const endpoints = {
+          arm: 'arm', disarm: 'disarm', takeoff: 'takeoff', land: 'land',
+          rtl: 'rtl', mission_start: 'mission/start', mission_pause: 'mission/pause',
+        };
+        const ep = endpoints[command];
+        if (ep) {
+          await fetch(`/api/${ep}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(command === 'takeoff' ? { alt: 10 } : {}),
+          });
+          addAlertStore(`Command: ${command}`, 'info');
+        }
+      }
+    } catch (err) {
+      addAlertStore(`Command failed: ${err.message}`, 'error');
+    }
+  }, [isConnected, addAlertStore]);
+
+  // Actuate servo group
+  const actuateServoGroup = useCallback(async (group, action) => {
+    if (!isConnected) return;
+    const servos = group.servos || [{ servo: group.servo, openPwm: group.openPwm, closePwm: group.closePwm }];
+    try {
+      for (const s of servos) {
+        const pwm = action === 'open' ? s.openPwm : s.closePwm;
+        await fetch('/api/servo/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ servo: s.servo, pwm }),
+        });
+      }
+      setServoGroupState(group.id, action === 'open' ? 'open' : 'closed');
+      addAlertStore(`${group.name}: ${action === 'open' ? 'Opened' : 'Closed'}`, 'info');
+    } catch (err) {
+      addAlertStore(`Servo command failed: ${err.message}`, 'error');
+    }
+  }, [isConnected, setServoGroupState, addAlertStore]);
+
+  // Global hotkey listener
+  useEffect(() => {
+    if (!isConnected) return;
+
+    const handleKeyDown = (e) => {
+      // Don't trigger if typing in input
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+
+      const key = e.key.toLowerCase();
+
+      // Check command hotkeys
+      const command = commandHotkeys[key];
+      if (command) {
+        e.preventDefault();
+        executeCommand(command);
+        return;
+      }
+
+      // Check servo group hotkeys
+      for (const group of servoGroups) {
+        if (group.openHotkey === key) {
+          e.preventDefault();
+          actuateServoGroup(group, 'open');
+          return;
+        }
+        if (group.closeHotkey === key) {
+          e.preventDefault();
+          actuateServoGroup(group, 'close');
+          return;
+        }
+        // Legacy single hotkey (toggle)
+        if (group.hotkey === key) {
+          e.preventDefault();
+          const newAction = group.state === 'open' ? 'close' : 'open';
+          actuateServoGroup(group, newAction);
+          return;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isConnected, commandHotkeys, servoGroups, executeCommand, actuateServoGroup]);
   const alerts = useDroneStore((s) => s.alerts);
   const activeTab = useDroneStore((s) => s.activeTab);
   const setActiveTab = useDroneStore((s) => s.setActiveTab);

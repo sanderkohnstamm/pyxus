@@ -125,7 +125,7 @@ export default function ManualControlOverlay() {
   if (!isConnected || !isActive) return null;
 
   return (
-    <div className="absolute top-14 left-3 z-[1000] flex flex-col gap-2">
+    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] flex flex-col items-center gap-2">
       {/* Manual control status badge - always visible */}
       <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border backdrop-blur-md shadow-xl ${
         isSending

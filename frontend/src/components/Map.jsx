@@ -70,6 +70,19 @@ function createFenceVertexIcon(index) {
   });
 }
 
+// Home position icon
+const homeIcon = L.divIcon({
+  html: `<div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:#10b981;border:2px solid #34d399;border-radius:50%;box-shadow:0 2px 8px rgba(16,185,129,0.4)">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+      <polyline points="9 22 9 12 15 12 15 22"></polyline>
+    </svg>
+  </div>`,
+  className: '',
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+});
+
 // Invalidate map size when sidebar collapses/expands
 function MapResizer() {
   const map = useMap();
@@ -406,7 +419,7 @@ function ServoGroupButtons() {
   };
 
   return (
-    <div className="absolute bottom-14 right-3 z-[1000] flex flex-col gap-1.5">
+    <div className="absolute top-12 right-3 z-[1000] flex flex-col gap-1.5">
       {servoGroups.map((group) => {
         const isOpen = groupStates[group.id] === 'open';
         return (
@@ -438,10 +451,11 @@ const flyTargetIcon = L.divIcon({
   iconAnchor: [6, 6],
 });
 
-// Fly mode click target marker with Go To / Look At
+// Fly mode click target marker with Go To / Look At / Set Home
 function FlyClickTarget() {
   const flyClickTarget = useDroneStore((s) => s.flyClickTarget);
   const clearFlyClickTarget = useDroneStore((s) => s.clearFlyClickTarget);
+  const setHomePosition = useDroneStore((s) => s.setHomePosition);
   const alt = useDroneStore((s) => s.telemetry.alt);
   const addAlert = useDroneStore((s) => s.addAlert);
 
@@ -456,6 +470,7 @@ function FlyClickTarget() {
       });
       const data = await res.json();
       if (data.status === 'error') addAlert(data.error || 'Go To failed', 'error');
+      else addAlert('Going to location', 'success');
     } catch (err) {
       addAlert('Go To failed: ' + err.message, 'error');
     }
@@ -473,29 +488,66 @@ function FlyClickTarget() {
       });
       const data = await res.json();
       if (data.status === 'error') addAlert(data.error || 'Look At failed', 'error');
+      else addAlert('Looking at location', 'success');
     } catch (err) {
       addAlert('Look At failed: ' + err.message, 'error');
     }
     clearFlyClickTarget();
   }, [addAlert, clearFlyClickTarget]);
 
+  const handleSetHome = useCallback(async () => {
+    const target = useDroneStore.getState().flyClickTarget;
+    if (!target) return;
+    try {
+      const res = await fetch('/api/home/set', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat: target.lat, lon: target.lon, alt: 0 }),
+      });
+      const data = await res.json();
+      if (data.status === 'error') {
+        addAlert(data.error || 'Set Home failed', 'error');
+      } else {
+        setHomePosition({ lat: target.lat, lon: target.lon, alt: 0 });
+        addAlert('Home position set', 'success');
+      }
+    } catch (err) {
+      addAlert('Set Home failed: ' + err.message, 'error');
+    }
+    clearFlyClickTarget();
+  }, [addAlert, clearFlyClickTarget, setHomePosition]);
+
   if (!flyClickTarget) return null;
+
+  const btnStyle = {
+    flex: 1,
+    padding: '6px 8px',
+    fontSize: '10px',
+    fontWeight: 600,
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    textAlign: 'center',
+  };
 
   return (
     <Marker position={[flyClickTarget.lat, flyClickTarget.lon]} icon={flyTargetIcon}>
       <Popup eventHandlers={{ remove: clearFlyClickTarget }}>
-        <div style={{display:'flex',gap:'6px'}}>
-          <button
-            onClick={handleGoto}
-            style={{padding:'4px 10px',fontSize:'11px',fontWeight:600,background:'#06b6d4',color:'white',border:'none',borderRadius:'4px',cursor:'pointer'}}
-          >
-            Go To
-          </button>
-          <button
-            onClick={handleRoi}
-            style={{padding:'4px 10px',fontSize:'11px',fontWeight:600,background:'#f59e0b',color:'white',border:'none',borderRadius:'4px',cursor:'pointer'}}
-          >
-            Look At
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '140px' }}>
+          <div style={{ fontSize: '9px', color: '#64748b', marginBottom: '2px', textAlign: 'center' }}>
+            {flyClickTarget.lat.toFixed(6)}, {flyClickTarget.lon.toFixed(6)}
+          </div>
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button onClick={handleGoto} style={{ ...btnStyle, background: '#06b6d4' }}>
+              Go To
+            </button>
+            <button onClick={handleRoi} style={{ ...btnStyle, background: '#f59e0b' }}>
+              Look At
+            </button>
+          </div>
+          <button onClick={handleSetHome} style={{ ...btnStyle, background: '#10b981' }}>
+            Set Home/Return
           </button>
         </div>
       </Popup>
@@ -519,8 +571,10 @@ export default function MapView() {
   const addWaypointMode = useDroneStore((s) => s.addWaypointMode);
   const toggleAddWaypointMode = useDroneStore((s) => s.toggleAddWaypointMode);
   const planSubTab = useDroneStore((s) => s.planSubTab);
+  const homePosition = useDroneStore((s) => s.homePosition);
 
   const hasPosition = lat !== 0 && lon !== 0;
+  const hasHome = homePosition && homePosition.lat !== 0 && homePosition.lon !== 0;
   const yawDeg = heading || (yaw * 180) / Math.PI;
 
   const droneIcon = useMemo(() => createDroneIcon(yawDeg), [yawDeg]);
@@ -565,6 +619,18 @@ export default function MapView() {
                 <div><span style={{color:'#94a3b8'}}>GS</span> <span style={{color:'#e2e8f0'}}>{groundspeed.toFixed(1)} m/s</span></div>
                 <div><span style={{color:'#94a3b8'}}>HDG</span> <span style={{color:'#e2e8f0'}}>{Math.round(yawDeg)}&deg;</span></div>
                 <div style={{borderTop:'1px solid rgba(100,116,139,0.3)',marginTop:'4px',paddingTop:'4px',fontSize:'9px',color:'#64748b'}}>{lat.toFixed(6)}, {lon.toFixed(6)}</div>
+              </div>
+            </Popup>
+          </Marker>
+        )}
+
+        {/* Home position marker */}
+        {hasHome && (
+          <Marker position={[homePosition.lat, homePosition.lon]} icon={homeIcon}>
+            <Popup>
+              <div className="text-xs font-mono space-y-0.5">
+                <div className="font-semibold text-[11px] mb-1" style={{color:'#10b981'}}>Home / Return</div>
+                <div style={{fontSize:'9px',color:'#64748b'}}>{homePosition.lat.toFixed(6)}, {homePosition.lon.toFixed(6)}</div>
               </div>
             </Popup>
           </Marker>

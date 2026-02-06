@@ -92,6 +92,12 @@ class RoiRequest(BaseModel):
     alt: float = 0.0
 
 
+class SetHomeRequest(BaseModel):
+    lat: float
+    lon: float
+    alt: float = 0.0
+
+
 class MotorTestRequest(BaseModel):
     motor: int = 1          # Motor instance (1-indexed)
     throttle: float = 5.0   # Throttle percent (0-100)
@@ -289,6 +295,14 @@ async def api_roi(req: RoiRequest):
         return {"status": "error", "error": "Not connected"}
     drone.set_roi(req.lat, req.lon, req.alt)
     return {"status": "ok", "command": "roi", "lat": req.lat, "lon": req.lon}
+
+
+@app.post("/api/home/set")
+async def api_set_home(req: SetHomeRequest):
+    if not drone.connected:
+        return {"status": "error", "error": "Not connected"}
+    drone.set_home(req.lat, req.lon, req.alt)
+    return {"status": "ok", "command": "set_home", "lat": req.lat, "lon": req.lon, "alt": req.alt}
 
 
 @app.post("/api/mission/upload")
