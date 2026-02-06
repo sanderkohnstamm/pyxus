@@ -35,6 +35,9 @@ export default function PatternModal() {
   const [lawnmowerAngle, setLawnmowerAngle] = useState(0);
   const [lawnmowerOvershoot, setLawnmowerOvershoot] = useState(10);
   const [lawnmowerAlt, setLawnmowerAlt] = useState(defaultAlt);
+  const [lawnmowerWidth, setLawnmowerWidth] = useState(200);  // meters
+  const [lawnmowerHeight, setLawnmowerHeight] = useState(200); // meters
+  const [lawnmowerUseCustomSize, setLawnmowerUseCustomSize] = useState(false);
 
   // Spiral config
   const [spiralStartRadius, setSpiralStartRadius] = useState(100);
@@ -67,27 +70,45 @@ export default function PatternModal() {
     return null;
   }, [plannedWaypoints, plannedFence, telemetry]);
 
-  // Get bounds for lawnmower (from fence or waypoints)
+  // Get bounds for lawnmower (from fence, waypoints, or custom size)
   const getPatternBounds = useCallback(() => {
+    // If custom size mode, create bounds around center
+    if (lawnmowerUseCustomSize) {
+      const center = getCenter();
+      if (center) {
+        // Convert meters to approximate degrees (1 deg lat ≈ 111km, lon varies by latitude)
+        const latDelta = (lawnmowerHeight / 2) / 111000;
+        const lonDelta = (lawnmowerWidth / 2) / (111000 * Math.cos(center.lat * Math.PI / 180));
+        return {
+          north: center.lat + latDelta,
+          south: center.lat - latDelta,
+          east: center.lon + lonDelta,
+          west: center.lon - lonDelta,
+        };
+      }
+    }
+    // Use fence if available
     if (plannedFence.length >= 3) {
       return getBounds(plannedFence);
     }
+    // Use waypoints bounds
     if (plannedWaypoints.length >= 2) {
       return getBounds(plannedWaypoints);
     }
-    // Default 200m square around center
+    // Default: use custom size around center
     const center = getCenter();
     if (center) {
-      const delta = 0.001; // ~100m
+      const latDelta = (lawnmowerHeight / 2) / 111000;
+      const lonDelta = (lawnmowerWidth / 2) / (111000 * Math.cos(center.lat * Math.PI / 180));
       return {
-        north: center.lat + delta,
-        south: center.lat - delta,
-        east: center.lon + delta,
-        west: center.lon - delta,
+        north: center.lat + latDelta,
+        south: center.lat - latDelta,
+        east: center.lon + lonDelta,
+        west: center.lon - lonDelta,
       };
     }
     return null;
-  }, [plannedFence, plannedWaypoints, getCenter]);
+  }, [plannedFence, plannedWaypoints, getCenter, lawnmowerUseCustomSize, lawnmowerWidth, lawnmowerHeight]);
 
   const generatePreview = useCallback(() => {
     let waypoints = [];
@@ -170,6 +191,9 @@ export default function PatternModal() {
     lawnmowerSpacing,
     lawnmowerAngle,
     lawnmowerAlt,
+    lawnmowerWidth,
+    lawnmowerHeight,
+    lawnmowerUseCustomSize,
     spiralStartRadius,
     spiralEndRadius,
     spiralSpacing,
@@ -209,8 +233,8 @@ export default function PatternModal() {
   const hasFence = plannedFence.length >= 3;
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-gray-900 border border-gray-700/50 rounded-xl shadow-2xl w-[400px] max-h-[80vh] flex flex-col">
+    <div className="fixed inset-0 z-[2000] flex items-start justify-end p-4 pointer-events-none">
+      <div className="bg-gray-900/85 backdrop-blur-md border border-gray-700/50 rounded-xl shadow-2xl w-[320px] max-h-[90vh] flex flex-col pointer-events-auto">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
           <div className="flex items-center gap-2">
@@ -262,9 +286,53 @@ export default function PatternModal() {
           {activeTab === 'lawnmower' && (
             <>
               <div className="text-[10px] text-gray-500 mb-3">
-                Creates a serpentine survey pattern within the fence/waypoint bounds.
+                Creates a serpentine survey pattern. {hasFence ? 'Using fence bounds.' : 'Set custom size below.'}
               </div>
               <div className="space-y-3">
+                {/* Size controls */}
+                <div className="p-2 bg-gray-800/50 rounded-lg space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={lawnmowerUseCustomSize}
+                      onChange={(e) => setLawnmowerUseCustomSize(e.target.checked)}
+                      className="w-3 h-3 rounded accent-cyan-500"
+                    />
+                    <span className="text-[10px] text-gray-400">Custom size</span>
+                  </label>
+                  {(lawnmowerUseCustomSize || (!hasFence && plannedWaypoints.length < 2)) && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[9px] text-gray-500 block mb-0.5">Width</label>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            value={lawnmowerWidth}
+                            onChange={(e) => setLawnmowerWidth(Number(e.target.value) || 100)}
+                            className="w-full bg-gray-900/60 text-gray-200 border border-gray-700/50 rounded px-2 py-1 text-[11px] font-mono focus:outline-none focus:border-cyan-500/50"
+                            min={10}
+                            max={5000}
+                          />
+                          <span className="text-[9px] text-gray-500">m</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-gray-500 block mb-0.5">Height</label>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            value={lawnmowerHeight}
+                            onChange={(e) => setLawnmowerHeight(Number(e.target.value) || 100)}
+                            className="w-full bg-gray-900/60 text-gray-200 border border-gray-700/50 rounded px-2 py-1 text-[11px] font-mono focus:outline-none focus:border-cyan-500/50"
+                            min={10}
+                            max={5000}
+                          />
+                          <span className="text-[9px] text-gray-500">m</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <div>
                   <label className="text-[10px] text-gray-400 block mb-1">Lane Spacing</label>
                   <div className="flex items-center gap-2">
