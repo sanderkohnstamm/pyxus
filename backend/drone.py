@@ -784,6 +784,32 @@ class DroneConnection:
                     self._statustext_queue = self._statustext_queue[-100:]
             return
 
+        # Handle COMMAND_ACK and convert to status messages for calibration feedback
+        if msg_type == "COMMAND_ACK":
+            command = msg.command
+            result = msg.result
+            now = time.time()
+
+            # MAV_CMD_PREFLIGHT_CALIBRATION = 241
+            if command == 241:
+                result_texts = {
+                    0: ("Calibration accepted", 6),      # MAV_RESULT_ACCEPTED
+                    1: ("Calibration temporarily rejected - try again", 4),  # MAV_RESULT_TEMPORARILY_REJECTED
+                    2: ("Calibration denied", 3),        # MAV_RESULT_DENIED
+                    3: ("Calibration unsupported", 4),   # MAV_RESULT_UNSUPPORTED
+                    4: ("Calibration failed", 3),        # MAV_RESULT_FAILED
+                    5: ("Calibration in progress", 6),   # MAV_RESULT_IN_PROGRESS
+                    6: ("Calibration cancelled", 4),     # MAV_RESULT_CANCELLED
+                }
+                text, severity = result_texts.get(result, (f"Calibration result: {result}", 4))
+                with self._statustext_lock:
+                    self._statustext_queue.append({
+                        'severity': severity,
+                        'text': text,
+                        'time': now,
+                    })
+            return
+
         with self._lock:
             if msg_type == "HEARTBEAT":
                 src_system = msg.get_srcSystem()
