@@ -134,6 +134,8 @@ function DroneFollower() {
 function MapClickHandler() {
   const addWaypoint = useDroneStore((s) => s.addWaypoint);
   const addFenceVertex = useDroneStore((s) => s.addFenceVertex);
+  const addPatternBoundsVertex = useDroneStore((s) => s.addPatternBoundsVertex);
+  const patternDrawMode = useDroneStore((s) => s.patternDrawMode);
   const connectionStatus = useDroneStore((s) => s.connectionStatus);
   const addWaypointMode = useDroneStore((s) => s.addWaypointMode);
   const activeTab = useDroneStore((s) => s.activeTab);
@@ -142,6 +144,11 @@ function MapClickHandler() {
 
   useMapEvents({
     click: (e) => {
+      // Pattern bounds drawing mode (highest priority)
+      if (patternDrawMode) {
+        addPatternBoundsVertex(e.latlng.lat, e.latlng.lng);
+        return;
+      }
       // Planning mode works offline
       if (activeTab === 'planning' && addWaypointMode) {
         if (planSubTab === 'fence') {
@@ -505,6 +512,75 @@ function FenceVertexMarkers() {
             </div>
           </Popup>
         </Marker>
+      ))}
+    </>
+  );
+}
+
+// Pattern bounds polygon for lawnmower area selection
+function PatternBoundsPolygon() {
+  const patternBounds = useDroneStore((s) => s.patternBounds);
+  const patternDrawMode = useDroneStore((s) => s.patternDrawMode);
+  const updatePatternBoundsVertex = useDroneStore((s) => s.updatePatternBoundsVertex);
+  const removePatternBoundsVertex = useDroneStore((s) => s.removePatternBoundsVertex);
+
+  const positions = patternBounds.map((v) => [v.lat, v.lon]);
+
+  if (patternBounds.length === 0) return null;
+
+  return (
+    <>
+      {positions.length >= 3 && (
+        <Polygon
+          positions={positions}
+          pathOptions={{
+            color: '#ec4899',
+            weight: 2,
+            opacity: 0.8,
+            fillColor: '#ec4899',
+            fillOpacity: 0.15,
+            dashArray: '8 4',
+          }}
+        />
+      )}
+      {positions.length >= 2 && positions.length < 3 && (
+        <Polyline
+          positions={positions}
+          pathOptions={{ color: '#ec4899', weight: 2, opacity: 0.8, dashArray: '8 4' }}
+        />
+      )}
+
+      {patternDrawMode && patternBounds.map((v, i) => (
+        <Marker
+          key={v.id}
+          position={[v.lat, v.lon]}
+          icon={L.divIcon({
+            className: 'pattern-vertex-marker',
+            html: `<div style="
+              width: 18px; height: 18px;
+              background: #ec4899;
+              border: 2px solid white;
+              border-radius: 50%;
+              display: flex; align-items: center; justify-content: center;
+              font-size: 9px; font-weight: bold; color: white;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            ">${i + 1}</div>`,
+            iconSize: [18, 18],
+            iconAnchor: [9, 9],
+          })}
+          draggable={true}
+          autoPan={false}
+          eventHandlers={{
+            dragend: (e) => {
+              const pos = e.target.getLatLng();
+              updatePatternBoundsVertex(v.id, { lat: pos.lat, lon: pos.lng });
+            },
+            contextmenu: (e) => {
+              e.originalEvent.preventDefault();
+              removePatternBoundsVertex(v.id);
+            },
+          }}
+        />
       ))}
     </>
   );
@@ -908,6 +984,9 @@ export default function MapView() {
 
         {/* Fence vertex markers + polygon (isolated from telemetry re-renders) */}
         <FenceVertexMarkers />
+
+        {/* Pattern bounds polygon for lawnmower area drawing */}
+        <PatternBoundsPolygon />
 
         {/* Fly mode click target */}
         <FlyClickTarget />

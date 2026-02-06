@@ -24,6 +24,10 @@ export default function PatternModal() {
   const replaceWithPattern = useDroneStore((s) => s.replaceWithPattern);
   const plannedWaypoints = useDroneStore((s) => s.plannedWaypoints);
   const plannedFence = useDroneStore((s) => s.plannedFence);
+  const patternBounds = useDroneStore((s) => s.patternBounds);
+  const patternDrawMode = useDroneStore((s) => s.patternDrawMode);
+  const setPatternDrawMode = useDroneStore((s) => s.setPatternDrawMode);
+  const clearPatternBounds = useDroneStore((s) => s.clearPatternBounds);
   const defaultAlt = useDroneStore((s) => s.defaultAlt);
   const telemetry = useDroneStore((s) => s.telemetry);
 
@@ -70,13 +74,16 @@ export default function PatternModal() {
     return null;
   }, [plannedWaypoints, plannedFence, telemetry]);
 
-  // Get bounds for lawnmower (from fence, waypoints, or custom size)
+  // Get bounds for lawnmower (from drawn polygon, fence, waypoints, or custom size)
   const getPatternBounds = useCallback(() => {
-    // If custom size mode, create bounds around center
+    // Priority 1: Custom drawn polygon for pattern
+    if (patternBounds.length >= 3) {
+      return getBounds(patternBounds);
+    }
+    // Priority 2: Custom size mode with width/height
     if (lawnmowerUseCustomSize) {
       const center = getCenter();
       if (center) {
-        // Convert meters to approximate degrees (1 deg lat ≈ 111km, lon varies by latitude)
         const latDelta = (lawnmowerHeight / 2) / 111000;
         const lonDelta = (lawnmowerWidth / 2) / (111000 * Math.cos(center.lat * Math.PI / 180));
         return {
@@ -87,11 +94,11 @@ export default function PatternModal() {
         };
       }
     }
-    // Use fence if available
+    // Priority 3: Use fence if available
     if (plannedFence.length >= 3) {
       return getBounds(plannedFence);
     }
-    // Use waypoints bounds
+    // Priority 4: Use waypoints bounds
     if (plannedWaypoints.length >= 2) {
       return getBounds(plannedWaypoints);
     }
@@ -108,7 +115,7 @@ export default function PatternModal() {
       };
     }
     return null;
-  }, [plannedFence, plannedWaypoints, getCenter, lawnmowerUseCustomSize, lawnmowerWidth, lawnmowerHeight]);
+  }, [patternBounds, plannedFence, plannedWaypoints, getCenter, lawnmowerUseCustomSize, lawnmowerWidth, lawnmowerHeight]);
 
   const generatePreview = useCallback(() => {
     let waypoints = [];
@@ -194,6 +201,7 @@ export default function PatternModal() {
     lawnmowerWidth,
     lawnmowerHeight,
     lawnmowerUseCustomSize,
+    patternBounds,
     spiralStartRadius,
     spiralEndRadius,
     spiralSpacing,
@@ -218,11 +226,13 @@ export default function PatternModal() {
     }
 
     setPatternConfig({ visible: false, preview: [] });
-  }, [patternConfig.preview, replaceMode, replaceWithPattern, applyPattern, setPatternConfig]);
+    clearPatternBounds();
+  }, [patternConfig.preview, replaceMode, replaceWithPattern, applyPattern, setPatternConfig, clearPatternBounds]);
 
   const handleClose = useCallback(() => {
     setPatternConfig({ visible: false, preview: [] });
-  }, [setPatternConfig]);
+    clearPatternBounds();
+  }, [setPatternConfig, clearPatternBounds]);
 
   if (!patternConfig.visible) return null;
 
@@ -233,8 +243,8 @@ export default function PatternModal() {
   const hasFence = plannedFence.length >= 3;
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-start justify-end p-4 pointer-events-none">
-      <div className="bg-gray-900/85 backdrop-blur-md border border-gray-700/50 rounded-xl shadow-2xl w-[320px] max-h-[90vh] flex flex-col pointer-events-auto">
+    <div className="fixed inset-0 z-[2000] flex items-center justify-start p-4 pointer-events-none">
+      <div className="bg-gray-900/90 backdrop-blur-md border border-gray-700/50 rounded-xl shadow-2xl w-[300px] max-h-[85vh] flex flex-col pointer-events-auto ml-2">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
           <div className="flex items-center gap-2">
@@ -289,7 +299,43 @@ export default function PatternModal() {
                 Creates a serpentine survey pattern. {hasFence ? 'Using fence bounds.' : 'Set custom size below.'}
               </div>
               <div className="space-y-3">
-                {/* Size controls */}
+                {/* Draw area on map */}
+                <div className="p-2 bg-gray-800/50 rounded-lg space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-gray-400">Survey Area</span>
+                    {patternBounds.length > 0 && (
+                      <span className="text-[9px] text-pink-400">{patternBounds.length} vertices</span>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setPatternDrawMode(!patternDrawMode)}
+                      className={`flex-1 px-2 py-1.5 rounded text-[10px] font-medium transition-all ${
+                        patternDrawMode
+                          ? 'bg-pink-500/20 text-pink-300 border border-pink-500/30'
+                          : 'bg-gray-700/50 text-gray-400 hover:text-gray-200 border border-gray-600/30'
+                      }`}
+                    >
+                      {patternDrawMode ? '✓ Drawing...' : 'Draw Area'}
+                    </button>
+                    {patternBounds.length > 0 && (
+                      <button
+                        onClick={clearPatternBounds}
+                        className="px-2 py-1.5 rounded text-[10px] font-medium bg-gray-700/50 text-gray-400 hover:text-red-400 border border-gray-600/30 transition-all"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  {patternDrawMode && (
+                    <div className="text-[9px] text-gray-500 italic">
+                      Click on the map to add vertices. Right-click a vertex to remove it.
+                    </div>
+                  )}
+                </div>
+
+                {/* Size controls (only if no drawn area) */}
+                {patternBounds.length === 0 && (
                 <div className="p-2 bg-gray-800/50 rounded-lg space-y-2">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -333,6 +379,7 @@ export default function PatternModal() {
                     </div>
                   )}
                 </div>
+                )}
                 <div>
                   <label className="text-[10px] text-gray-400 block mb-1">Lane Spacing</label>
                   <div className="flex items-center gap-2">

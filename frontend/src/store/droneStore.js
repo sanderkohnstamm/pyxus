@@ -127,6 +127,8 @@ const useDroneStore = create((set, get) => ({
     visible: false,    // Show pattern config modal
     preview: [],       // Preview waypoints before committing
   },
+  patternBounds: [],     // Custom polygon vertices for pattern area [{lat, lon, id}, ...]
+  patternDrawMode: false, // Whether we're drawing pattern bounds
 
   // Mission manipulation
   missionManipMode: null, // null | 'translate' | 'rotate' | 'scale'
@@ -660,6 +662,29 @@ const useDroneStore = create((set, get) => ({
   clearPatternPreview: () => set((s) => ({
     patternConfig: { ...s.patternConfig, preview: [] }
   })),
+
+  // Pattern bounds drawing
+  setPatternDrawMode: (enabled) => set({ patternDrawMode: enabled }),
+  addPatternBoundsVertex: (lat, lon) => {
+    const { patternBounds } = get();
+    set({
+      patternBounds: [
+        ...patternBounds,
+        { lat, lon, id: Date.now() },
+      ],
+    });
+  },
+  removePatternBoundsVertex: (id) => {
+    const { patternBounds } = get();
+    set({ patternBounds: patternBounds.filter((v) => v.id !== id) });
+  },
+  updatePatternBoundsVertex: (id, updates) => {
+    const { patternBounds } = get();
+    set({
+      patternBounds: patternBounds.map((v) => (v.id === id ? { ...v, ...updates } : v)),
+    });
+  },
+  clearPatternBounds: () => set({ patternBounds: [], patternDrawMode: false }),
 
   // Mission manipulation
   setMissionManipMode: (mode) => set({ missionManipMode: mode }),
