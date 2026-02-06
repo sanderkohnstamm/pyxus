@@ -497,19 +497,20 @@ function FlyClickTarget() {
 
   const handleSetHome = useCallback(async () => {
     const target = useDroneStore.getState().flyClickTarget;
+    const altMsl = useDroneStore.getState().telemetry.alt_msl || 0;
     if (!target) return;
     try {
       const res = await fetch('/api/home/set', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat: target.lat, lon: target.lon, alt: 0 }),
+        body: JSON.stringify({ lat: target.lat, lon: target.lon, alt: altMsl }),
       });
       const data = await res.json();
       if (data.status === 'error') {
         addAlert(data.error || 'Set Home failed', 'error');
       } else {
-        setHomePosition({ lat: target.lat, lon: target.lon, alt: 0 });
-        addAlert('Home position set', 'success');
+        setHomePosition({ lat: target.lat, lon: target.lon, alt: altMsl });
+        addAlert(`Home position set (alt: ${altMsl.toFixed(1)}m MSL)`, 'success');
       }
     } catch (err) {
       addAlert('Set Home failed: ' + err.message, 'error');
