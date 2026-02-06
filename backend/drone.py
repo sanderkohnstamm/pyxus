@@ -287,7 +287,7 @@ class DroneConnection:
                     break
                 else:
                     type_name = PERIPHERAL_TYPES.get(mav_type, MAV_TYPES.get(mav_type, f"Type {mav_type}"))
-                    print(f"Skipping non-autopilot heartbeat: {type_name} (sys={src_system}, comp={src_component})")
+                    print(f"Registered {type_name} (sys={src_system}, comp={src_component}), waiting for autopilot...")
 
             if vehicle_msg is None:
                 print("No autopilot (component 1) heartbeat received within timeout")
