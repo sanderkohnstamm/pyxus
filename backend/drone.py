@@ -555,35 +555,40 @@ class DroneConnection:
                     )
                 else:
                     # PX4: use MAV_CMD_ACTUATOR_TEST (command ID 310)
-                    # PX4 motor indexing is 0-based
-                    # param1: output value (-1 to 1, we use 0 to throttle_pct/100)
-                    # param2: timeout in ms
-                    # param3: output function/motor index (0-based for motors)
+                    # param1: output value (0 to 1 for motors)
+                    # param2: timeout in seconds
+                    # param5: actuator function (101-108 for Motor1-Motor8)
                     MAV_CMD_ACTUATOR_TEST = 310
                     value = throttle_pct / 100.0  # Convert to 0-1 range
-                    timeout_ms = int(duration_sec * 1000)
                     if motor_count == 0:
-                        # Test all motors - send to each one
+                        # Test all motors - send to each one (Motor1=101 through Motor8=108)
                         for m in range(8):
+                            motor_function = 101 + m  # Motor1=101, Motor2=102, etc.
                             self._mav.mav.command_long_send(
                                 self._target_system, self._target_component,
                                 MAV_CMD_ACTUATOR_TEST,
                                 0,
-                                value,        # param1: actuator value (-1 to 1)
-                                timeout_ms,   # param2: timeout in ms
-                                m,            # param3: actuator index (0-based)
-                                0, 0, 0, 0,
+                                value,           # param1: actuator value (0-1)
+                                duration_sec,    # param2: timeout in seconds
+                                0,               # param3: reserved
+                                0,               # param4: reserved
+                                motor_function,  # param5: actuator function (101-108)
+                                0, 0,
                             )
+                            time.sleep(0.05)  # Small delay between commands
                     else:
-                        # Test single motor (convert from 1-indexed to 0-indexed)
+                        # Test single motor (Motor1=101, Motor2=102, etc.)
+                        motor_function = 100 + motor_instance  # 1->101, 2->102, etc.
                         self._mav.mav.command_long_send(
                             self._target_system, self._target_component,
                             MAV_CMD_ACTUATOR_TEST,
                             0,
-                            value,                # param1: actuator value (-1 to 1)
-                            timeout_ms,           # param2: timeout in ms
-                            motor_instance - 1,   # param3: actuator index (0-based)
-                            0, 0, 0, 0,
+                            value,           # param1: actuator value (0-1)
+                            duration_sec,    # param2: timeout in seconds
+                            0,               # param3: reserved
+                            0,               # param4: reserved
+                            motor_function,  # param5: actuator function (101-108)
+                            0, 0,
                         )
             elif cmd_type == "servo_set":
                 self._mav.mav.command_long_send(
