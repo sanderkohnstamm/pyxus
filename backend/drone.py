@@ -263,8 +263,9 @@ class DroneConnection:
                 source_component=0,
             )
 
-            # Wait for a heartbeat from an actual vehicle/autopilot (not camera, gimbal, etc.)
-            # Try for up to 10 seconds, collecting any peripheral heartbeats along the way
+            # Wait for a heartbeat from component 1 (autopilot)
+            # Component 1 is the standard MAVLink component ID for autopilots
+            # Track other components we see along the way
             start_time = time.time()
             vehicle_msg = None
 
@@ -280,16 +281,16 @@ class DroneConnection:
                 # Track this component
                 self._register_component(src_system, src_component, mav_type, msg.autopilot)
 
-                # Check if this is a vehicle we should connect to
-                if mav_type in VEHICLE_TYPES:
+                # Only connect to component 1 (autopilot)
+                if src_component == 1:
                     vehicle_msg = msg
                     break
                 else:
                     type_name = PERIPHERAL_TYPES.get(mav_type, MAV_TYPES.get(mav_type, f"Type {mav_type}"))
-                    print(f"Skipping peripheral heartbeat: {type_name} (sys={src_system}, comp={src_component})")
+                    print(f"Skipping non-autopilot heartbeat: {type_name} (sys={src_system}, comp={src_component})")
 
             if vehicle_msg is None:
-                print("No vehicle heartbeat received within timeout")
+                print("No autopilot (component 1) heartbeat received within timeout")
                 self._mav.close()
                 self._mav = None
                 return False
