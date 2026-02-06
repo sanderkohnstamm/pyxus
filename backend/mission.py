@@ -28,6 +28,8 @@ ITEM_TYPE_COMMANDS = {
     "loiter_time": mavutil.mavlink.MAV_CMD_NAV_LOITER_TIME,
     "roi": mavutil.mavlink.MAV_CMD_DO_SET_ROI,
     "land": mavutil.mavlink.MAV_CMD_NAV_LAND,
+    "do_jump": mavutil.mavlink.MAV_CMD_DO_JUMP,           # 177: param1=target seq, param2=repeat count
+    "do_set_servo": mavutil.mavlink.MAV_CMD_DO_SET_SERVO, # 183: param1=servo #, param2=PWM
 }
 
 # Reverse map: MAVLink command number -> item_type string

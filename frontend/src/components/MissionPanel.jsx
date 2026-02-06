@@ -39,6 +39,8 @@ import {
   Check,
   Pencil,
   Grid3X3,
+  Repeat,
+  Grip,
 } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
 import FenceSubPanel from './FenceSubPanel';
@@ -53,6 +55,8 @@ const ITEM_TYPES = {
   loiter_time: { label: 'Loiter Time', icon: Clock, color: 'violet' },
   roi: { label: 'ROI', icon: Crosshair, color: 'amber' },
   land: { label: 'Land', icon: ArrowDown, color: 'orange' },
+  do_jump: { label: 'Jump To', icon: Repeat, color: 'pink' },
+  do_set_servo: { label: 'Servo', icon: Grip, color: 'cyan' },
 };
 
 const TYPE_COLORS = {
@@ -61,6 +65,8 @@ const TYPE_COLORS = {
   violet: 'text-violet-400 bg-violet-500/10 border-violet-500/20',
   amber: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
   orange: 'text-orange-400 bg-orange-500/10 border-orange-500/20',
+  pink: 'text-pink-400 bg-pink-500/10 border-pink-500/20',
+  cyan: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
 };
 
 const STATUS_COLORS = {
@@ -100,7 +106,9 @@ function WaypointItem({ wp, index, onUpdate, onRemove }) {
         </select>
 
         <span className="font-mono text-[10px] opacity-70 truncate flex-1 text-right">
-          {wp.lat.toFixed(5)}, {wp.lon.toFixed(5)}
+          {wp.type === 'do_jump' ? `→ item ${wp.param1 || 1}` :
+           wp.type === 'do_set_servo' ? `Servo ${wp.param1 || 1}: ${wp.param2 || 1500}µs` :
+           `${wp.lat.toFixed(5)}, ${wp.lon.toFixed(5)}`}
         </span>
 
         <button
@@ -226,7 +234,75 @@ function WaypointItem({ wp, index, onUpdate, onRemove }) {
             </div>
           )}
 
-          {/* Yaw (all types) */}
+          {/* Jump To (do_jump) */}
+          {wp.type === 'do_jump' && (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] opacity-60">Target Item</span>
+                <input
+                  type="number"
+                  value={wp.param1}
+                  onChange={(e) => onUpdate(wp.id, { param1: parseInt(e.target.value) || 1 })}
+                  className="w-16 bg-gray-900/50 border border-current/20 rounded px-1.5 py-0.5 text-[11px] text-right font-mono focus:outline-none focus:border-current/50"
+                  min={1}
+                  max={999}
+                  step={1}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] opacity-60">Repeat</span>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    value={wp.param2}
+                    onChange={(e) => onUpdate(wp.id, { param2: parseInt(e.target.value) || 1 })}
+                    className="w-16 bg-gray-900/50 border border-current/20 rounded px-1.5 py-0.5 text-[11px] text-right font-mono focus:outline-none focus:border-current/50"
+                    min={-1}
+                    max={999}
+                    step={1}
+                  />
+                  <span className="text-[10px] opacity-50">x</span>
+                </div>
+              </div>
+              <div className="text-[9px] opacity-40 italic">-1 = infinite loop</div>
+            </>
+          )}
+
+          {/* Servo (do_set_servo) */}
+          {wp.type === 'do_set_servo' && (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] opacity-60">Servo #</span>
+                <input
+                  type="number"
+                  value={wp.param1}
+                  onChange={(e) => onUpdate(wp.id, { param1: parseInt(e.target.value) || 1 })}
+                  className="w-16 bg-gray-900/50 border border-current/20 rounded px-1.5 py-0.5 text-[11px] text-right font-mono focus:outline-none focus:border-current/50"
+                  min={1}
+                  max={16}
+                  step={1}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] opacity-60">PWM</span>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    value={wp.param2}
+                    onChange={(e) => onUpdate(wp.id, { param2: parseInt(e.target.value) || 1500 })}
+                    className="w-20 bg-gray-900/50 border border-current/20 rounded px-1.5 py-0.5 text-[11px] text-right font-mono focus:outline-none focus:border-current/50"
+                    min={500}
+                    max={2500}
+                    step={10}
+                  />
+                  <span className="text-[10px] opacity-50">µs</span>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Yaw (nav types only) */}
+          {wp.type !== 'do_jump' && wp.type !== 'do_set_servo' && (
           <div className="flex items-center justify-between">
             <span className="text-[10px] opacity-60">Yaw</span>
             <div className="flex items-center gap-1">
@@ -242,6 +318,7 @@ function WaypointItem({ wp, index, onUpdate, onRemove }) {
               <span className="text-[10px] opacity-50">deg</span>
             </div>
           </div>
+          )}
         </div>
       )}
     </div>
