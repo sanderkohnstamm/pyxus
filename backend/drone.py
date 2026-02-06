@@ -444,8 +444,8 @@ class DroneConnection:
                     0, 0,     # yaw, yaw_rate
                 )
             elif cmd_type == "set_home":
-                # MAV_CMD_DO_SET_HOME: param1=1 uses specified location, 0=use current
-                use_current = kwargs.get("use_current", 0)
+                # MAV_CMD_DO_SET_HOME: param1=1 means use current position, param1=0 means use specified
+                use_current = kwargs.get("use_current", False)
                 lat = kwargs.get("lat", 0)
                 lon = kwargs.get("lon", 0)
                 alt = kwargs.get("alt", 0)
@@ -453,9 +453,9 @@ class DroneConnection:
                     self._target_system, self._target_component,
                     mavutil.mavlink.MAV_CMD_DO_SET_HOME,
                     0,
-                    1 if not use_current else 0,  # param1: 1=use specified, 0=current
+                    1 if use_current else 0,  # param1: 1=use current position, 0=use specified
                     0, 0, 0,  # params 2-4 unused
-                    lat, lon, alt  # lat, lon, alt
+                    lat, lon, alt  # param5=lat, param6=lon, param7=alt
                 )
             elif cmd_type == "set_roi":
                 self._mav.mav.command_long_send(

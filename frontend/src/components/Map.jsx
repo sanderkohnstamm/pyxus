@@ -609,9 +609,9 @@ export default function MapView() {
           />
         )}
 
-        {/* Drone marker */}
+        {/* Drone marker - zIndexOffset ensures it's on top of all other markers */}
         {hasPosition && (
-          <Marker position={[lat, lon]} icon={droneIcon}>
+          <Marker position={[lat, lon]} icon={droneIcon} zIndexOffset={1000}>
             <Popup>
               <div className="text-xs font-mono space-y-0.5">
                 <div className="font-semibold text-[11px] mb-1" style={{color:'#06b6d4'}}>Vehicle</div>
