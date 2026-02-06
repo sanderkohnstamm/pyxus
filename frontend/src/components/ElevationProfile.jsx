@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import useDroneStore from '../store/droneStore';
 
 // Haversine distance in meters
@@ -72,8 +72,11 @@ async function fetchElevation(points) {
 
 export default function ElevationProfile() {
   const plannedWaypoints = useDroneStore((s) => s.plannedWaypoints);
+  const updateWaypoint = useDroneStore((s) => s.updateWaypoint);
   const [groundData, setGroundData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [dragging, setDragging] = useState(null); // { index, startY, startAlt }
+  const svgRef = useRef(null);
 
   // Filter navigable waypoints (not ROI)
   const navWaypoints = useMemo(
@@ -112,38 +115,6 @@ export default function ElevationProfile() {
     return () => { cancelled = true; };
   }, [pathPoints]);
 
-  if (navWaypoints.length < 2) return null;
-  if (loading) {
-    return (
-      <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-800/50 mt-3">
-        <div className="text-[10px] text-gray-500 text-center py-4">Loading elevation data...</div>
-      </div>
-    );
-  }
-  if (!groundData) return null;
-
-  // Build chart data
-  const totalDist = groundData[groundData.length - 1].dist;
-  const wpPoints = [];
-  for (let i = 0; i < navWaypoints.length; i++) {
-    const gd = groundData.find((d) => d.wpIndex === i) || groundData[i === 0 ? 0 : groundData.length - 1];
-    wpPoints.push({
-      dist: gd.dist,
-      altMsl: gd.ground + navWaypoints[i].alt,
-      altRel: navWaypoints[i].alt,
-      ground: gd.ground,
-      index: i,
-    });
-  }
-
-  const allHeights = [
-    ...groundData.map((d) => d.ground),
-    ...wpPoints.map((w) => w.altMsl),
-  ];
-  const minH = Math.min(...allHeights) - 10;
-  const maxH = Math.max(...allHeights) + 20;
-  const rangeH = maxH - minH || 1;
-
   // SVG dimensions
   const W = 340;
   const H = 120;
@@ -154,8 +125,94 @@ export default function ElevationProfile() {
   const chartW = W - padL - padR;
   const chartH = H - padT - padB;
 
-  const x = (dist) => padL + (dist / totalDist) * chartW;
-  const y = (h) => padT + chartH - ((h - minH) / rangeH) * chartH;
+  // Memoize chart calculations
+  const chartData = useMemo(() => {
+    if (!groundData || navWaypoints.length < 2) return null;
+
+    const totalDist = groundData[groundData.length - 1].dist;
+    const wpPoints = [];
+    for (let i = 0; i < navWaypoints.length; i++) {
+      const gd = groundData.find((d) => d.wpIndex === i) || groundData[i === 0 ? 0 : groundData.length - 1];
+      wpPoints.push({
+        dist: gd.dist,
+        altMsl: gd.ground + navWaypoints[i].alt,
+        altRel: navWaypoints[i].alt,
+        ground: gd.ground,
+        index: i,
+        id: navWaypoints[i].id,
+      });
+    }
+
+    const allHeights = [
+      ...groundData.map((d) => d.ground),
+      ...wpPoints.map((w) => w.altMsl),
+    ];
+    const minH = Math.min(...allHeights) - 10;
+    const maxH = Math.max(...allHeights) + 20;
+    const rangeH = maxH - minH || 1;
+
+    return { totalDist, wpPoints, minH, maxH, rangeH };
+  }, [groundData, navWaypoints]);
+
+  const x = useCallback((dist) => chartData ? padL + (dist / chartData.totalDist) * chartW : 0, [chartData]);
+  const y = useCallback((h) => chartData ? padT + chartH - ((h - chartData.minH) / chartData.rangeH) * chartH : 0, [chartData]);
+
+  // Convert Y position back to altitude
+  const yToAlt = useCallback((yPos, groundElev) => {
+    if (!chartData) return 0;
+    const h = chartData.minH + ((padT + chartH - yPos) / chartH) * chartData.rangeH;
+    return Math.max(1, Math.round(h - groundElev));
+  }, [chartData]);
+
+  // Drag handlers
+  const handleMouseDown = useCallback((e, wpIndex, wpId, ground) => {
+    e.preventDefault();
+    const wp = navWaypoints[wpIndex];
+    setDragging({ index: wpIndex, id: wpId, startY: e.clientY, startAlt: wp.alt, ground });
+  }, [navWaypoints]);
+
+  const handleMouseMove = useCallback((e) => {
+    if (!dragging || !svgRef.current) return;
+
+    const svg = svgRef.current;
+    const rect = svg.getBoundingClientRect();
+    const svgY = ((e.clientY - rect.top) / rect.height) * H;
+    const newAlt = yToAlt(svgY, dragging.ground);
+
+    // Find the original waypoint by id (not filtered index)
+    const originalWp = plannedWaypoints.find(w => w.id === dragging.id);
+    if (originalWp && Math.abs(newAlt - originalWp.alt) >= 1) {
+      updateWaypoint(dragging.id, { alt: Math.max(1, Math.min(500, newAlt)) });
+    }
+  }, [dragging, yToAlt, plannedWaypoints, updateWaypoint]);
+
+  const handleMouseUp = useCallback(() => {
+    setDragging(null);
+  }, []);
+
+  // Global mouse events for drag
+  useEffect(() => {
+    if (dragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [dragging, handleMouseMove, handleMouseUp]);
+
+  if (navWaypoints.length < 2) return null;
+  if (loading) {
+    return (
+      <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-800/50 mt-3">
+        <div className="text-[10px] text-gray-500 text-center py-4">Loading elevation data...</div>
+      </div>
+    );
+  }
+  if (!groundData || !chartData) return null;
+
+  const { totalDist, wpPoints, minH, maxH, rangeH } = chartData;
 
   // Ground profile polygon
   const groundPath =
@@ -181,85 +238,54 @@ export default function ElevationProfile() {
       </div>
 
       <svg
+        ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
         className="w-full"
-        style={{ height: '120px' }}
+        style={{ height: '120px', cursor: dragging ? 'ns-resize' : 'default' }}
       >
         {/* Grid lines */}
         {yTicks.map((h) => (
           <g key={h}>
-            <line
-              x1={padL}
-              y1={y(h)}
-              x2={W - padR}
-              y2={y(h)}
-              stroke="rgba(148,163,184,0.1)"
-              strokeWidth="0.5"
-            />
-            <text
-              x={padL - 3}
-              y={y(h) + 3}
-              textAnchor="end"
-              fill="rgba(148,163,184,0.4)"
-              fontSize="7"
-              fontFamily="monospace"
-            >
-              {h}m
-            </text>
+            <line x1={padL} y1={y(h)} x2={W - padR} y2={y(h)} stroke="rgba(148,163,184,0.1)" strokeWidth="0.5" />
+            <text x={padL - 3} y={y(h) + 3} textAnchor="end" fill="rgba(148,163,184,0.4)" fontSize="7" fontFamily="monospace">{h}m</text>
           </g>
         ))}
 
         {/* Ground fill */}
         <path d={groundPath} fill="rgba(139,92,246,0.15)" stroke="none" />
         {/* Ground line */}
-        <polyline
-          points={groundData.map((d) => `${x(d.dist)},${y(d.ground)}`).join(' ')}
-          fill="none"
-          stroke="rgba(139,92,246,0.5)"
-          strokeWidth="1"
-        />
+        <polyline points={groundData.map((d) => `${x(d.dist)},${y(d.ground)}`).join(' ')} fill="none" stroke="rgba(139,92,246,0.5)" strokeWidth="1" />
 
         {/* Waypoint altitude line */}
         <path d={wpLine} fill="none" stroke="#06b6d4" strokeWidth="1.5" strokeLinejoin="round" />
 
-        {/* Waypoint dots + labels */}
+        {/* Waypoint dots + labels (draggable) */}
         {wpPoints.map((w) => (
           <g key={w.index}>
             {/* Vertical line from ground to waypoint */}
-            <line
-              x1={x(w.dist)}
-              y1={y(w.ground)}
-              x2={x(w.dist)}
-              y2={y(w.altMsl)}
-              stroke="rgba(6,182,212,0.2)"
-              strokeWidth="0.5"
-              strokeDasharray="2 2"
+            <line x1={x(w.dist)} y1={y(w.ground)} x2={x(w.dist)} y2={y(w.altMsl)} stroke="rgba(6,182,212,0.2)" strokeWidth="0.5" strokeDasharray="2 2" />
+            {/* Draggable circle */}
+            <circle
+              cx={x(w.dist)}
+              cy={y(w.altMsl)}
+              r={dragging?.index === w.index ? 5 : 4}
+              fill={dragging?.index === w.index ? '#22d3ee' : '#06b6d4'}
+              stroke={dragging?.index === w.index ? '#fff' : 'none'}
+              strokeWidth="1"
+              style={{ cursor: 'ns-resize' }}
+              onMouseDown={(e) => handleMouseDown(e, w.index, w.id, w.ground)}
             />
-            <circle cx={x(w.dist)} cy={y(w.altMsl)} r="3" fill="#06b6d4" />
-            <text
-              x={x(w.dist)}
-              y={y(w.altMsl) - 5}
-              textAnchor="middle"
-              fill="rgba(6,182,212,0.8)"
-              fontSize="7"
-              fontFamily="monospace"
-            >
-              {w.index + 1}
-            </text>
+            {/* Index label */}
+            <text x={x(w.dist)} y={y(w.altMsl) - 7} textAnchor="middle" fill="rgba(6,182,212,0.8)" fontSize="7" fontFamily="monospace">{w.index + 1}</text>
+            {/* Altitude label (show when dragging) */}
+            {dragging?.index === w.index && (
+              <text x={x(w.dist) + 8} y={y(w.altMsl) + 3} textAnchor="start" fill="#22d3ee" fontSize="8" fontFamily="monospace" fontWeight="bold">{w.altRel}m</text>
+            )}
           </g>
         ))}
 
         {/* X axis label */}
-        <text
-          x={W / 2}
-          y={H - 2}
-          textAnchor="middle"
-          fill="rgba(148,163,184,0.3)"
-          fontSize="7"
-          fontFamily="monospace"
-        >
-          distance
-        </text>
+        <text x={W / 2} y={H - 2} textAnchor="middle" fill="rgba(148,163,184,0.3)" fontSize="7" fontFamily="monospace">distance</text>
       </svg>
 
       {/* Legend */}
@@ -272,6 +298,7 @@ export default function ElevationProfile() {
           <span className="w-2.5 h-0.5 bg-violet-500/50 rounded-full inline-block" />
           Ground
         </span>
+        <span className="text-gray-500 ml-auto">Drag points to adjust</span>
       </div>
     </div>
   );

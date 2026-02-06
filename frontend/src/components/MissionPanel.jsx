@@ -34,6 +34,10 @@ import {
   Cloud,
   Save,
   FolderOpen,
+  Plus,
+  Copy,
+  Check,
+  Pencil,
 } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
 import FenceSubPanel from './FenceSubPanel';
@@ -292,6 +296,21 @@ function MissionSubPanel() {
   const setDroneMission = useDroneStore((s) => s.setDroneMission);
   const importDroneMission = useDroneStore((s) => s.importDroneMission);
 
+  // Multi-mission state
+  const savedMissions = useDroneStore((s) => s.savedMissions);
+  const activeMissionId = useDroneStore((s) => s.activeMissionId);
+  const saveMission = useDroneStore((s) => s.saveMission);
+  const loadMission = useDroneStore((s) => s.loadMission);
+  const deleteMission = useDroneStore((s) => s.deleteMission);
+  const duplicateMission = useDroneStore((s) => s.duplicateMission);
+  const renameMission = useDroneStore((s) => s.renameMission);
+  const newMission = useDroneStore((s) => s.newMission);
+  const importDroneAsMission = useDroneStore((s) => s.importDroneAsMission);
+
+  // Rename editing state
+  const [editingName, setEditingName] = React.useState(false);
+  const [nameValue, setNameValue] = React.useState('');
+
   const isConnected = connectionStatus === 'connected';
 
   const sensors = useSensors(
@@ -376,15 +395,21 @@ function MissionSubPanel() {
       const data = await res.json();
       if (data.status === 'ok' && data.waypoints && data.waypoints.length > 0) {
         setDroneMission(data.waypoints);
-        importDroneMission();
-        addAlert(`Imported ${data.waypoints.length} waypoints from drone`, 'success');
+        const newMissionObj = importDroneAsMission();
+        if (newMissionObj) {
+          addAlert(`Imported ${data.waypoints.length} waypoints as "${newMissionObj.name}"`, 'success');
+        } else {
+          // Fallback to regular import if no droneMission
+          importDroneMission();
+          addAlert(`Imported ${data.waypoints.length} waypoints from drone`, 'success');
+        }
       } else {
         addAlert('No mission on drone to import', 'warning');
       }
     } catch (err) {
       addAlert(`Import failed: ${err.message}`, 'error');
     }
-  }, [setDroneMission, importDroneMission, addAlert]);
+  }, [setDroneMission, importDroneAsMission, importDroneMission, addAlert]);
 
   const handleSaveToFile = useCallback(() => {
     if (plannedWaypoints.length === 0) {
@@ -395,6 +420,7 @@ function MissionSubPanel() {
     const missionData = {
       version: 1,
       timestamp: new Date().toISOString(),
+      name: activeMissionName,
       waypoints: plannedWaypoints.map((w) => ({
         lat: w.lat,
         lon: w.lon,
@@ -415,14 +441,16 @@ function MissionSubPanel() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `mission_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    // Use mission name or timestamp for filename
+    const safeName = activeMissionName.replace(/[^a-zA-Z0-9_-]/g, '_');
+    a.download = `${safeName}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    addAlert(`Saved ${plannedWaypoints.length} waypoints to file`, 'success');
-  }, [plannedWaypoints, defaultAlt, defaultSpeed, addAlert]);
+    addAlert(`Saved "${activeMissionName}" to file`, 'success');
+  }, [plannedWaypoints, defaultAlt, defaultSpeed, activeMissionName, addAlert]);
 
   const handleLoadFromFile = useCallback(() => {
     const input = document.createElement('input');
@@ -441,9 +469,6 @@ function MissionSubPanel() {
           addAlert('Invalid mission file format', 'error');
           return;
         }
-
-        // Clear existing waypoints
-        clearWaypoints();
 
         // Import waypoints
         const imported = missionData.waypoints.map((wp, index) => ({
@@ -466,17 +491,170 @@ function MissionSubPanel() {
           if (missionData.defaults.speed) setDefaultSpeed(missionData.defaults.speed);
         }
 
-        addAlert(`Loaded ${imported.length} waypoints from file`, 'success');
+        // Extract mission name from filename (without extension)
+        const missionName = file.name.replace(/\.json$/, '');
+
+        // Save as new mission
+        const now = Date.now();
+        const newMissionObj = {
+          id: now,
+          name: missionName || `Loaded ${new Date().toLocaleTimeString()}`,
+          waypoints: imported,
+          defaults: { alt: missionData.defaults?.alt || 50, speed: missionData.defaults?.speed || 5 },
+          createdAt: now,
+          updatedAt: now,
+        };
+        const currentMissions = useDroneStore.getState().savedMissions;
+        const updated = [...currentMissions, newMissionObj];
+        localStorage.setItem('pyxus-saved-missions', JSON.stringify(updated));
+        useDroneStore.setState({ savedMissions: updated, activeMissionId: newMissionObj.id });
+
+        addAlert(`Loaded "${missionName}" (${imported.length} waypoints)`, 'success');
       } catch (err) {
         addAlert(`Failed to load mission: ${err.message}`, 'error');
       }
     };
 
     input.click();
-  }, [clearWaypoints, setPlannedWaypoints, setDefaultAlt, setDefaultSpeed, addAlert]);
+  }, [setPlannedWaypoints, setDefaultAlt, setDefaultSpeed, addAlert]);
+
+  // Get active mission name
+  const activeMission = savedMissions.find(m => m.id === activeMissionId);
+  const activeMissionName = activeMission?.name || 'Unsaved Mission';
+
+  const handleSaveMission = useCallback(() => {
+    if (!activeMissionId && plannedWaypoints.length === 0) {
+      addAlert('No waypoints to save', 'warning');
+      return;
+    }
+    saveMission();
+    addAlert(activeMissionId ? 'Mission updated' : 'Mission saved', 'success');
+  }, [activeMissionId, plannedWaypoints.length, saveMission, addAlert]);
+
+  const handleNewMission = useCallback(() => {
+    newMission();
+    addAlert('New mission started', 'info');
+  }, [newMission, addAlert]);
+
+  const handleDeleteMission = useCallback(() => {
+    if (!activeMissionId) return;
+    const name = activeMission?.name || 'Mission';
+    deleteMission(activeMissionId);
+    addAlert(`${name} deleted`, 'info');
+  }, [activeMissionId, activeMission, deleteMission, addAlert]);
+
+  const handleDuplicateMission = useCallback(() => {
+    if (!activeMissionId) return;
+    duplicateMission(activeMissionId);
+    addAlert('Mission duplicated', 'success');
+  }, [activeMissionId, duplicateMission, addAlert]);
+
+  const handleStartRename = useCallback(() => {
+    if (!activeMissionId) return;
+    setNameValue(activeMission?.name || '');
+    setEditingName(true);
+  }, [activeMissionId, activeMission]);
+
+  const handleFinishRename = useCallback(() => {
+    if (nameValue.trim() && activeMissionId) {
+      renameMission(activeMissionId, nameValue.trim());
+    }
+    setEditingName(false);
+  }, [nameValue, activeMissionId, renameMission]);
 
   return (
     <>
+      {/* Mission selector */}
+      <div className="bg-gray-800/40 rounded-lg p-2.5 border border-gray-800/50 mb-3">
+        <div className="flex items-center gap-2 mb-2">
+          {editingName ? (
+            <div className="flex-1 flex items-center gap-1">
+              <input
+                type="text"
+                value={nameValue}
+                onChange={(e) => setNameValue(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleFinishRename()}
+                className="flex-1 bg-gray-900/60 text-gray-200 border border-cyan-500/50 rounded px-2 py-1 text-xs focus:outline-none"
+                autoFocus
+              />
+              <button
+                onClick={handleFinishRename}
+                className="p-1 text-cyan-400 hover:text-cyan-300"
+              >
+                <Check size={14} />
+              </button>
+            </div>
+          ) : (
+            <>
+              <select
+                value={activeMissionId || ''}
+                onChange={(e) => {
+                  const id = parseInt(e.target.value);
+                  if (id) loadMission(id);
+                }}
+                className="flex-1 bg-gray-900/60 text-gray-200 border border-gray-700/50 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500/50 cursor-pointer"
+              >
+                <option value="" className="bg-gray-800">
+                  {activeMissionId ? activeMissionName : '-- Select or create mission --'}
+                </option>
+                {savedMissions.map((m) => (
+                  <option key={m.id} value={m.id} className="bg-gray-800">
+                    {m.name} ({m.waypoints.length} pts)
+                  </option>
+                ))}
+              </select>
+              {activeMissionId && (
+                <button
+                  onClick={handleStartRename}
+                  title="Rename mission"
+                  className="p-1 text-gray-500 hover:text-gray-300 transition-colors"
+                >
+                  <Pencil size={12} />
+                </button>
+              )}
+            </>
+          )}
+        </div>
+        <div className="grid grid-cols-4 gap-1.5">
+          <button
+            onClick={handleNewMission}
+            title="New mission"
+            className="flex items-center justify-center gap-1 px-2 py-1.5 bg-gray-700/40 hover:bg-gray-700/60 border border-gray-600/30 rounded text-[10px] font-medium text-gray-400 hover:text-gray-200 transition-all"
+          >
+            <Plus size={11} /> New
+          </button>
+          <button
+            onClick={handleSaveMission}
+            disabled={plannedWaypoints.length === 0}
+            title={activeMissionId ? 'Update mission' : 'Save as new mission'}
+            className="flex items-center justify-center gap-1 px-2 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 rounded text-[10px] font-medium text-cyan-400 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <Save size={11} /> {activeMissionId ? 'Update' : 'Save'}
+          </button>
+          <button
+            onClick={handleDuplicateMission}
+            disabled={!activeMissionId}
+            title="Duplicate mission"
+            className="flex items-center justify-center gap-1 px-2 py-1.5 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 rounded text-[10px] font-medium text-violet-400 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <Copy size={11} /> Copy
+          </button>
+          <button
+            onClick={handleDeleteMission}
+            disabled={!activeMissionId}
+            title="Delete mission"
+            className="flex items-center justify-center gap-1 px-2 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded text-[10px] font-medium text-red-400 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <Trash2 size={11} /> Del
+          </button>
+        </div>
+        {savedMissions.length > 0 && (
+          <div className="text-[9px] text-gray-600 mt-1.5 text-center">
+            {savedMissions.length} saved mission{savedMissions.length !== 1 ? 's' : ''}
+          </div>
+        )}
+      </div>
+
       {/* Header with status */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1.5">

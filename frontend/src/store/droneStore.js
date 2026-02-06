@@ -38,6 +38,10 @@ const useDroneStore = create((set, get) => ({
   defaultSpeed: 5,
   takeoffAlt: 10,
 
+  // Saved missions (multi-mission planning)
+  savedMissions: JSON.parse(localStorage.getItem('pyxus-saved-missions') || '[]'),
+  activeMissionId: null,
+
   // Drone mission (downloaded from vehicle, read-only)
   droneMission: [],
 
@@ -275,6 +279,123 @@ const useDroneStore = create((set, get) => ({
       param4: wp.param4 || 0,
     }));
     set({ plannedWaypoints: imported });
+  },
+
+  // Multi-mission management
+  saveMission: (name) => {
+    const { plannedWaypoints, defaultAlt, defaultSpeed, savedMissions, activeMissionId } = get();
+    const now = Date.now();
+
+    if (activeMissionId) {
+      // Update existing mission
+      const updated = savedMissions.map(m => m.id === activeMissionId ? {
+        ...m,
+        name: name || m.name,
+        waypoints: plannedWaypoints,
+        defaults: { alt: defaultAlt, speed: defaultSpeed },
+        updatedAt: now,
+      } : m);
+      localStorage.setItem('pyxus-saved-missions', JSON.stringify(updated));
+      set({ savedMissions: updated });
+    } else {
+      // Create new mission
+      const newMission = {
+        id: now,
+        name: name || `Mission ${savedMissions.length + 1}`,
+        waypoints: plannedWaypoints,
+        defaults: { alt: defaultAlt, speed: defaultSpeed },
+        createdAt: now,
+        updatedAt: now,
+      };
+      const updated = [...savedMissions, newMission];
+      localStorage.setItem('pyxus-saved-missions', JSON.stringify(updated));
+      set({ savedMissions: updated, activeMissionId: newMission.id });
+    }
+  },
+
+  loadMission: (id) => {
+    const { savedMissions } = get();
+    const mission = savedMissions.find(m => m.id === id);
+    if (mission) {
+      const waypoints = mission.waypoints.map(wp => ({ ...wp, id: Date.now() + Math.random() * 10000 }));
+      set({
+        plannedWaypoints: waypoints,
+        activeMissionId: id,
+        defaultAlt: mission.defaults?.alt || 50,
+        defaultSpeed: mission.defaults?.speed || 5,
+      });
+    }
+  },
+
+  deleteMission: (id) => {
+    const { savedMissions, activeMissionId } = get();
+    const updated = savedMissions.filter(m => m.id !== id);
+    localStorage.setItem('pyxus-saved-missions', JSON.stringify(updated));
+    set({
+      savedMissions: updated,
+      activeMissionId: activeMissionId === id ? null : activeMissionId,
+    });
+  },
+
+  duplicateMission: (id) => {
+    const { savedMissions } = get();
+    const mission = savedMissions.find(m => m.id === id);
+    if (mission) {
+      const now = Date.now();
+      const newMission = {
+        ...mission,
+        id: now,
+        name: `${mission.name} (copy)`,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const updated = [...savedMissions, newMission];
+      localStorage.setItem('pyxus-saved-missions', JSON.stringify(updated));
+      set({ savedMissions: updated });
+    }
+  },
+
+  renameMission: (id, name) => {
+    const { savedMissions } = get();
+    const updated = savedMissions.map(m => m.id === id ? { ...m, name, updatedAt: Date.now() } : m);
+    localStorage.setItem('pyxus-saved-missions', JSON.stringify(updated));
+    set({ savedMissions: updated });
+  },
+
+  newMission: () => {
+    set({ plannedWaypoints: [], activeMissionId: null });
+  },
+
+  importDroneAsMission: (name) => {
+    const { droneMission, savedMissions } = get();
+    if (!droneMission.length) return null;
+
+    const now = Date.now();
+    const waypoints = droneMission.map((wp) => ({
+      lat: wp.lat,
+      lon: wp.lon,
+      alt: wp.alt,
+      id: now + Math.random() * 10000,
+      type: wp.item_type || 'waypoint',
+      param1: wp.param1 || 0,
+      param2: wp.param2 || 2,
+      param3: wp.param3 || 0,
+      param4: wp.param4 || 0,
+    }));
+
+    const newMission = {
+      id: now,
+      name: name || `Imported ${new Date().toLocaleTimeString()}`,
+      waypoints,
+      defaults: { alt: 50, speed: 5 },
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const updated = [...savedMissions, newMission];
+    localStorage.setItem('pyxus-saved-missions', JSON.stringify(updated));
+    set({ savedMissions: updated, plannedWaypoints: waypoints, activeMissionId: newMission.id });
+    return newMission;
   },
 
   // Plan subtab
