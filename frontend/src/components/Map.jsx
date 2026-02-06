@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useCallback } from 'react';
+import React, { useEffect, useMemo, useCallback, useState } from 'react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, Circle, Polygon, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import useDroneStore from '../store/droneStore';
@@ -6,6 +6,9 @@ import MavLog from './MavLog';
 import VideoOverlay from './VideoOverlay';
 import WeatherMapLayer from './WeatherMapLayer';
 import ManualControlOverlay from './ManualControlOverlay';
+import PatternModal from './PatternModal';
+import { Move, RotateCw, Maximize2, ArrowLeftRight, Grid3X3 } from 'lucide-react';
+import { centroid, transformMission } from '../utils/geo';
 
 // Satellite imagery tiles
 const TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -186,17 +189,202 @@ const TYPE_LABELS = {
   land: 'Land',
 };
 
+// Mission context menu component
+function MissionContextMenu({ position, onClose, onAction }) {
+  if (!position) return null;
+
+  const menuItems = [
+    { label: 'Move Mission', icon: Move, action: 'translate' },
+    { label: 'Rotate Mission', icon: RotateCw, action: 'rotate' },
+    { label: 'Scale Mission', icon: Maximize2, action: 'scale' },
+    { label: 'Reverse Order', icon: ArrowLeftRight, action: 'reverse' },
+    { label: 'Generate Pattern...', icon: Grid3X3, action: 'pattern' },
+  ];
+
+  return (
+    <div
+      className="fixed z-[2000] bg-gray-900 border border-gray-700/50 rounded-lg shadow-xl py-1 min-w-[160px]"
+      style={{ left: position.x, top: position.y }}
+    >
+      {menuItems.map((item) => {
+        const Icon = item.icon;
+        return (
+          <button
+            key={item.action}
+            onClick={() => {
+              onAction(item.action);
+              onClose();
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+          >
+            <Icon size={12} className="text-gray-500" />
+            {item.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// Mission manipulation overlay
+function ManipulationOverlay({ mode, onComplete, onCancel }) {
+  const map = useMap();
+  const plannedWaypoints = useDroneStore((s) => s.plannedWaypoints);
+  const setPlannedWaypoints = useDroneStore((s) => s.setPlannedWaypoints);
+  const [startPos, setStartPos] = useState(null);
+  const [previewWaypoints, setPreviewWaypoints] = useState([]);
+  const [manipValue, setManipValue] = useState(null);
+
+  // Calculate mission center
+  const missionCenter = useMemo(() => {
+    if (plannedWaypoints.length === 0) return null;
+    return centroid(plannedWaypoints.map(w => ({ lat: w.lat, lon: w.lon })));
+  }, [plannedWaypoints]);
+
+  useEffect(() => {
+    if (!mode || !missionCenter) return;
+
+    const container = map.getContainer();
+
+    if (mode === 'translate') {
+      container.style.cursor = 'move';
+    } else if (mode === 'rotate') {
+      container.style.cursor = 'crosshair';
+    } else if (mode === 'scale') {
+      container.style.cursor = 'nwse-resize';
+    }
+
+    const handleMouseDown = (e) => {
+      const latlng = map.mouseEventToLatLng(e);
+      setStartPos(latlng);
+    };
+
+    const handleMouseMove = (e) => {
+      if (!startPos) return;
+
+      const currentPos = map.mouseEventToLatLng(e);
+
+      if (mode === 'translate') {
+        const deltaLat = currentPos.lat - startPos.lat;
+        const deltaLon = currentPos.lng - startPos.lng;
+        const transformed = transformMission(plannedWaypoints, 'translate', { deltaLat, deltaLon });
+        setPreviewWaypoints(transformed);
+        setManipValue(`${(deltaLat * 111000).toFixed(0)}m, ${(deltaLon * 111000 * Math.cos(missionCenter.lat * Math.PI / 180)).toFixed(0)}m`);
+      } else if (mode === 'rotate') {
+        // Calculate angle from center to current position
+        const dx = currentPos.lng - missionCenter.lon;
+        const dy = currentPos.lat - missionCenter.lat;
+        const currentAngle = Math.atan2(dx, dy) * 180 / Math.PI;
+
+        const startDx = startPos.lng - missionCenter.lon;
+        const startDy = startPos.lat - missionCenter.lat;
+        const startAngle = Math.atan2(startDx, startDy) * 180 / Math.PI;
+
+        const angle = currentAngle - startAngle;
+        const transformed = transformMission(plannedWaypoints, 'rotate', { angle });
+        setPreviewWaypoints(transformed);
+        setManipValue(`${angle.toFixed(1)}°`);
+      } else if (mode === 'scale') {
+        // Calculate scale factor based on distance from center
+        const startDist = Math.sqrt(
+          Math.pow(startPos.lat - missionCenter.lat, 2) +
+          Math.pow(startPos.lng - missionCenter.lon, 2)
+        );
+        const currentDist = Math.sqrt(
+          Math.pow(currentPos.lat - missionCenter.lat, 2) +
+          Math.pow(currentPos.lng - missionCenter.lon, 2)
+        );
+        const factor = startDist > 0.00001 ? currentDist / startDist : 1;
+        const transformed = transformMission(plannedWaypoints, 'scale', { factor });
+        setPreviewWaypoints(transformed);
+        setManipValue(`${(factor * 100).toFixed(0)}%`);
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (previewWaypoints.length > 0) {
+        setPlannedWaypoints(previewWaypoints);
+      }
+      setStartPos(null);
+      setPreviewWaypoints([]);
+      setManipValue(null);
+      onComplete();
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setStartPos(null);
+        setPreviewWaypoints([]);
+        setManipValue(null);
+        onCancel();
+      }
+    };
+
+    container.addEventListener('mousedown', handleMouseDown);
+    container.addEventListener('mousemove', handleMouseMove);
+    container.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      container.style.cursor = '';
+      container.removeEventListener('mousedown', handleMouseDown);
+      container.removeEventListener('mousemove', handleMouseMove);
+      container.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [mode, map, startPos, plannedWaypoints, missionCenter, previewWaypoints, setPlannedWaypoints, onComplete, onCancel]);
+
+  if (!mode) return null;
+
+  const previewPositions = previewWaypoints
+    .filter(w => w.type !== 'roi')
+    .map(w => [w.lat, w.lon]);
+
+  return (
+    <>
+      {/* Preview polyline */}
+      {previewPositions.length > 1 && (
+        <Polyline
+          positions={previewPositions}
+          pathOptions={{ color: '#f59e0b', weight: 2, opacity: 0.8, dashArray: '4 4' }}
+        />
+      )}
+
+      {/* Mode indicator */}
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] bg-gray-900/90 border border-cyan-500/30 rounded-lg px-4 py-2 backdrop-blur-sm">
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-cyan-300 font-medium">
+            {mode === 'translate' && 'Move Mode'}
+            {mode === 'rotate' && 'Rotate Mode'}
+            {mode === 'scale' && 'Scale Mode'}
+          </span>
+          {manipValue && (
+            <span className="text-gray-400 font-mono">{manipValue}</span>
+          )}
+          <span className="text-gray-500 text-xs ml-2">Click and drag | Esc to cancel</span>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // Isolated component for planned waypoint markers - prevents telemetry re-renders from
 // recreating marker DOM (which kills in-progress drags)
-function PlannedWaypointMarkers() {
+function PlannedWaypointMarkers({ onContextMenu }) {
   const plannedWaypoints = useDroneStore((s) => s.plannedWaypoints);
   const activeTab = useDroneStore((s) => s.activeTab);
   const updateWaypoint = useDroneStore((s) => s.updateWaypoint);
+  const patternConfig = useDroneStore((s) => s.patternConfig);
 
   const isPlanning = activeTab === 'planning';
   const plannedOpacity = isPlanning ? 1 : 0.3;
 
   const plannedNavPositions = plannedWaypoints
+    .filter((w) => w.type !== 'roi')
+    .map((w) => [w.lat, w.lon]);
+
+  // Pattern preview positions
+  const previewPositions = patternConfig.preview
     .filter((w) => w.type !== 'roi')
     .map((w) => [w.lat, w.lon]);
 
@@ -237,6 +425,27 @@ function PlannedWaypointMarkers() {
         <Polyline
           positions={plannedNavPositions}
           pathOptions={{ color: '#3b82f6', weight: 2, opacity: 0.5 * plannedOpacity, dashArray: '8 4' }}
+          eventHandlers={{
+            contextmenu: (e) => {
+              if (isPlanning && onContextMenu) {
+                e.originalEvent.preventDefault();
+                onContextMenu({
+                  lat: e.latlng.lat,
+                  lon: e.latlng.lng,
+                  x: e.originalEvent.clientX,
+                  y: e.originalEvent.clientY,
+                });
+              }
+            },
+          }}
+        />
+      )}
+
+      {/* Pattern preview */}
+      {previewPositions.length > 1 && (
+        <Polyline
+          positions={previewPositions}
+          pathOptions={{ color: '#f59e0b', weight: 2, opacity: 0.7, dashArray: '4 4' }}
         />
       )}
     </>
@@ -573,6 +782,12 @@ export default function MapView() {
   const toggleAddWaypointMode = useDroneStore((s) => s.toggleAddWaypointMode);
   const planSubTab = useDroneStore((s) => s.planSubTab);
   const homePosition = useDroneStore((s) => s.homePosition);
+  const setPatternConfig = useDroneStore((s) => s.setPatternConfig);
+  const reverseWaypoints = useDroneStore((s) => s.reverseWaypoints);
+
+  // Context menu and manipulation state
+  const [contextMenu, setContextMenu] = useState(null);
+  const [manipMode, setManipMode] = useState(null);
 
   const hasPosition = lat !== 0 && lon !== 0;
   const hasHome = homePosition && homePosition.lat !== 0 && homePosition.lon !== 0;
@@ -585,6 +800,31 @@ export default function MapView() {
 
   const center = hasPosition ? [lat, lon] : [0, 0];
   const zoom = hasPosition ? 17 : 3;
+
+  // Handle context menu actions
+  const handleContextAction = useCallback((action) => {
+    switch (action) {
+      case 'translate':
+      case 'rotate':
+      case 'scale':
+        setManipMode(action);
+        break;
+      case 'reverse':
+        reverseWaypoints();
+        break;
+      case 'pattern':
+        setPatternConfig({ visible: true });
+        break;
+    }
+  }, [reverseWaypoints, setPatternConfig]);
+
+  // Close context menu on click anywhere
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handleClick = () => setContextMenu(null);
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [contextMenu]);
 
   return (
     <div className="w-full h-full relative">
@@ -638,7 +878,14 @@ export default function MapView() {
         )}
 
         {/* Planned waypoint markers + polyline (isolated from telemetry re-renders) */}
-        <PlannedWaypointMarkers />
+        <PlannedWaypointMarkers onContextMenu={setContextMenu} />
+
+        {/* Mission manipulation overlay */}
+        <ManipulationOverlay
+          mode={manipMode}
+          onComplete={() => setManipMode(null)}
+          onCancel={() => setManipMode(null)}
+        />
 
         {/* Drone mission markers + polyline (with Start From Here in fly mode) */}
         <DroneMissionMarkers />
@@ -711,6 +958,16 @@ export default function MapView() {
 
       {/* Servo group quick buttons */}
       <ServoGroupButtons />
+
+      {/* Mission context menu */}
+      <MissionContextMenu
+        position={contextMenu}
+        onClose={() => setContextMenu(null)}
+        onAction={handleContextAction}
+      />
+
+      {/* Pattern generation modal */}
+      <PatternModal />
     </div>
   );
 }

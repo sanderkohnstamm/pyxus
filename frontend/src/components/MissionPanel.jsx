@@ -38,6 +38,7 @@ import {
   Copy,
   Check,
   Pencil,
+  Grid3X3,
 } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
 import FenceSubPanel from './FenceSubPanel';
@@ -306,6 +307,7 @@ function MissionSubPanel() {
   const renameMission = useDroneStore((s) => s.renameMission);
   const newMission = useDroneStore((s) => s.newMission);
   const importDroneAsMission = useDroneStore((s) => s.importDroneAsMission);
+  const setPatternConfig = useDroneStore((s) => s.setPatternConfig);
 
   // Rename editing state
   const [editingName, setEditingName] = React.useState(false);
@@ -783,7 +785,7 @@ function MissionSubPanel() {
         </div>
 
         {/* File operations (work offline) */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <button
             onClick={handleSaveToFile}
             disabled={plannedWaypoints.length === 0}
@@ -798,6 +800,13 @@ function MissionSubPanel() {
             className="flex items-center justify-center gap-1.5 px-2 py-2 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 hover:border-violet-500/40 rounded-md text-xs font-semibold text-violet-300 transition-all"
           >
             <FolderOpen size={12} /> Load
+          </button>
+          <button
+            onClick={() => setPatternConfig({ visible: true })}
+            title="Generate pattern (lawnmower, spiral, orbit)"
+            className="flex items-center justify-center gap-1.5 px-2 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-500/40 rounded-md text-xs font-semibold text-amber-300 transition-all"
+          >
+            <Grid3X3 size={12} /> Pattern
           </button>
         </div>
       </div>

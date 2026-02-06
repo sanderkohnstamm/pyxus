@@ -419,13 +419,20 @@ async def api_fence_clear():
 async def api_motor_test(req: MotorTestRequest):
     if not drone.connected:
         return {"status": "error", "error": "Not connected"}
+
+    # Check if vehicle is armed - motor test requires disarmed state
+    telemetry = drone.get_telemetry()
+    if telemetry.get("armed", False):
+        return {"status": "error", "error": "Vehicle must be disarmed for motor test"}
+
     drone.motor_test(
         motor=req.motor,
         throttle=req.throttle,
         duration=req.duration,
         all_motors=req.all_motors,
     )
-    return {"status": "ok", "command": "motor_test", "motor": req.motor, "throttle": req.throttle}
+    motor_desc = "all motors" if req.all_motors else f"motor {req.motor}"
+    return {"status": "ok", "command": "motor_test", "motor": motor_desc, "throttle": req.throttle}
 
 
 @app.post("/api/servo/test")

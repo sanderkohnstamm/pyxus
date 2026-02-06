@@ -13,18 +13,44 @@ MAV_TYPES = {
     2: "Quadrotor",
     3: "Coaxial",
     4: "Helicopter",
+    5: "Antenna Tracker",
     6: "GCS",
+    7: "Airship",
+    8: "Free Balloon",
+    9: "Rocket",
     10: "Ground Rover",
     11: "Surface Boat",
     12: "Submarine",
     13: "Hexarotor",
     14: "Octorotor",
     15: "Tricopter",
+    16: "Flapping Wing",
+    17: "Kite",
+    18: "Companion Computer",
     19: "VTOL Tiltrotor",
     20: "VTOL Duo",
     21: "VTOL Quad",
     22: "VTOL Tailsitter",
+    23: "VTOL Reserved",
+    24: "VTOL Reserved",
+    25: "VTOL Reserved",
+    26: "Gimbal",
+    27: "ADSB",
+    28: "Parafoil",
     29: "Dodecarotor",
+    30: "Camera",
+    31: "Charging Station",
+    32: "FLARM",
+    33: "Servo",
+    34: "ODID",
+    35: "Decarotor",
+    36: "Battery",
+    37: "Parachute",
+    38: "Log",
+    39: "OSD",
+    40: "IMU",
+    41: "GPS",
+    42: "Winch",
 }
 
 
@@ -111,16 +137,22 @@ ARDUPILOT_MODES = {
     19: "AVOID_ADSB", 20: "GUIDED_NOGPS", 21: "SMART_RTL",
 }
 
-# PX4 main mode bitmask mappings
+# PX4 main mode and sub-mode mappings
+# Main modes: 1=MANUAL, 2=ALTCTL, 3=POSCTL, 4=AUTO, 5=ACRO, 6=OFFBOARD, 7=STABILIZED, 8=RATTITUDE
+# Sub modes (for AUTO=4): 1=READY, 2=TAKEOFF, 3=LOITER, 4=MISSION, 5=RTL, 6=LAND, 7=RTGS, 8=FOLLOW
 PX4_MODES = {
+    (0, 0): "UNKNOWN",
     (1, 0): "MANUAL", (1, 1): "MANUAL",
-    (2, 0): "ALTCTL", (2, 3): "ALTCTL",
+    (2, 0): "ALTCTL", (2, 1): "ALTCTL",
     (3, 0): "POSCTL", (3, 1): "POSCTL",
-    (4, 1): "AUTO_READY", (4, 2): "AUTO_TAKEOFF",
+    (4, 0): "AUTO", (4, 1): "AUTO_READY", (4, 2): "AUTO_TAKEOFF",
     (4, 3): "AUTO_LOITER", (4, 4): "AUTO_MISSION",
     (4, 5): "AUTO_RTL", (4, 6): "AUTO_LAND",
-    (5, 0): "OFFBOARD",
-    (6, 0): "STABILIZED",
+    (4, 7): "AUTO_RTGS", (4, 8): "AUTO_FOLLOW",
+    (5, 0): "ACRO",
+    (6, 0): "OFFBOARD",
+    (7, 0): "STABILIZED",
+    (8, 0): "RATTITUDE",
 }
 
 
@@ -409,18 +441,57 @@ class DroneConnection:
                     kwargs.get("mission_type", mavutil.mavlink.MAV_MISSION_TYPE_MISSION),
                 )
             elif cmd_type == "motor_test":
-                self._mav.mav.command_long_send(
-                    self._target_system, self._target_component,
-                    mavutil.mavlink.MAV_CMD_DO_MOTOR_TEST,
-                    0,
-                    kwargs["motor"],      # param1: motor instance (1-indexed)
-                    0,                    # param2: throttle type (0=percent)
-                    kwargs["throttle"],   # param3: throttle value (0-100%)
-                    kwargs["duration"],   # param4: timeout (seconds)
-                    kwargs.get("motor_count", 1),  # param5: motor count
-                    0,                    # param6: test order
-                    0,
-                )
+                motor_instance = kwargs["motor"]
+                throttle_pct = kwargs["throttle"]
+                duration_sec = kwargs["duration"]
+                motor_count = kwargs.get("motor_count", 1)
+
+                if self._is_ardupilot:
+                    # ArduPilot: use MAV_CMD_DO_MOTOR_TEST
+                    self._mav.mav.command_long_send(
+                        self._target_system, self._target_component,
+                        mavutil.mavlink.MAV_CMD_DO_MOTOR_TEST,
+                        0,
+                        motor_instance,       # param1: motor instance (1-indexed)
+                        0,                    # param2: throttle type (0=percent)
+                        throttle_pct,         # param3: throttle value (0-100%)
+                        duration_sec,         # param4: timeout (seconds)
+                        motor_count,          # param5: motor count (0=all)
+                        0,                    # param6: test order
+                        0,
+                    )
+                else:
+                    # PX4: use MAV_CMD_ACTUATOR_TEST (command ID 310)
+                    # PX4 motor indexing is 0-based
+                    # param1: output value (-1 to 1, we use 0 to throttle_pct/100)
+                    # param2: timeout in ms
+                    # param3: output function/motor index (0-based for motors)
+                    MAV_CMD_ACTUATOR_TEST = 310
+                    value = throttle_pct / 100.0  # Convert to 0-1 range
+                    timeout_ms = int(duration_sec * 1000)
+                    if motor_count == 0:
+                        # Test all motors - send to each one
+                        for m in range(8):
+                            self._mav.mav.command_long_send(
+                                self._target_system, self._target_component,
+                                MAV_CMD_ACTUATOR_TEST,
+                                0,
+                                value,        # param1: actuator value (-1 to 1)
+                                timeout_ms,   # param2: timeout in ms
+                                m,            # param3: actuator index (0-based)
+                                0, 0, 0, 0,
+                            )
+                    else:
+                        # Test single motor (convert from 1-indexed to 0-indexed)
+                        self._mav.mav.command_long_send(
+                            self._target_system, self._target_component,
+                            MAV_CMD_ACTUATOR_TEST,
+                            0,
+                            value,                # param1: actuator value (-1 to 1)
+                            timeout_ms,           # param2: timeout in ms
+                            motor_instance - 1,   # param3: actuator index (0-based)
+                            0, 0, 0, 0,
+                        )
             elif cmd_type == "servo_set":
                 self._mav.mav.command_long_send(
                     self._target_system, self._target_component,
@@ -600,7 +671,21 @@ class DroneConnection:
 
         with self._lock:
             if msg_type == "HEARTBEAT":
-                if msg.type != mavutil.mavlink.MAV_TYPE_GCS:
+                # Only process heartbeats from the target system's autopilot (not GCS, gimbals, etc.)
+                src_system = msg.get_srcSystem()
+                src_component = msg.get_srcComponent()
+
+                # Skip if not from our target system
+                if src_system != self._target_system:
+                    return
+
+                # Skip GCS heartbeats
+                if msg.type == mavutil.mavlink.MAV_TYPE_GCS:
+                    return
+
+                # Only update telemetry from main autopilot component (typically 1)
+                # or if this is the first/only component we've seen
+                if src_component == self._target_component or src_component == 1:
                     base_mode = msg.base_mode
                     self._telemetry.armed = bool(base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED)
                     self._telemetry.system_status = msg.system_status
@@ -612,6 +697,7 @@ class DroneConnection:
                         custom = msg.custom_mode
                         self._telemetry.mode = ARDUPILOT_MODES.get(custom, f"MODE_{custom}")
                     else:
+                        # PX4 mode decoding - fixed bit positions
                         main_mode = (msg.custom_mode >> 16) & 0xFF
                         sub_mode = (msg.custom_mode >> 24) & 0xFF
                         self._telemetry.mode = PX4_MODES.get(

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { transformMission } from '../utils/geo';
 
 const MAX_TRAIL_POINTS = 500;
 
@@ -119,6 +120,18 @@ const useDroneStore = create((set, get) => ({
 
   // Zoom on connect trigger
   zoomToDrone: false,
+
+  // Pattern generation
+  patternConfig: {
+    type: null,        // 'lawnmower' | 'spiral' | 'orbit' | 'perimeter'
+    visible: false,    // Show pattern config modal
+    preview: [],       // Preview waypoints before committing
+  },
+
+  // Mission manipulation
+  missionManipMode: null, // null | 'translate' | 'rotate' | 'scale'
+  manipStartPos: null,    // {lat, lon} - mouse start position
+  contextMenuPos: null,   // {lat, lon, x, y} - context menu position
 
   // Cameras and gimbals detected via MAVLink
   cameras: [],   // [{id, vendor, model, capabilities, ...}]
@@ -611,6 +624,58 @@ const useDroneStore = create((set, get) => ({
 
   // Home position
   setHomePosition: (pos) => set({ homePosition: pos }),
+
+  // Pattern generation
+  setPatternConfig: (config) => set((s) => ({
+    patternConfig: { ...s.patternConfig, ...config }
+  })),
+
+  applyPattern: (waypoints) => {
+    const { plannedWaypoints } = get();
+    const withIds = waypoints.map((w, i) => ({
+      ...w,
+      id: Date.now() + i,
+      type: w.type || 'waypoint',
+      param1: 0,
+      param2: 2,
+      param3: 0,
+      param4: 0,
+    }));
+    set({ plannedWaypoints: [...plannedWaypoints, ...withIds] });
+  },
+
+  replaceWithPattern: (waypoints) => {
+    const withIds = waypoints.map((w, i) => ({
+      ...w,
+      id: Date.now() + i,
+      type: w.type || 'waypoint',
+      param1: 0,
+      param2: 2,
+      param3: 0,
+      param4: 0,
+    }));
+    set({ plannedWaypoints: withIds });
+  },
+
+  clearPatternPreview: () => set((s) => ({
+    patternConfig: { ...s.patternConfig, preview: [] }
+  })),
+
+  // Mission manipulation
+  setMissionManipMode: (mode) => set({ missionManipMode: mode }),
+  setManipStartPos: (pos) => set({ manipStartPos: pos }),
+  setContextMenuPos: (pos) => set({ contextMenuPos: pos }),
+
+  transformAllWaypoints: (transform, params) => {
+    const { plannedWaypoints } = get();
+    const transformed = transformMission(plannedWaypoints, transform, params);
+    set({ plannedWaypoints: transformed });
+  },
+
+  reverseWaypoints: () => {
+    const { plannedWaypoints } = get();
+    set({ plannedWaypoints: [...plannedWaypoints].reverse() });
+  },
 
   // Alerts
   addAlert: (message, type = 'info') => {
