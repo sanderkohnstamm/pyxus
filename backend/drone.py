@@ -145,6 +145,11 @@ class DroneConnection:
         self._statustext_queue: list = []
         self._statustext_lock = threading.Lock()
 
+        # Cameras and gimbals discovered
+        self._cameras: dict = {}  # component_id -> info
+        self._gimbals: dict = {}  # component_id -> info
+        self._camera_lock = threading.Lock()
+
     @property
     def connected(self) -> bool:
         return self._connected
@@ -470,6 +475,30 @@ class DroneConnection:
                     param_id, kwargs["value"],
                     kwargs.get("param_type", 9),  # MAV_PARAM_TYPE_REAL32
                 )
+            elif cmd_type == "request_camera_info":
+                # Request camera information from all camera components
+                self._mav.mav.command_long_send(
+                    self._target_system, 0,  # 0 = broadcast to all components
+                    mavutil.mavlink.MAV_CMD_REQUEST_MESSAGE,
+                    0,
+                    mavutil.mavlink.MAVLINK_MSG_ID_CAMERA_INFORMATION,
+                    0, 0, 0, 0, 0, 0
+                )
+            elif cmd_type == "gimbal_pitch_yaw":
+                import math
+                pitch_rad = math.radians(kwargs.get("pitch", 0))
+                yaw_rad = math.radians(kwargs.get("yaw", 0))
+                self._mav.mav.command_long_send(
+                    self._target_system, self._target_component,
+                    mavutil.mavlink.MAV_CMD_DO_GIMBAL_MANAGER_PITCHYAW,
+                    0,
+                    pitch_rad,      # param1: pitch angle (rad)
+                    yaw_rad,        # param2: yaw angle (rad)
+                    kwargs.get("pitch_rate", float('nan')),  # param3: pitch rate
+                    kwargs.get("yaw_rate", float('nan')),    # param4: yaw rate
+                    0,              # param5: gimbal manager flags
+                    0, 0
+                )
         except Exception as e:
             print(f"Command error ({cmd_type}): {e}")
 
@@ -492,6 +521,45 @@ class DroneConnection:
                     'index': msg.param_index,
                 }
                 self._params_total = msg.param_count
+            return
+
+        # Store camera information
+        if msg_type == "CAMERA_INFORMATION":
+            with self._camera_lock:
+                comp_id = msg.get_srcComponent()
+                vendor = msg.vendor_name.rstrip(b'\x00').decode('utf-8', errors='replace') if hasattr(msg, 'vendor_name') else ''
+                model = msg.model_name.rstrip(b'\x00').decode('utf-8', errors='replace') if hasattr(msg, 'model_name') else ''
+                self._cameras[comp_id] = {
+                    'component_id': comp_id,
+                    'vendor': vendor,
+                    'model': model,
+                    'firmware_version': getattr(msg, 'firmware_version', 0),
+                    'focal_length': getattr(msg, 'focal_length', 0),
+                    'sensor_size_h': getattr(msg, 'sensor_size_h', 0),
+                    'sensor_size_v': getattr(msg, 'sensor_size_v', 0),
+                    'resolution_h': getattr(msg, 'resolution_h', 0),
+                    'resolution_v': getattr(msg, 'resolution_v', 0),
+                    'flags': getattr(msg, 'flags', 0),
+                }
+            return
+
+        # Store gimbal device information
+        if msg_type == "GIMBAL_DEVICE_INFORMATION":
+            with self._camera_lock:
+                comp_id = msg.get_srcComponent()
+                vendor = msg.vendor_name.rstrip(b'\x00').decode('utf-8', errors='replace') if hasattr(msg, 'vendor_name') else ''
+                model = msg.model_name.rstrip(b'\x00').decode('utf-8', errors='replace') if hasattr(msg, 'model_name') else ''
+                self._gimbals[comp_id] = {
+                    'component_id': comp_id,
+                    'vendor': vendor,
+                    'model': model,
+                    'firmware_version': getattr(msg, 'firmware_version', ''),
+                    'cap_flags': getattr(msg, 'cap_flags', 0),
+                    'tilt_max': getattr(msg, 'tilt_max', 0),
+                    'tilt_min': getattr(msg, 'tilt_min', 0),
+                    'pan_max': getattr(msg, 'pan_max', 0),
+                    'pan_min': getattr(msg, 'pan_min', 0),
+                }
             return
 
         # Capture STATUSTEXT messages (deduplicate within 1s window)
@@ -621,7 +689,7 @@ class DroneConnection:
         self._enqueue_cmd("set_roi", lat=lat, lon=lon, alt=alt)
 
     def calibrate(self, cal_type: str):
-        """Start a sensor calibration. Types: gyro, accel, level, compass, pressure, cancel."""
+        """Start a sensor calibration. Types: gyro, accel, level, compass, pressure, cancel, next_step."""
         cal_map = {
             "gyro":     {"param1": 1},
             "compass":  {"param2": 1},
@@ -629,10 +697,29 @@ class DroneConnection:
             "accel":    {"param5": 1},
             "level":    {"param5": 2},
             "cancel":   {"param1": 0, "param2": 0, "param3": 0, "param4": 0, "param5": 0, "param6": 0},  # All zeros = cancel
+            "next_step": {"param5": 4},  # Simple accel cal accept (next position)
         }
         params = cal_map.get(cal_type, {})
         if params:
             self._enqueue_cmd("preflight_calibration", **params)
+
+    def get_cameras(self) -> list:
+        """Return list of discovered cameras."""
+        with self._camera_lock:
+            return list(self._cameras.values())
+
+    def get_gimbals(self) -> list:
+        """Return list of discovered gimbals."""
+        with self._camera_lock:
+            return list(self._gimbals.values())
+
+    def request_camera_info(self):
+        """Request camera information from all cameras."""
+        self._enqueue_cmd("request_camera_info")
+
+    def set_gimbal_pitch_yaw(self, pitch: float, yaw: float, pitch_rate: float = 0, yaw_rate: float = 0):
+        """Set gimbal pitch and yaw angles in degrees."""
+        self._enqueue_cmd("gimbal_pitch_yaw", pitch=pitch, yaw=yaw, pitch_rate=pitch_rate, yaw_rate=yaw_rate)
 
     def send_mission_cmd(self, cmd_type: str, **kwargs):
         self._enqueue_cmd(cmd_type, **kwargs)

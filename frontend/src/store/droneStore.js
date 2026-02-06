@@ -113,6 +113,20 @@ const useDroneStore = create((set, get) => ({
   // Manual control overlay
   manualOverlayCollapsed: false,
 
+  // Zoom on connect trigger
+  zoomToDrone: false,
+
+  // Cameras and gimbals detected via MAVLink
+  cameras: [],   // [{id, vendor, model, capabilities, ...}]
+  gimbals: [],   // [{id, vendor, model, capabilities, ...}]
+  activeCamera: null,
+
+  // Hotkeys for flight commands
+  commandHotkeys: JSON.parse(localStorage.getItem('pyxus-command-hotkeys') || '{}'),
+
+  // Servo groups (for quick actuation buttons)
+  servoGroups: JSON.parse(localStorage.getItem('pyxus-servo-groups') || '[]'),
+
   // WebSocket
   wsConnected: false,
 
@@ -415,6 +429,54 @@ const useDroneStore = create((set, get) => ({
 
   // Manual control overlay
   toggleManualOverlay: () => set((s) => ({ manualOverlayCollapsed: !s.manualOverlayCollapsed })),
+
+  // Zoom on connect
+  triggerZoomToDrone: () => set({ zoomToDrone: true }),
+  clearZoomToDrone: () => set({ zoomToDrone: false }),
+
+  // Cameras and gimbals
+  setCameras: (cameras) => set({ cameras }),
+  setGimbals: (gimbals) => set({ gimbals }),
+  setActiveCamera: (id) => set({ activeCamera: id }),
+
+  // Command hotkeys
+  setCommandHotkey: (key, command) => {
+    const { commandHotkeys } = get();
+    const updated = { ...commandHotkeys, [key.toLowerCase()]: command };
+    localStorage.setItem('pyxus-command-hotkeys', JSON.stringify(updated));
+    set({ commandHotkeys: updated });
+  },
+  removeCommandHotkey: (key) => {
+    const { commandHotkeys } = get();
+    const updated = { ...commandHotkeys };
+    delete updated[key.toLowerCase()];
+    localStorage.setItem('pyxus-command-hotkeys', JSON.stringify(updated));
+    set({ commandHotkeys: updated });
+  },
+  clearCommandHotkeys: () => {
+    localStorage.removeItem('pyxus-command-hotkeys');
+    set({ commandHotkeys: {} });
+  },
+
+  // Servo groups
+  addServoGroup: (group) => {
+    const { servoGroups } = get();
+    const updated = [...servoGroups, { ...group, id: Date.now() }];
+    localStorage.setItem('pyxus-servo-groups', JSON.stringify(updated));
+    set({ servoGroups: updated });
+  },
+  updateServoGroup: (id, updates) => {
+    const { servoGroups } = get();
+    const updated = servoGroups.map(g => g.id === id ? { ...g, ...updates } : g);
+    localStorage.setItem('pyxus-servo-groups', JSON.stringify(updated));
+    set({ servoGroups: updated });
+  },
+  removeServoGroup: (id) => {
+    const { servoGroups } = get();
+    const updated = servoGroups.filter(g => g.id !== id);
+    localStorage.setItem('pyxus-servo-groups', JSON.stringify(updated));
+    set({ servoGroups: updated });
+  },
 
   // Alerts
   addAlert: (message, type = 'info') => {

@@ -45,6 +45,9 @@ export default function ConnectionBar() {
   const setDefaultSpeed = useDroneStore((s) => s.setDefaultSpeed);
   const setTakeoffAlt = useDroneStore((s) => s.setTakeoffAlt);
   const setVideoUrl = useDroneStore((s) => s.setVideoUrl);
+  const triggerZoomToDrone = useDroneStore((s) => s.triggerZoomToDrone);
+  const setCameras = useDroneStore((s) => s.setCameras);
+  const setGimbals = useDroneStore((s) => s.setGimbals);
 
   // Load settings + check backend connection on mount
   useEffect(() => {
@@ -120,6 +123,9 @@ export default function ConnectionBar() {
         setConnectionStatus('connected');
         addAlert(`Connected (${data.autopilot})`, 'success');
 
+        // Zoom to drone after a brief delay for telemetry to arrive
+        setTimeout(() => triggerZoomToDrone(), 500);
+
         // Auto-download mission and fence from drone
         try {
           const missionRes = await fetch('/api/mission/download');
@@ -136,6 +142,16 @@ export default function ConnectionBar() {
           if (fenceData.status === 'ok' && fenceData.fence_items && fenceData.fence_items.length > 0) {
             setDroneFence(fenceData.fence_items);
             addAlert(`Downloaded ${fenceData.fence_items.length} fence items from drone`, 'info');
+          }
+        } catch {}
+
+        // Fetch cameras and gimbals
+        try {
+          const camerasRes = await fetch('/api/cameras');
+          const camerasData = await camerasRes.json();
+          if (camerasData.status === 'ok') {
+            setCameras(camerasData.cameras || []);
+            setGimbals(camerasData.gimbals || []);
           }
         } catch {}
       } else {

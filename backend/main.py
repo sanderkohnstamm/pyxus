@@ -422,6 +422,35 @@ async def api_servo_test(req: ServoTestRequest):
     return {"status": "ok", "command": "servo_test", "servo": req.servo, "pwm": req.pwm}
 
 
+# --- Cameras & Gimbals ---
+
+class GimbalControlRequest(BaseModel):
+    pitch: float = 0.0
+    yaw: float = 0.0
+    pitch_rate: float = 0.0
+    yaw_rate: float = 0.0
+
+
+@app.get("/api/cameras")
+async def api_cameras():
+    if not drone.connected:
+        return {"status": "error", "error": "Not connected"}
+    # Request camera info first
+    drone.request_camera_info()
+    await asyncio.sleep(0.5)  # Brief wait for responses
+    cameras = drone.get_cameras()
+    gimbals = drone.get_gimbals()
+    return {"status": "ok", "cameras": cameras, "gimbals": gimbals}
+
+
+@app.post("/api/gimbal/control")
+async def api_gimbal_control(req: GimbalControlRequest):
+    if not drone.connected:
+        return {"status": "error", "error": "Not connected"}
+    drone.set_gimbal_pitch_yaw(req.pitch, req.yaw, req.pitch_rate, req.yaw_rate)
+    return {"status": "ok", "command": "gimbal_control", "pitch": req.pitch, "yaw": req.yaw}
+
+
 # --- Parameters ---
 
 @app.get("/api/params")

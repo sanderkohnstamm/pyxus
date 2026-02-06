@@ -90,10 +90,20 @@ function DroneFollower() {
   const lon = useDroneStore((s) => s.telemetry.lon);
   const followDrone = useDroneStore((s) => s.followDrone);
   const setFollowDrone = useDroneStore((s) => s.setFollowDrone);
+  const zoomToDrone = useDroneStore((s) => s.zoomToDrone);
+  const clearZoomToDrone = useDroneStore((s) => s.clearZoomToDrone);
 
   useMapEvents({
     dragstart: () => setFollowDrone(false),
   });
+
+  // Zoom to drone on connect trigger
+  useEffect(() => {
+    if (zoomToDrone && lat !== 0 && lon !== 0) {
+      map.setView([lat, lon], 17, { animate: true });
+      clearZoomToDrone();
+    }
+  }, [zoomToDrone, lat, lon, map, clearZoomToDrone]);
 
   useEffect(() => {
     if (followDrone && lat !== 0 && lon !== 0) {
@@ -367,6 +377,59 @@ function DroneMissionMarkers() {
   );
 }
 
+// Servo group quick action buttons
+function ServoGroupButtons() {
+  const servoGroups = useDroneStore((s) => s.servoGroups);
+  const connectionStatus = useDroneStore((s) => s.connectionStatus);
+  const addAlert = useDroneStore((s) => s.addAlert);
+  const isConnected = connectionStatus === 'connected';
+  const [groupStates, setGroupStates] = React.useState({});
+
+  if (!isConnected || servoGroups.length === 0) return null;
+
+  const toggleGroup = async (group) => {
+    const currentState = groupStates[group.id] || 'closed';
+    const isOpen = currentState === 'open';
+    const pwm = isOpen ? group.closePwm : group.openPwm;
+
+    try {
+      await fetch('/api/servo/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ servo: group.servo, pwm }),
+      });
+      setGroupStates(prev => ({ ...prev, [group.id]: isOpen ? 'closed' : 'open' }));
+      addAlert(`${group.name}: ${isOpen ? 'Closed' : 'Opened'}`, 'info');
+    } catch (err) {
+      addAlert(`Servo command failed: ${err.message}`, 'error');
+    }
+  };
+
+  return (
+    <div className="absolute bottom-14 right-3 z-[1000] flex flex-col gap-1.5">
+      {servoGroups.map((group) => {
+        const isOpen = groupStates[group.id] === 'open';
+        return (
+          <button
+            key={group.id}
+            onClick={() => toggleGroup(group)}
+            className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all border backdrop-blur-md shadow-lg ${
+              isOpen
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                : 'bg-gray-900/60 text-gray-400 hover:text-gray-200 border-gray-700/40'
+            }`}
+          >
+            {group.name}
+            {group.hotkey && (
+              <span className="ml-1.5 text-[9px] opacity-60">({group.hotkey.toUpperCase()})</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // Target icon for fly mode click
 const flyTargetIcon = L.divIcon({
   html: '<div style="width:12px;height:12px;border:2px solid #f97316;border-radius:50%;background:rgba(249,115,22,0.3)"></div>',
@@ -578,6 +641,9 @@ export default function MapView() {
           <VideoOverlay />
         </div>
       )}
+
+      {/* Servo group quick buttons */}
+      <ServoGroupButtons />
     </div>
   );
 }

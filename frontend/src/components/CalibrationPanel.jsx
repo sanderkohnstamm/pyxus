@@ -283,13 +283,34 @@ export default function CalibrationPanel() {
 
             {/* Buttons */}
             {isRunning ? (
-              <button
-                onClick={cancelCalibration}
-                className="w-full py-2 rounded-md text-xs font-semibold transition-all border bg-red-500/10 hover:bg-red-500/20 border-red-500/20 hover:border-red-500/40 text-red-300 flex items-center justify-center gap-1.5"
-              >
-                <X size={12} />
-                Cancel Calibration
-              </button>
+              <div className="flex gap-2">
+                {/* Continue/Next button for accel calibration */}
+                {cal.id === 'accel' && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        await fetch('/api/calibrate', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ type: 'next_step' }),
+                        });
+                        addAlert('Sent continue signal', 'info');
+                      } catch {}
+                    }}
+                    className="flex-1 py-2 rounded-md text-xs font-semibold transition-all border bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/20 hover:border-emerald-500/40 text-emerald-300 flex items-center justify-center gap-1.5"
+                  >
+                    <Check size={12} />
+                    Continue (Enter)
+                  </button>
+                )}
+                <button
+                  onClick={cancelCalibration}
+                  className={`${cal.id === 'accel' ? 'flex-1' : 'w-full'} py-2 rounded-md text-xs font-semibold transition-all border bg-red-500/10 hover:bg-red-500/20 border-red-500/20 hover:border-red-500/40 text-red-300 flex items-center justify-center gap-1.5`}
+                >
+                  <X size={12} />
+                  Cancel
+                </button>
+              </div>
             ) : (
               <button
                 onClick={() => startCalibration(cal.id)}
