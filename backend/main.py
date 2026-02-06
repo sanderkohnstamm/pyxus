@@ -526,6 +526,19 @@ async def api_mavlink_stats_clear():
     return {"status": "ok"}
 
 
+@app.get("/api/mavlink/components")
+async def api_mavlink_components():
+    if not drone.connected:
+        return {"status": "error", "error": "Not connected"}
+    components = drone.get_components()
+    return {
+        "status": "ok",
+        "components": components,
+        "target_system": drone.target_system,
+        "target_component": drone.target_component,
+    }
+
+
 # --- Settings ---
 
 @app.get("/api/settings")

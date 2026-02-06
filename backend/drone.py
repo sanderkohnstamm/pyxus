@@ -137,6 +137,57 @@ ARDUPILOT_MODES = {
     19: "AVOID_ADSB", 20: "GUIDED_NOGPS", 21: "SMART_RTL",
 }
 
+# Vehicle MAV_TYPEs - these are actual aircraft/vehicles we should connect to
+VEHICLE_TYPES = {
+    0,   # Generic (could be autopilot in some configs)
+    1,   # Fixed Wing
+    2,   # Quadrotor
+    3,   # Coaxial
+    4,   # Helicopter
+    7,   # Airship
+    8,   # Free Balloon
+    9,   # Rocket
+    10,  # Ground Rover
+    11,  # Surface Boat
+    12,  # Submarine
+    13,  # Hexarotor
+    14,  # Octorotor
+    15,  # Tricopter
+    16,  # Flapping Wing
+    17,  # Kite
+    19,  # VTOL Tiltrotor
+    20,  # VTOL Duo
+    21,  # VTOL Quad
+    22,  # VTOL Tailsitter
+    23,  # VTOL Reserved
+    24,  # VTOL Reserved
+    25,  # VTOL Reserved
+    28,  # Parafoil
+    29,  # Dodecarotor
+    35,  # Decarotor
+}
+
+# Peripheral types we track but don't connect to
+PERIPHERAL_TYPES = {
+    5: "Antenna Tracker",
+    6: "GCS",
+    18: "Companion Computer",
+    26: "Gimbal",
+    27: "ADSB",
+    30: "Camera",
+    31: "Charging Station",
+    32: "FLARM",
+    33: "Servo",
+    34: "ODID",
+    36: "Battery",
+    37: "Parachute",
+    38: "Log",
+    39: "OSD",
+    40: "IMU",
+    41: "GPS",
+    42: "Winch",
+}
+
 # PX4 main mode and sub-mode mappings
 # Main modes: 1=MANUAL, 2=ALTCTL, 3=POSCTL, 4=AUTO, 5=ACRO, 6=OFFBOARD, 7=STABILIZED, 8=RATTITUDE
 # Sub modes (for AUTO=4): 1=READY, 2=TAKEOFF, 3=LOITER, 4=MISSION, 5=RTL, 6=LAND, 7=RTGS, 8=FOLLOW
@@ -188,6 +239,10 @@ class DroneConnection:
         self._gimbals: dict = {}  # component_id -> info
         self._camera_lock = threading.Lock()
 
+        # All discovered components (from heartbeats)
+        self._components: dict = {}  # "sys:comp" -> {type, name, last_seen, ...}
+        self._components_lock = threading.Lock()
+
     @property
     def connected(self) -> bool:
         return self._connected
@@ -207,20 +262,51 @@ class DroneConnection:
                 source_system=255,
                 source_component=0,
             )
-            # Wait for heartbeat with timeout
-            msg = self._mav.wait_heartbeat(timeout=10)
-            if msg is None:
+
+            # Wait for a heartbeat from an actual vehicle/autopilot (not camera, gimbal, etc.)
+            # Try for up to 10 seconds, collecting any peripheral heartbeats along the way
+            start_time = time.time()
+            vehicle_msg = None
+
+            while time.time() - start_time < 10:
+                msg = self._mav.recv_match(type='HEARTBEAT', blocking=True, timeout=1)
+                if msg is None:
+                    continue
+
+                src_system = msg.get_srcSystem()
+                src_component = msg.get_srcComponent()
+                mav_type = msg.type
+
+                # Track this component
+                self._register_component(src_system, src_component, mav_type, msg.autopilot)
+
+                # Check if this is a vehicle we should connect to
+                if mav_type in VEHICLE_TYPES:
+                    vehicle_msg = msg
+                    break
+                else:
+                    type_name = PERIPHERAL_TYPES.get(mav_type, MAV_TYPES.get(mav_type, f"Type {mav_type}"))
+                    print(f"Skipping peripheral heartbeat: {type_name} (sys={src_system}, comp={src_component})")
+
+            if vehicle_msg is None:
+                print("No vehicle heartbeat received within timeout")
                 self._mav.close()
                 self._mav = None
                 return False
 
-            self._target_system = msg.get_srcSystem()
-            self._target_component = msg.get_srcComponent()
+            self._target_system = vehicle_msg.get_srcSystem()
+            self._target_component = vehicle_msg.get_srcComponent()
+
+            # Mark this component as the target
+            self._mark_target_component()
 
             # Detect autopilot type
-            self._is_ardupilot = msg.autopilot == mavutil.mavlink.MAV_AUTOPILOT_ARDUPILOTMEGA
+            self._is_ardupilot = vehicle_msg.autopilot == mavutil.mavlink.MAV_AUTOPILOT_ARDUPILOTMEGA
             with self._lock:
                 self._telemetry.autopilot = "ardupilot" if self._is_ardupilot else "px4"
+                self._telemetry.platform_type = MAV_TYPES.get(vehicle_msg.type, f"Type {vehicle_msg.type}")
+
+            print(f"Connected to {self._telemetry.platform_type} (sys={self._target_system}, comp={self._target_component})")
 
             self._connected = True
             self._running = True
@@ -681,11 +767,13 @@ class DroneConnection:
 
         with self._lock:
             if msg_type == "HEARTBEAT":
-                # Only process heartbeats from the exact autopilot we connected to
                 src_system = msg.get_srcSystem()
                 src_component = msg.get_srcComponent()
 
-                # Strict filter: only accept from our target system AND target component
+                # Register ALL components for tracking (even non-targets)
+                self._register_component(src_system, src_component, msg.type, msg.autopilot)
+
+                # Only update telemetry from the exact autopilot we connected to
                 if src_system != self._target_system or src_component != self._target_component:
                     return
 
@@ -936,6 +1024,81 @@ class DroneConnection:
         with self._msg_stats_lock:
             self._msg_stats.clear()
             self._msg_history.clear()
+
+    def _register_component(self, src_system: int, src_component: int, mav_type: int, autopilot: int):
+        """Register a discovered component from its heartbeat."""
+        key = f"{src_system}:{src_component}"
+        now = time.time()
+
+        # Determine component category and name
+        if mav_type in VEHICLE_TYPES:
+            category = "vehicle"
+            type_name = MAV_TYPES.get(mav_type, f"Type {mav_type}")
+        elif mav_type in PERIPHERAL_TYPES:
+            category = "peripheral"
+            type_name = PERIPHERAL_TYPES[mav_type]
+        else:
+            category = "unknown"
+            type_name = MAV_TYPES.get(mav_type, f"Type {mav_type}")
+
+        # Autopilot type
+        autopilot_name = "unknown"
+        if autopilot == 3:  # MAV_AUTOPILOT_ARDUPILOTMEGA
+            autopilot_name = "ardupilot"
+        elif autopilot == 12:  # MAV_AUTOPILOT_PX4
+            autopilot_name = "px4"
+        elif autopilot == 8:  # MAV_AUTOPILOT_INVALID
+            autopilot_name = "none"
+
+        with self._components_lock:
+            if key not in self._components:
+                self._components[key] = {
+                    'src_system': src_system,
+                    'src_component': src_component,
+                    'mav_type': mav_type,
+                    'type_name': type_name,
+                    'category': category,
+                    'autopilot': autopilot_name,
+                    'first_seen': now,
+                    'last_seen': now,
+                    'heartbeat_count': 1,
+                    'is_target': False,
+                }
+            else:
+                self._components[key]['last_seen'] = now
+                self._components[key]['heartbeat_count'] += 1
+
+    def _mark_target_component(self):
+        """Mark the current target as the connected vehicle."""
+        key = f"{self._target_system}:{self._target_component}"
+        with self._components_lock:
+            # Clear previous target
+            for comp in self._components.values():
+                comp['is_target'] = False
+            # Mark new target
+            if key in self._components:
+                self._components[key]['is_target'] = True
+
+    def get_components(self) -> list:
+        """Return list of discovered components."""
+        with self._components_lock:
+            now = time.time()
+            result = []
+            for key, comp in self._components.items():
+                age = round(now - comp['last_seen'], 1)
+                result.append({
+                    **comp,
+                    'age': age,
+                    'active': age < 5,  # Active if heartbeat within last 5 seconds
+                })
+            # Sort: target first, then vehicles, then by system/component
+            result.sort(key=lambda x: (
+                not x['is_target'],
+                x['category'] != 'vehicle',
+                x['src_system'],
+                x['src_component']
+            ))
+            return result
 
     def drain_statustext(self) -> list:
         """Return and clear pending STATUSTEXT messages."""
