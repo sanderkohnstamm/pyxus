@@ -1,6 +1,72 @@
 import React, { useCallback } from 'react';
-import { Upload, Trash2, X, Shield, Pentagon } from 'lucide-react';
+import { Upload, Trash2, X, Shield, Pentagon, Download, FolderOpen } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
+
+// Parse KML polygon coordinates
+function parseKmlPolygon(kmlText) {
+  const coordinates = [];
+  // Find coordinates within Polygon > outerBoundaryIs > LinearRing > coordinates
+  const coordMatch = kmlText.match(/<coordinates[^>]*>([\s\S]*?)<\/coordinates>/i);
+  if (coordMatch) {
+    const coordString = coordMatch[1].trim();
+    // KML format: lon,lat,alt lon,lat,alt ...
+    const points = coordString.split(/\s+/).filter(p => p.trim());
+    for (const point of points) {
+      const parts = point.split(',');
+      if (parts.length >= 2) {
+        const lon = parseFloat(parts[0]);
+        const lat = parseFloat(parts[1]);
+        if (!isNaN(lat) && !isNaN(lon)) {
+          coordinates.push({ lat, lon });
+        }
+      }
+    }
+  }
+  // Remove last point if it's same as first (KML closes polygons)
+  if (coordinates.length > 1) {
+    const first = coordinates[0];
+    const last = coordinates[coordinates.length - 1];
+    if (Math.abs(first.lat - last.lat) < 0.0000001 && Math.abs(first.lon - last.lon) < 0.0000001) {
+      coordinates.pop();
+    }
+  }
+  return coordinates;
+}
+
+// Generate KML from polygon vertices
+function generateKml(vertices, name = 'Geofence') {
+  const coordString = vertices
+    .map(v => `${v.lon},${v.lat},0`)
+    .concat([`${vertices[0].lon},${vertices[0].lat},0`]) // Close polygon
+    .join(' ');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>${name}</name>
+    <Style id="fenceStyle">
+      <LineStyle>
+        <color>ff00ffff</color>
+        <width>2</width>
+      </LineStyle>
+      <PolyStyle>
+        <color>4000ffff</color>
+      </PolyStyle>
+    </Style>
+    <Placemark>
+      <name>${name}</name>
+      <styleUrl>#fenceStyle</styleUrl>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>${coordString}</coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+  </Document>
+</kml>`;
+}
 
 export default function FenceSubPanel() {
   const connectionStatus = useDroneStore((s) => s.connectionStatus);
@@ -79,6 +145,64 @@ export default function FenceSubPanel() {
       vertices: plannedFence.map((v) => ({ lat: v.lat, lon: v.lon })),
     }, true); // Clear planned fence on success
   }, [plannedFence, fenceApiCall, addAlert]);
+
+  // Add fence vertices from store
+  const addFenceVertex = useDroneStore((s) => s.addFenceVertex);
+
+  // Import KML file
+  const handleImportKml = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.kml,.kmz';
+
+    input.onchange = async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const vertices = parseKmlPolygon(text);
+
+        if (vertices.length < 3) {
+          addAlert('KML must contain a polygon with at least 3 vertices', 'error');
+          return;
+        }
+
+        // Clear existing and add new vertices
+        clearPlannedFence();
+        for (const v of vertices) {
+          addFenceVertex(v.lat, v.lon);
+        }
+
+        addAlert(`Imported ${vertices.length} vertices from KML`, 'success');
+      } catch (err) {
+        addAlert(`Failed to import KML: ${err.message}`, 'error');
+      }
+    };
+
+    input.click();
+  }, [addAlert, clearPlannedFence, addFenceVertex]);
+
+  // Export to KML file
+  const handleExportKml = useCallback(() => {
+    if (plannedFence.length < 3) {
+      addAlert('Need at least 3 vertices to export', 'warning');
+      return;
+    }
+
+    const kml = generateKml(plannedFence);
+    const blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'geofence.kml';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    addAlert('Fence exported to KML', 'success');
+  }, [plannedFence, addAlert]);
 
   return (
     <div className="space-y-3">
@@ -178,6 +302,23 @@ export default function FenceSubPanel() {
             className="flex items-center justify-center gap-1.5 px-2 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 rounded-md text-[11px] font-semibold text-red-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
           >
             <Trash2 size={10} /> Clear
+          </button>
+        </div>
+
+        {/* KML Import/Export */}
+        <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-gray-800/30">
+          <button
+            onClick={handleImportKml}
+            className="flex items-center justify-center gap-1.5 px-2 py-1.5 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 hover:border-violet-500/40 rounded-md text-[11px] font-semibold text-violet-300 transition-all"
+          >
+            <FolderOpen size={10} /> Import KML
+          </button>
+          <button
+            onClick={handleExportKml}
+            disabled={plannedFence.length < 3}
+            className="flex items-center justify-center gap-1.5 px-2 py-1.5 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 hover:border-violet-500/40 rounded-md text-[11px] font-semibold text-violet-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <Download size={10} /> Export KML
           </button>
         </div>
       </div>

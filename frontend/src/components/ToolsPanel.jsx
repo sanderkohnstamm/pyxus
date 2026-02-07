@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { SlidersHorizontal, Cog, Gamepad2, Compass, Keyboard, Zap, Plus, X, Trash2, ChevronDown, ChevronUp, Radio, Activity, ArrowDownToLine, Gauge, Loader2, Check } from 'lucide-react';
+import { SlidersHorizontal, Cog, Gamepad2, Compass, Keyboard, Zap, Plus, X, Trash2, ChevronDown, ChevronUp, Radio, Activity, ArrowDownToLine, Gauge, Loader2, Check, Video } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
 import ParamsPanel from './ParamsPanel';
 import MavlinkInspector from './MavlinkInspector';
 import GamepadPanel from './GamepadPanel';
+import VideoFeed from './VideoFeed';
 
 const COMMAND_OPTIONS = [
   { value: 'arm', label: 'Arm' },
@@ -346,31 +347,85 @@ function HardwarePanel() {
   );
 }
 
+// Combined Input Panel (Gamepad config visible, controls collapsed)
+function InputPanel({ sendMessage }) {
+  const [showControls, setShowControls] = useState(false);
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Gamepad section (main) */}
+      <div className="flex-1 overflow-y-auto">
+        <GamepadPanel />
+      </div>
+
+      {/* Collapsible controls section */}
+      <div className="border-t border-gray-800/50">
+        <button
+          onClick={() => setShowControls(!showControls)}
+          className="w-full flex items-center justify-between p-3 hover:bg-gray-800/20 transition-colors"
+        >
+          <div className="flex items-center gap-1.5">
+            <Keyboard size={11} className="text-cyan-500" />
+            <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Hotkeys & Servos</span>
+          </div>
+          {showControls ? <ChevronUp size={12} className="text-gray-500" /> : <ChevronDown size={12} className="text-gray-500" />}
+        </button>
+        {showControls && <ControlsPanel sendMessage={sendMessage} />}
+      </div>
+    </div>
+  );
+}
+
+// Combined System Panel (Params + MAVLink)
+function SystemPanel() {
+  const [subSection, setSubSection] = useState('params');
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex border-b border-gray-800/50 shrink-0">
+        <button
+          onClick={() => setSubSection('params')}
+          className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 text-[9px] font-semibold uppercase tracking-wider transition-colors ${subSection === 'params' ? 'text-cyan-400 bg-cyan-500/5' : 'text-gray-500 hover:text-gray-300'}`}
+        >
+          <SlidersHorizontal size={10} /> Params
+        </button>
+        <button
+          onClick={() => setSubSection('mavlink')}
+          className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 text-[9px] font-semibold uppercase tracking-wider transition-colors ${subSection === 'mavlink' ? 'text-cyan-400 bg-cyan-500/5' : 'text-gray-500 hover:text-gray-300'}`}
+        >
+          <Radio size={10} /> MAVLink
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {subSection === 'params' ? <ParamsPanel /> : <MavlinkInspector />}
+      </div>
+    </div>
+  );
+}
+
 export default function ToolsPanel({ sendMessage }) {
-  const [subTab, setSubTab] = useState('controls');
+  const [subTab, setSubTab] = useState('video');
   const tabs = [
-    { id: 'controls', label: 'Controls', icon: Keyboard },
-    { id: 'gamepad', label: 'Gamepad', icon: Gamepad2 },
+    { id: 'video', label: 'Video', icon: Video },
+    { id: 'input', label: 'Input', icon: Gamepad2 },
     { id: 'hardware', label: 'Hardware', icon: Cog },
-    { id: 'params', label: 'Params', icon: SlidersHorizontal },
-    { id: 'mavlink', label: 'MAVLink', icon: Radio },
+    { id: 'system', label: 'System', icon: SlidersHorizontal },
   ];
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex border-b border-gray-800/50 shrink-0 overflow-x-auto">
+      <div className="flex border-b border-gray-800/50 shrink-0">
         {tabs.map((tab) => (
-          <button key={tab.id} onClick={() => setSubTab(tab.id)} className={`flex items-center justify-center gap-1 px-3 py-2 text-[9px] font-semibold uppercase tracking-wider transition-colors whitespace-nowrap ${subTab === tab.id ? 'text-cyan-400 bg-cyan-500/5' : 'text-gray-500 hover:text-gray-300'}`}>
+          <button key={tab.id} onClick={() => setSubTab(tab.id)} className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 text-[9px] font-semibold uppercase tracking-wider transition-colors whitespace-nowrap ${subTab === tab.id ? 'text-cyan-400 bg-cyan-500/5' : 'text-gray-500 hover:text-gray-300'}`}>
             <tab.icon size={10} />{tab.label}
           </button>
         ))}
       </div>
       <div className="flex-1 overflow-y-auto min-h-0">
-        {subTab === 'controls' ? <ControlsPanel sendMessage={sendMessage} /> :
-         subTab === 'gamepad' ? <GamepadPanel /> :
+        {subTab === 'video' ? <VideoFeed /> :
+         subTab === 'input' ? <InputPanel sendMessage={sendMessage} /> :
          subTab === 'hardware' ? <HardwarePanel /> :
-         subTab === 'params' ? <ParamsPanel /> :
-         <MavlinkInspector />}
+         <SystemPanel />}
       </div>
     </div>
   );

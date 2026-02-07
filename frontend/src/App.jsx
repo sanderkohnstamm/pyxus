@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback, useRef } from 'react';
-import { Map as MapIcon, Plane, Video, Wrench, PanelRightClose, PanelRightOpen, AlertTriangle } from 'lucide-react';
+import { Map as MapIcon, Plane, Wrench, PanelRightClose, PanelRightOpen, AlertTriangle } from 'lucide-react';
 import useWebSocket from './hooks/useWebSocket';
 import useDroneStore from './store/droneStore';
 
@@ -84,7 +84,6 @@ import MapView from './components/Map';
 import Telemetry from './components/Telemetry';
 import Controls from './components/Controls';
 import MissionPanel from './components/MissionPanel';
-import VideoFeed from './components/VideoFeed';
 import ToolsPanel from './components/ToolsPanel';
 import FlyOverlay from './components/FlyOverlay';
 import AttitudeIndicator from './components/AttitudeIndicator';
@@ -331,7 +330,6 @@ export default function App() {
             {[
               { id: 'planning', label: 'Plan', icon: MapIcon },
               { id: 'flying', label: 'Fly', icon: Plane },
-              { id: 'video', label: 'Video', icon: Video },
               { id: 'tools', label: 'Tools', icon: Wrench },
             ].map((tab) => (
               <button
@@ -364,8 +362,6 @@ export default function App() {
                 </div>
                 <Controls sendMessage={sendMessage} />
               </>
-            ) : activeTab === 'video' ? (
-              <VideoFeed />
             ) : (
               <ToolsPanel sendMessage={sendMessage} />
             )}

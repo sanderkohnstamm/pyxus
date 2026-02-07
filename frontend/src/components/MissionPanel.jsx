@@ -31,7 +31,6 @@ import {
   Shield,
   GripVertical,
   Download,
-  Cloud,
   Save,
   FolderOpen,
   Plus,
@@ -45,7 +44,6 @@ import {
 import useDroneStore from '../store/droneStore';
 import FenceSubPanel from './FenceSubPanel';
 import ElevationProfile from './ElevationProfile';
-import WeatherPanel from './WeatherPanel';
 
 const ITEM_TYPES = {
   waypoint: { label: 'Waypoint', icon: MapPin, color: 'sky' },
@@ -917,22 +915,10 @@ export default function MissionPanel() {
         >
           <Shield size={12} /> Fence
         </button>
-        <button
-          onClick={() => setPlanSubTab('weather')}
-          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all ${
-            planSubTab === 'weather'
-              ? 'bg-violet-500/15 text-violet-300 border border-violet-500/30'
-              : 'text-gray-500 hover:text-gray-300 border border-transparent'
-          }`}
-        >
-          <Cloud size={12} /> Weather
-        </button>
       </div>
 
       {/* Content */}
-      {planSubTab === 'mission' ? <MissionSubPanel /> :
-       planSubTab === 'fence' ? <FenceSubPanel /> :
-       <WeatherPanel />}
+      {planSubTab === 'mission' ? <MissionSubPanel /> : <FenceSubPanel />}
     </div>
   );
 }
