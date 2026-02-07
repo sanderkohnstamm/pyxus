@@ -1,7 +1,84 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useRef } from 'react';
 import { Map as MapIcon, Plane, Video, Wrench, PanelRightClose, PanelRightOpen, AlertTriangle } from 'lucide-react';
 import useWebSocket from './hooks/useWebSocket';
 import useDroneStore from './store/droneStore';
+
+const RC_CENTER = 1500;
+const RC_MIN = 1000;
+const RC_MAX = 2000;
+const RC_RANGE = 500;
+const RC_SEND_RATE = 50; // 20Hz
+
+// Load gamepad config from localStorage
+function loadGamepadConfig() {
+  try {
+    const saved = localStorage.getItem('pyxus-gamepad-config');
+    if (saved) return JSON.parse(saved);
+  } catch {}
+  return {
+    buttonMappings: {},
+    axisMappings: {
+      0: { channel: 'yaw', inverted: false, deadzone: 0.1 },
+      1: { channel: 'throttle', inverted: true, deadzone: 0.1 },
+      2: { channel: 'roll', inverted: false, deadzone: 0.1 },
+      3: { channel: 'pitch', inverted: true, deadzone: 0.1 },
+    },
+  };
+}
+
+// Execute gamepad button action
+async function executeGamepadAction(action, addAlert) {
+  if (!action || action === 'none') return;
+
+  if (action.startsWith('mode:')) {
+    const mode = action.slice(5);
+    try {
+      await fetch('/api/mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode }),
+      });
+      addAlert(`Mode: ${mode}`, 'info');
+    } catch {}
+    return;
+  }
+
+  const endpoints = {
+    arm: 'arm',
+    disarm: 'disarm',
+    takeoff: 'takeoff',
+    land: 'land',
+    rtl: 'rtl',
+    mission_start: 'mission/start',
+    mission_pause: 'mission/pause',
+  };
+
+  if (action === 'toggle_arm') {
+    const armed = useDroneStore.getState().telemetry.armed;
+    const ep = armed ? 'disarm' : 'arm';
+    try {
+      await fetch(`/api/${ep}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      addAlert(`${ep === 'arm' ? 'Armed' : 'Disarmed'}`, 'info');
+    } catch {}
+    return;
+  }
+
+  const ep = endpoints[action];
+  if (ep) {
+    try {
+      await fetch(`/api/${ep}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(action === 'takeoff' ? { alt: 10 } : {}),
+      });
+      addAlert(`Command: ${action}`, 'info');
+    } catch {}
+  }
+}
 import ConnectionBar from './components/ConnectionBar';
 import MapView from './components/Map';
 import Telemetry from './components/Telemetry';
@@ -126,6 +203,93 @@ export default function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isConnected, commandHotkeys, servoGroups, executeCommand, actuateServoGroup]);
+
+  // Gamepad RC override + button handling - runs globally regardless of active tab
+  const gamepadEnabled = useDroneStore((s) => s.gamepadEnabled);
+  const updateManualControlRc = useDroneStore((s) => s.updateManualControlRc);
+  const gamepadIntervalRef = useRef(null);
+  const gamepadConfigRef = useRef(loadGamepadConfig());
+  const prevButtonsRef = useRef({});
+
+  // Reload config when gamepad is toggled (user may have changed settings)
+  useEffect(() => {
+    gamepadConfigRef.current = loadGamepadConfig();
+    prevButtonsRef.current = {}; // Reset button state on config reload
+  }, [gamepadEnabled]);
+
+  useEffect(() => {
+    if (!gamepadEnabled) {
+      if (gamepadIntervalRef.current) {
+        clearInterval(gamepadIntervalRef.current);
+        gamepadIntervalRef.current = null;
+      }
+      return;
+    }
+
+    gamepadIntervalRef.current = setInterval(() => {
+      const gps = navigator.getGamepads ? navigator.getGamepads() : [];
+      // Find first connected gamepad
+      let gp = null;
+      for (let i = 0; i < gps.length; i++) {
+        if (gps[i]) {
+          gp = gps[i];
+          break;
+        }
+      }
+      if (!gp) return;
+
+      const config = gamepadConfigRef.current;
+      const channels = { roll: RC_CENTER, pitch: RC_CENTER, throttle: RC_CENTER, yaw: RC_CENTER };
+
+      for (let i = 0; i < gp.axes.length; i++) {
+        const mapping = config.axisMappings?.[i];
+        if (!mapping || mapping.channel === 'none') continue;
+
+        let val = gp.axes[i];
+        const dz = mapping.deadzone || 0.1;
+        if (Math.abs(val) < dz) val = 0;
+        if (mapping.inverted) val = -val;
+
+        const rc = RC_CENTER + Math.round(val * RC_RANGE);
+        channels[mapping.channel] = Math.max(RC_MIN, Math.min(RC_MAX, rc));
+      }
+
+      const rcChannels = [channels.roll, channels.pitch, channels.throttle, channels.yaw];
+
+      // Only send to drone if connected
+      if (isConnected) {
+        sendMessage({
+          type: 'rc_override',
+          channels: rcChannels,
+        });
+      }
+      // Always update visualization
+      updateManualControlRc(rcChannels);
+
+      // Button press detection (edge trigger) - only when connected
+      if (isConnected && config.buttonMappings) {
+        const prev = prevButtonsRef.current;
+        for (let i = 0; i < gp.buttons.length; i++) {
+          const pressed = gp.buttons[i].pressed;
+          if (pressed && !prev[i]) {
+            const action = config.buttonMappings[i];
+            if (action && action !== 'none') {
+              executeGamepadAction(action, addAlertStore);
+            }
+          }
+          prev[i] = pressed;
+        }
+      }
+    }, RC_SEND_RATE);
+
+    return () => {
+      if (gamepadIntervalRef.current) {
+        clearInterval(gamepadIntervalRef.current);
+        gamepadIntervalRef.current = null;
+      }
+    };
+  }, [gamepadEnabled, isConnected, sendMessage, updateManualControlRc, addAlertStore]);
+
   const alerts = useDroneStore((s) => s.alerts);
   const activeTab = useDroneStore((s) => s.activeTab);
   const setActiveTab = useDroneStore((s) => s.setActiveTab);

@@ -5,16 +5,21 @@ import L from 'leaflet';
 import { X, Minimize2, Battery, Wifi, Gauge, Mountain, ArrowUp, Home, Keyboard, Gamepad2 } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
 import { apiUrl } from '../utils/api';
+import FlyOverlay from './FlyOverlay';
 
 const RC_CENTER = 1500;
 
-// Mini drone icon for map
-const miniDroneIcon = L.divIcon({
-  html: `<div style="width:12px;height:12px;background:#06b6d4;border:2px solid #22d3ee;border-radius:50%;box-shadow:0 0 8px #06b6d4"></div>`,
-  className: '',
-  iconSize: [12, 12],
-  iconAnchor: [6, 6],
-});
+// Mini drone arrow icon that rotates with heading
+function createMiniDroneIcon(heading) {
+  return L.divIcon({
+    html: `<svg width="20" height="20" viewBox="-10 -10 20 20" style="transform: rotate(${heading}deg)">
+      <path d="M0,-8 L5,6 L0,3 L-5,6 Z" fill="#06b6d4" stroke="#22d3ee" stroke-width="1"/>
+    </svg>`,
+    className: 'mini-drone-arrow',
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+  });
+}
 
 // Mini home icon
 const miniHomeIcon = L.divIcon({
@@ -399,6 +404,9 @@ export default function FullscreenVideo({ onClose }) {
 
   const hasPosition = telemetry.lat !== 0 || telemetry.lon !== 0;
 
+  // Create drone icon with current heading
+  const droneIcon = useMemo(() => createMiniDroneIcon(telemetry.heading), [telemetry.heading]);
+
   // ESC key to exit
   useEffect(() => {
     const handleKey = (e) => {
@@ -434,8 +442,8 @@ export default function FullscreenVideo({ onClose }) {
       {/* Manual Control HUD - bottom left */}
       <ManualControlHUD />
 
-      {/* Minimap - bottom right */}
-      <div className="absolute bottom-4 right-4 w-48 h-48 rounded-lg overflow-hidden border-2 border-gray-700/50 shadow-2xl pointer-events-auto">
+      {/* Minimap - above flight controls */}
+      <div className="absolute bottom-28 right-4 w-48 h-48 rounded-lg overflow-hidden border-2 border-gray-700/50 shadow-2xl pointer-events-auto">
         <MapContainer
           center={hasPosition ? [telemetry.lat, telemetry.lon] : [0, 0]}
           zoom={15}
@@ -460,10 +468,13 @@ export default function FullscreenVideo({ onClose }) {
 
           {/* Drone */}
           {hasPosition && (
-            <Marker position={[telemetry.lat, telemetry.lon]} icon={miniDroneIcon} />
+            <Marker position={[telemetry.lat, telemetry.lon]} icon={droneIcon} />
           )}
         </MapContainer>
       </div>
+
+      {/* Flight Controls - same as map view, bottom right */}
+      <FlyOverlay />
 
       {/* Close button */}
       <button

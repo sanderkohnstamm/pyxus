@@ -542,6 +542,89 @@ async def api_params_set(req: ParamSetRequest):
     return {"status": "ok", "command": "param_set", "param_id": req.param_id, "value": req.value}
 
 
+@app.get("/api/params/metadata/{vehicle}")
+async def api_params_metadata(vehicle: str):
+    """Proxy parameter metadata to avoid CORS issues. Supports ArduPilot and PX4."""
+    import httpx
+
+    # Map common vehicle names for ArduPilot
+    ardupilot_map = {
+        "arducopter": "ArduCopter",
+        "arduplane": "ArduPlane",
+        "rover": "Rover",
+        "ardusub": "ArduSub",
+        "antennatracker": "AntennaTracker",
+    }
+
+    vehicle_lower = vehicle.lower()
+
+    # Check if this is a PX4 request
+    if vehicle_lower == "px4":
+        # PX4 parameter metadata from QGroundControl's cached metadata
+        url = "https://raw.githubusercontent.com/mavlink/qgroundcontrol/master/src/FirmwarePlugin/PX4/PX4ParameterFactMetaData.xml"
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.get(url)
+                if resp.status_code == 200:
+                    # Parse XML to JSON-like format
+                    import xml.etree.ElementTree as ET
+                    root = ET.fromstring(resp.text)
+                    metadata = {}
+                    for param in root.findall(".//parameter"):
+                        name = param.get("name")
+                        if name:
+                            info = {
+                                "Description": param.findtext("short_desc") or param.findtext("long_desc") or "",
+                                "DisplayName": param.get("name"),
+                            }
+                            # Get min/max
+                            min_val = param.findtext("min")
+                            max_val = param.findtext("max")
+                            if min_val or max_val:
+                                info["Range"] = {"low": float(min_val) if min_val else None, "high": float(max_val) if max_val else None}
+                            # Get unit
+                            unit = param.findtext("unit")
+                            if unit:
+                                info["Units"] = unit
+                            # Get values (enums)
+                            values = {}
+                            for val in param.findall("values/value"):
+                                code = val.get("code")
+                                if code:
+                                    values[code] = val.text or ""
+                            if values:
+                                info["Values"] = values
+                            # Get bitmask
+                            bitmask = {}
+                            for bit in param.findall("bitmask/bit"):
+                                index = bit.get("index")
+                                if index:
+                                    bitmask[index] = bit.text or ""
+                            if bitmask:
+                                info["Bitmask"] = bitmask
+                            # Reboot required
+                            if param.get("reboot_required") == "true":
+                                info["RebootRequired"] = True
+                            metadata[name] = info
+                    return {"status": "ok", "metadata": metadata}
+                return {"status": "error", "error": f"Failed to fetch: {resp.status_code}"}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
+    # ArduPilot metadata
+    vehicle_name = ardupilot_map.get(vehicle_lower, vehicle)
+    url = f"https://autotest.ardupilot.org/Parameters/{vehicle_name}/apm.pdef.json"
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(url)
+            if resp.status_code == 200:
+                return {"status": "ok", "metadata": resp.json()}
+            return {"status": "error", "error": f"Failed to fetch: {resp.status_code}"}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
 # --- MAVLink Inspector ---
 
 @app.get("/api/mavlink/stats")

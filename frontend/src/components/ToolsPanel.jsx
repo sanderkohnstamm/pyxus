@@ -3,6 +3,7 @@ import { SlidersHorizontal, Cog, Gamepad2, Compass, Keyboard, Zap, Plus, X, Tras
 import useDroneStore from '../store/droneStore';
 import ParamsPanel from './ParamsPanel';
 import MavlinkInspector from './MavlinkInspector';
+import GamepadPanel from './GamepadPanel';
 
 const COMMAND_OPTIONS = [
   { value: 'arm', label: 'Arm' },
@@ -51,34 +52,6 @@ function ControlsPanel({ sendMessage }) {
   // Collapsible sections
   const [hotkeysExpanded, setHotkeysExpanded] = useState(true);
   const [servosExpanded, setServosExpanded] = useState(true);
-  const [gamepadExpanded, setGamepadExpanded] = useState(true);
-
-  // Gamepad state
-  const gamepadEnabled = useDroneStore((s) => s.gamepadEnabled);
-  const setGamepadEnabled = useDroneStore((s) => s.setGamepadEnabled);
-  const keyboardEnabled = useDroneStore((s) => s.keyboardEnabled);
-  const setKeyboardEnabled = useDroneStore((s) => s.setKeyboardEnabled);
-  const [gamepads, setGamepads] = useState([]);
-
-  useEffect(() => {
-    const scanGamepads = () => {
-      const gps = navigator.getGamepads ? navigator.getGamepads() : [];
-      const connected = [];
-      for (let i = 0; i < gps.length; i++) {
-        if (gps[i]) {
-          connected.push({ index: i, id: gps[i].id, name: gps[i].id.split('(')[0].trim().substring(0, 25) || gps[i].id });
-        }
-      }
-      setGamepads(connected);
-    };
-    scanGamepads();
-    window.addEventListener('gamepadconnected', scanGamepads);
-    window.addEventListener('gamepaddisconnected', scanGamepads);
-    return () => {
-      window.removeEventListener('gamepadconnected', scanGamepads);
-      window.removeEventListener('gamepaddisconnected', scanGamepads);
-    };
-  }, []);
 
   useEffect(() => {
     if (!recording) return;
@@ -223,41 +196,6 @@ function ControlsPanel({ sendMessage }) {
         )}
       </div>
 
-      {/* Input Devices Section */}
-      <div className="bg-gray-800/40 rounded-lg border border-gray-800/50 overflow-hidden">
-        <button onClick={() => setGamepadExpanded(!gamepadExpanded)} className="w-full flex items-center justify-between p-3 hover:bg-gray-800/20 transition-colors">
-          <div className="flex items-center gap-1.5">
-            <Gamepad2 size={11} className="text-violet-500" />
-            <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Input Devices</span>
-          </div>
-          {gamepadExpanded ? <ChevronUp size={12} className="text-gray-500" /> : <ChevronDown size={12} className="text-gray-500" />}
-        </button>
-        {gamepadExpanded && (
-          <div className="p-3 pt-0 space-y-3">
-            <div className="flex items-center justify-between p-2 bg-gray-900/30 rounded-md border border-gray-800/30">
-              <div className="flex items-center gap-2">
-                <Keyboard size={12} className="text-cyan-500" />
-                <div><div className="text-[10px] text-gray-300 font-medium">Keyboard Control</div><div className="text-[9px] text-gray-500">WASD/Arrows for RC</div></div>
-              </div>
-              <button onClick={() => setKeyboardEnabled(!keyboardEnabled)} className={`relative w-10 h-5 rounded-full transition-colors ${keyboardEnabled ? 'bg-cyan-600' : 'bg-gray-700'}`}>
-                <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${keyboardEnabled ? 'translate-x-5' : ''}`} />
-              </button>
-            </div>
-            <div className="p-2 bg-gray-900/30 rounded-md border border-gray-800/30 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Gamepad2 size={12} className="text-violet-500" />
-                  <div><div className="text-[10px] text-gray-300 font-medium">Gamepad</div><div className="text-[9px] text-gray-500">{gamepads.length > 0 ? gamepads[0].name : 'No controller'}</div></div>
-                </div>
-                <button onClick={() => setGamepadEnabled(!gamepadEnabled)} disabled={gamepads.length === 0} className={`relative w-10 h-5 rounded-full transition-colors ${gamepadEnabled ? 'bg-violet-600' : 'bg-gray-700'} ${gamepads.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${gamepadEnabled ? 'translate-x-5' : ''}`} />
-                </button>
-              </div>
-              {(keyboardEnabled || gamepadEnabled) && isConnected && <div className="flex items-center gap-1.5 text-[9px] text-cyan-400 pt-1"><Radio size={9} className="animate-pulse" /><span>RC Override Active</span></div>}
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
@@ -412,6 +350,7 @@ export default function ToolsPanel({ sendMessage }) {
   const [subTab, setSubTab] = useState('controls');
   const tabs = [
     { id: 'controls', label: 'Controls', icon: Keyboard },
+    { id: 'gamepad', label: 'Gamepad', icon: Gamepad2 },
     { id: 'hardware', label: 'Hardware', icon: Cog },
     { id: 'params', label: 'Params', icon: SlidersHorizontal },
     { id: 'mavlink', label: 'MAVLink', icon: Radio },
@@ -428,6 +367,7 @@ export default function ToolsPanel({ sendMessage }) {
       </div>
       <div className="flex-1 overflow-y-auto min-h-0">
         {subTab === 'controls' ? <ControlsPanel sendMessage={sendMessage} /> :
+         subTab === 'gamepad' ? <GamepadPanel /> :
          subTab === 'hardware' ? <HardwarePanel /> :
          subTab === 'params' ? <ParamsPanel /> :
          <MavlinkInspector />}

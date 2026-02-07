@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#06b6d4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="grad2" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="#0f172a"/>
+  <circle cx="256" cy="256" r="240" fill="none" stroke="url(#grad1)" stroke-width="8"/>
+
+  <!-- Drone body (center) -->
+  <ellipse cx="256" cy="256" rx="45" ry="25" fill="url(#grad1)" filter="url(#glow)"/>
+
+  <!-- Drone arms -->
+  <g stroke="url(#grad1)" stroke-width="8" stroke-linecap="round">
+    <!-- Top-left arm -->
+    <line x1="220" y1="245" x2="140" y2="165"/>
+    <!-- Top-right arm -->
+    <line x1="292" y1="245" x2="372" y2="165"/>
+    <!-- Bottom-left arm -->
+    <line x1="220" y1="267" x2="140" y2="347"/>
+    <!-- Bottom-right arm -->
+    <line x1="292" y1="267" x2="372" y2="347"/>
+  </g>
+
+  <!-- Rotors (circles with spinning effect) -->
+  <g fill="none" stroke-width="4" filter="url(#glow)">
+    <!-- Top-left rotor -->
+    <circle cx="140" cy="165" r="50" stroke="url(#grad2)" opacity="0.8"/>
+    <circle cx="140" cy="165" r="35" stroke="url(#grad1)" opacity="0.5"/>
+    <circle cx="140" cy="165" r="8" fill="url(#grad1)"/>
+
+    <!-- Top-right rotor -->
+    <circle cx="372" cy="165" r="50" stroke="url(#grad2)" opacity="0.8"/>
+    <circle cx="372" cy="165" r="35" stroke="url(#grad1)" opacity="0.5"/>
+    <circle cx="372" cy="165" r="8" fill="url(#grad1)"/>
+
+    <!-- Bottom-left rotor -->
+    <circle cx="140" cy="347" r="50" stroke="url(#grad2)" opacity="0.8"/>
+    <circle cx="140" cy="347" r="35" stroke="url(#grad1)" opacity="0.5"/>
+    <circle cx="140" cy="347" r="8" fill="url(#grad1)"/>
+
+    <!-- Bottom-right rotor -->
+    <circle cx="372" cy="347" r="50" stroke="url(#grad2)" opacity="0.8"/>
+    <circle cx="372" cy="347" r="35" stroke="url(#grad1)" opacity="0.5"/>
+    <circle cx="372" cy="347" r="8" fill="url(#grad1)"/>
+  </g>
+
+  <!-- Center camera/sensor -->
+  <circle cx="256" cy="256" r="12" fill="#0f172a"/>
+  <circle cx="256" cy="256" r="8" fill="url(#grad2)"/>
+
+  <!-- Direction indicator (front) -->
+  <polygon points="256,220 248,235 264,235" fill="#10b981"/>
+</svg>

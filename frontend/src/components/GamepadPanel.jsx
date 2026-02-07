@@ -69,12 +69,6 @@ const AXIS_CHANNELS = [
   { value: 'yaw', label: 'Yaw' },
 ];
 
-const RC_CENTER = 1500;
-const RC_RANGE = 500;
-const RC_MIN = 1000;
-const RC_MAX = 2000;
-const SEND_RATE = 50; // 20Hz
-
 const DEFAULT_CONFIG = {
   buttonMappings: {},
   axisMappings: {
@@ -103,13 +97,11 @@ function saveConfig(config) {
   }).catch(() => {});
 }
 
-export default function GamepadPanel({ sendMessage }) {
+export default function GamepadPanel() {
   const connectionStatus = useDroneStore((s) => s.connectionStatus);
   const gamepadEnabled = useDroneStore((s) => s.gamepadEnabled);
   const setGamepadEnabled = useDroneStore((s) => s.setGamepadEnabled);
   const addAlert = useDroneStore((s) => s.addAlert);
-  const updateManualControlRc = useDroneStore((s) => s.updateManualControlRc);
-  const setManualControlActive = useDroneStore((s) => s.setManualControlActive);
   const isConnected = connectionStatus === 'connected';
 
   const [gamepads, setGamepads] = useState([]);
@@ -119,7 +111,6 @@ export default function GamepadPanel({ sendMessage }) {
   const [liveButtons, setLiveButtons] = useState([]);
 
   const prevButtonsRef = useRef({});
-  const sendIntervalRef = useRef(null);
   const pollFrameRef = useRef(null);
 
   // Scan for gamepads/transmitters
@@ -267,58 +258,8 @@ export default function GamepadPanel({ sendMessage }) {
     };
   }, [selectedIndex, gamepadEnabled, isConnected, config.buttonMappings, executeAction]);
 
-  // RC override send loop
-  useEffect(() => {
-    if (!gamepadEnabled || !isConnected || !sendMessage) {
-      if (sendIntervalRef.current) {
-        clearInterval(sendIntervalRef.current);
-        sendIntervalRef.current = null;
-      }
-      setManualControlActive(false);
-      return;
-    }
-
-    sendIntervalRef.current = setInterval(() => {
-      const gps = navigator.getGamepads ? navigator.getGamepads() : [];
-      const gp = gps[selectedIndex];
-      if (!gp) return;
-
-      let roll = RC_CENTER;
-      let pitch = RC_CENTER;
-      let throttle = RC_CENTER;
-      let yaw = RC_CENTER;
-
-      const channels = { roll, pitch, throttle, yaw };
-
-      for (let i = 0; i < gp.axes.length; i++) {
-        const mapping = config.axisMappings[i];
-        if (!mapping || mapping.channel === 'none') continue;
-
-        let val = gp.axes[i];
-        const dz = mapping.deadzone || 0.1;
-        if (Math.abs(val) < dz) val = 0;
-        if (mapping.inverted) val = -val;
-
-        const rc = RC_CENTER + Math.round(val * RC_RANGE);
-        channels[mapping.channel] = Math.max(RC_MIN, Math.min(RC_MAX, rc));
-      }
-
-      const rcChannels = [channels.roll, channels.pitch, channels.throttle, channels.yaw];
-      sendMessage({
-        type: 'rc_override',
-        channels: rcChannels,
-      });
-      updateManualControlRc(rcChannels);
-    }, SEND_RATE);
-
-    return () => {
-      if (sendIntervalRef.current) {
-        clearInterval(sendIntervalRef.current);
-        sendIntervalRef.current = null;
-      }
-      setManualControlActive(false);
-    };
-  }, [gamepadEnabled, isConnected, selectedIndex, config.axisMappings, sendMessage, updateManualControlRc, setManualControlActive]);
+  // Note: RC override sending is handled globally in App.jsx
+  // This panel only handles configuration and button actions
 
   const inputCls = 'w-full bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-md px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500/50 transition-colors';
 

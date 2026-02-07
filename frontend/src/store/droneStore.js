@@ -502,30 +502,40 @@ const useDroneStore = create((set, get) => ({
   setParamsLoading: (loading) => set({ paramsLoading: loading }),
   setParamMeta: (meta, platform) => set({ paramMeta: meta, paramMetaPlatform: platform }),
   fetchParamMeta: async (platformType, autopilot) => {
-    // Only fetch for ArduPilot - PX4 metadata would require different approach
-    if (autopilot !== 'ardupilot') return;
-
     const { paramMetaPlatform } = get();
-    // Don't refetch if already loaded for this platform
-    if (paramMetaPlatform === platformType) return;
+    // Create a cache key combining autopilot and platform
+    const cacheKey = `${autopilot}:${platformType}`;
+    // Don't refetch if already loaded for this autopilot/platform
+    if (paramMetaPlatform === cacheKey) return;
 
-    // Map platform type to ArduPilot vehicle type
-    const vehicleMap = {
-      'Quadrotor': 'ArduCopter',
-      'Hexarotor': 'ArduCopter',
-      'Octorotor': 'ArduCopter',
-      'Tricopter': 'ArduCopter',
-      'Coaxial': 'ArduCopter',
-      'Helicopter': 'ArduCopter',
-      'Fixed Wing': 'ArduPlane',
-      'Ground Rover': 'Rover',
-      'Surface Boat': 'Rover',
-      'Submarine': 'ArduSub',
-      'Antenna Tracker': 'AntennaTracker',
-    };
+    let vehicle;
 
-    const vehicle = vehicleMap[platformType] || 'ArduCopter';
-    const url = `https://autotest.ardupilot.org/Parameters/${vehicle}/apm.pdef.json`;
+    if (autopilot === 'px4') {
+      // PX4 uses a single metadata file for all vehicle types
+      vehicle = 'px4';
+    } else if (autopilot === 'ardupilot') {
+      // Map platform type to ArduPilot vehicle type
+      const vehicleMap = {
+        'Quadrotor': 'ArduCopter',
+        'Hexarotor': 'ArduCopter',
+        'Octorotor': 'ArduCopter',
+        'Tricopter': 'ArduCopter',
+        'Coaxial': 'ArduCopter',
+        'Helicopter': 'ArduCopter',
+        'Fixed Wing': 'ArduPlane',
+        'Ground Rover': 'Rover',
+        'Surface Boat': 'Rover',
+        'Submarine': 'ArduSub',
+        'Antenna Tracker': 'AntennaTracker',
+      };
+      vehicle = vehicleMap[platformType] || 'ArduCopter';
+    } else {
+      // Unknown autopilot, skip metadata fetch
+      return;
+    }
+
+    // Use backend proxy to avoid CORS issues
+    const url = `/api/params/metadata/${vehicle}`;
 
     set({ paramMetaLoading: true });
 
@@ -534,10 +544,14 @@ const useDroneStore = create((set, get) => ({
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
 
+      if (data.status !== 'ok' || !data.metadata) {
+        throw new Error(data.error || 'No metadata');
+      }
+
       // Parse the ArduPilot pdef format
       // It's a dict of param names -> {Description, Range, Values, Units, ...}
       const meta = {};
-      for (const [name, info] of Object.entries(data)) {
+      for (const [name, info] of Object.entries(data.metadata)) {
         if (typeof info === 'object' && info.Description) {
           meta[name] = {
             description: info.Description,
@@ -552,7 +566,7 @@ const useDroneStore = create((set, get) => ({
         }
       }
 
-      set({ paramMeta: meta, paramMetaPlatform: platformType, paramMetaLoading: false });
+      set({ paramMeta: meta, paramMetaPlatform: cacheKey, paramMetaLoading: false });
     } catch (err) {
       console.warn('Failed to fetch parameter metadata:', err);
       set({ paramMetaLoading: false });

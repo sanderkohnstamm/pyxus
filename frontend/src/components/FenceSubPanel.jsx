@@ -11,11 +11,23 @@ export default function FenceSubPanel() {
   const plannedFence = useDroneStore((s) => s.plannedFence);
   const removeFenceVertex = useDroneStore((s) => s.removeFenceVertex);
   const clearPlannedFence = useDroneStore((s) => s.clearPlannedFence);
+  const setDroneFence = useDroneStore((s) => s.setDroneFence);
 
   const isConnected = connectionStatus === 'connected';
 
+  // Reload fence from drone
+  const reloadDroneFence = useCallback(async () => {
+    try {
+      const res = await fetch('/api/fence/download');
+      const data = await res.json();
+      if (data.status === 'ok') {
+        setDroneFence(data.fence_items || []);
+      }
+    } catch {}
+  }, [setDroneFence]);
+
   const fenceApiCall = useCallback(
-    async (endpoint, body = {}) => {
+    async (endpoint, body = {}, clearPlannedOnSuccess = false) => {
       try {
         const res = await fetch(`/api/fence/${endpoint}`, {
           method: 'POST',
@@ -27,15 +39,21 @@ export default function FenceSubPanel() {
           addAlert(data.error || `Fence ${endpoint} failed`, 'error');
         } else {
           addAlert(`Fence ${endpoint} ok`, 'success');
+          // Reload fence from drone after successful upload
+          await reloadDroneFence();
+          // Clear planned fence if requested
+          if (clearPlannedOnSuccess) {
+            clearPlannedFence();
+          }
         }
       } catch (err) {
         addAlert(`Fence ${endpoint} failed: ${err.message}`, 'error');
       }
     },
-    [addAlert]
+    [addAlert, reloadDroneFence, clearPlannedFence]
   );
 
-  const handleCircularFenceUpload = useCallback(() => {
+  const handleCircularFenceUpload = useCallback(async () => {
     const lat = geofence.lat || telemetry.lat;
     const lon = geofence.lon || telemetry.lon;
     if (lat === 0 && lon === 0) {
@@ -43,22 +61,23 @@ export default function FenceSubPanel() {
       return;
     }
     setGeofence({ lat, lon, enabled: true });
-    fenceApiCall('upload', { lat, lon, radius: geofence.radius });
+    await fenceApiCall('upload', { lat, lon, radius: geofence.radius });
   }, [geofence, telemetry, fenceApiCall, setGeofence, addAlert]);
 
-  const handleCircularFenceClear = useCallback(() => {
+  const handleCircularFenceClear = useCallback(async () => {
     setGeofence({ enabled: false });
-    fenceApiCall('clear');
-  }, [fenceApiCall, setGeofence]);
+    await fenceApiCall('clear');
+    setDroneFence([]); // Clear local display
+  }, [fenceApiCall, setGeofence, setDroneFence]);
 
-  const handlePolygonFenceUpload = useCallback(() => {
+  const handlePolygonFenceUpload = useCallback(async () => {
     if (plannedFence.length < 3) {
       addAlert('Need at least 3 vertices for polygon fence', 'warning');
       return;
     }
-    fenceApiCall('upload_polygon', {
+    await fenceApiCall('upload_polygon', {
       vertices: plannedFence.map((v) => ({ lat: v.lat, lon: v.lon })),
-    });
+    }, true); // Clear planned fence on success
   }, [plannedFence, fenceApiCall, addAlert]);
 
   return (

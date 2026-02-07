@@ -42,7 +42,8 @@ function ParamRow({ name, param, meta, onSet }) {
   const [editValue, setEditValue] = useState('');
   const [expanded, setExpanded] = useState(false);
 
-  const startEdit = () => {
+  const startEdit = (e) => {
+    e.stopPropagation();
     setEditValue(String(param.value));
     setEditing(true);
   };
@@ -64,21 +65,27 @@ function ParamRow({ name, param, meta, onSet }) {
     if (e.key === 'Escape') cancelEdit();
   };
 
-  const hasDetails = meta && (meta.description || meta.range || meta.values);
+  const hasDetails = meta && (meta.description || meta.range || meta.values || meta.bitmask);
 
   // Format value description if we have enum values
   const getValueLabel = () => {
     if (!meta?.values) return null;
     const intVal = Math.round(param.value);
-    return meta.values[intVal];
+    return meta.values[intVal] || meta.values[String(intVal)];
   };
   const valueLabel = getValueLabel();
+
+  const handleRowClick = () => {
+    if (!editing) {
+      setExpanded(!expanded);
+    }
+  };
 
   return (
     <div className="hover:bg-gray-800/40 group">
       <div
-        className={`flex items-center gap-2 px-3 py-1.5 ${hasDetails ? 'cursor-pointer' : ''}`}
-        onClick={() => hasDetails && !editing && setExpanded(!expanded)}
+        className="flex items-center gap-2 px-3 py-1.5 cursor-pointer"
+        onClick={handleRowClick}
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -113,7 +120,7 @@ function ParamRow({ name, param, meta, onSet }) {
         ) : (
           <div className="flex items-center gap-1.5 shrink-0">
             <span
-              onClick={(e) => { e.stopPropagation(); startEdit(); }}
+              onClick={startEdit}
               className="text-[11px] font-mono text-cyan-300 cursor-pointer hover:text-cyan-200 tabular-nums"
               title="Click to edit"
             >
@@ -126,32 +133,32 @@ function ParamRow({ name, param, meta, onSet }) {
                 {valueLabel}
               </span>
             )}
-            {hasDetails && (
-              <ChevronDown size={10} className={`text-gray-600 transition-transform ${expanded ? 'rotate-180' : ''}`} />
-            )}
+            <ChevronDown size={10} className={`text-gray-600 transition-transform ${expanded ? 'rotate-180' : ''}`} />
           </div>
         )}
       </div>
 
       {/* Expanded details */}
-      {expanded && meta && (
+      {expanded && (
         <div className="px-3 pb-2 text-[9px] text-gray-500 space-y-1 border-l-2 border-cyan-500/30 ml-3">
-          {meta.description && (
+          {meta?.description ? (
             <div className="text-gray-400">{meta.description}</div>
+          ) : (
+            <div className="text-gray-600 italic">No description available</div>
           )}
-          {meta.range && (
-            <div>Range: {meta.range.low} - {meta.range.high}{meta.increment ? ` (step ${meta.increment})` : ''}</div>
+          {meta?.range && (
+            <div>Range: {meta.range.low ?? '?'} - {meta.range.high ?? '?'}{meta.increment ? ` (step ${meta.increment})` : ''}</div>
           )}
-          {meta.values && (
+          {meta?.values && (
             <div className="flex flex-wrap gap-x-2 gap-y-0.5">
               {Object.entries(meta.values).map(([k, v]) => (
-                <span key={k} className={param.value == k ? 'text-cyan-400' : ''}>
+                <span key={k} className={String(param.value) === k || param.value == k ? 'text-cyan-400' : ''}>
                   {k}={v}
                 </span>
               ))}
             </div>
           )}
-          {meta.bitmask && (
+          {meta?.bitmask && (
             <div className="flex flex-wrap gap-x-2 gap-y-0.5">
               {Object.entries(meta.bitmask).map(([bit, label]) => {
                 const isSet = (Math.floor(param.value) & (1 << parseInt(bit))) !== 0;
@@ -163,9 +170,12 @@ function ParamRow({ name, param, meta, onSet }) {
               })}
             </div>
           )}
-          {meta.rebootRequired && (
+          {meta?.rebootRequired && (
             <div className="text-amber-500">⚠ Reboot required</div>
           )}
+          <div className="text-gray-600 pt-1">
+            Type: {param.type ?? 'unknown'} | Index: {param.index ?? '?'}
+          </div>
         </div>
       )}
     </div>

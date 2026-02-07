@@ -27,10 +27,14 @@ function waitForBackend(retries = 30) {
 }
 
 function startBackend() {
-  const pythonPath = process.platform === 'win32' ? 'python' : 'python3';
   const backendDir = isDev
     ? path.join(__dirname, '..', 'backend')
     : path.join(process.resourcesPath, 'backend');
+
+  // Use venv python if available, otherwise system python
+  const venvPython = path.join(backendDir, 'venv', 'bin', 'python3');
+  const systemPython = process.platform === 'win32' ? 'python' : 'python3';
+  const pythonPath = require('fs').existsSync(venvPython) ? venvPython : systemPython;
 
   console.log('Starting backend from:', backendDir);
 

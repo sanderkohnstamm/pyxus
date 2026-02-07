@@ -526,6 +526,57 @@ function FenceVertexMarkers() {
   );
 }
 
+// Drone fence downloaded from vehicle (read-only display)
+function DroneFenceDisplay() {
+  const droneFence = useDroneStore((s) => s.droneFence);
+
+  if (!droneFence || droneFence.length === 0) return null;
+
+  // Separate circular and polygon fences
+  // 5003 = MAV_CMD_NAV_FENCE_CIRCLE_INCLUSION
+  // 5001 = MAV_CMD_NAV_FENCE_POLYGON_VERTEX_INCLUSION
+  const circularFences = droneFence.filter((f) => f.command === 5003);
+  const polygonVertices = droneFence.filter((f) => f.command === 5001);
+
+  const polygonPositions = polygonVertices.map((v) => [v.lat, v.lon]);
+
+  return (
+    <>
+      {/* Circular fences */}
+      {circularFences.map((fence, i) => (
+        <Circle
+          key={`drone-fence-circle-${i}`}
+          center={[fence.lat, fence.lon]}
+          radius={fence.param1} // param1 = radius
+          pathOptions={{
+            color: '#10b981', // emerald - different from planned (amber)
+            weight: 2,
+            opacity: 0.7,
+            fillColor: '#10b981',
+            fillOpacity: 0.08,
+            dashArray: '8 4',
+          }}
+        />
+      ))}
+
+      {/* Polygon fence */}
+      {polygonPositions.length >= 3 && (
+        <Polygon
+          positions={polygonPositions}
+          pathOptions={{
+            color: '#10b981',
+            weight: 2,
+            opacity: 0.7,
+            fillColor: '#10b981',
+            fillOpacity: 0.08,
+            dashArray: '8 4',
+          }}
+        />
+      )}
+    </>
+  );
+}
+
 // Pattern bounds polygon for lawnmower area selection
 function PatternBoundsPolygon() {
   const patternBounds = useDroneStore((s) => s.patternBounds);
@@ -996,7 +1047,7 @@ export default function MapView() {
         {/* Drone mission markers + polyline (with Start From Here in fly mode) */}
         <DroneMissionMarkers />
 
-        {/* Geofence circle */}
+        {/* Geofence circle (from local UI) */}
         {geofence.enabled && geofence.lat !== 0 && geofence.lon !== 0 && (
           <Circle
             center={[geofence.lat, geofence.lon]}
@@ -1012,7 +1063,10 @@ export default function MapView() {
           />
         )}
 
-        {/* Fence vertex markers + polygon (isolated from telemetry re-renders) */}
+        {/* Drone fence downloaded from vehicle */}
+        <DroneFenceDisplay />
+
+        {/* Fence vertex markers + polygon (for planning, isolated from telemetry re-renders) */}
         <FenceVertexMarkers />
 
         {/* Pattern bounds polygon for lawnmower area drawing */}

@@ -127,7 +127,7 @@ export default function Controls({ sendMessage }) {
     };
   }, [keyboardEnabled, setKeyPressed, telemetry.armed, apiCall]);
 
-  // RC override send loop at 20Hz - works even when disconnected for input testing
+  // Keyboard RC override send loop at 20Hz
   useEffect(() => {
     if (!keyboardEnabled) {
       if (rcIntervalRef.current) {
@@ -187,6 +187,8 @@ export default function Controls({ sendMessage }) {
       setManualControlActive(false);
     };
   }, [keyboardEnabled, isConnected, sendMessage, updateManualControlRc, setManualControlActive]);
+
+  // Note: Gamepad RC sending is handled globally in App.jsx
 
   if (!isConnected) {
     return (
