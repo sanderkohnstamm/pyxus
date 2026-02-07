@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect } from 'react';
-import { Wifi, WifiOff, Plug, Unplug, Heart, Sun, Moon } from 'lucide-react';
+import { Wifi, WifiOff, Plug, Unplug, Heart, Sun, Moon, Grid3X3 } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
 
 function HeartbeatIndicator({ age }) {
@@ -38,6 +38,8 @@ export default function ConnectionBar() {
   const telemetry = useDroneStore((s) => s.telemetry);
   const theme = useDroneStore((s) => s.theme);
   const toggleTheme = useDroneStore((s) => s.toggleTheme);
+  const coordFormat = useDroneStore((s) => s.coordFormat);
+  const toggleCoordFormat = useDroneStore((s) => s.toggleCoordFormat);
 
   const setDroneMission = useDroneStore((s) => s.setDroneMission);
   const setDroneFence = useDroneStore((s) => s.setDroneFence);
@@ -283,6 +285,17 @@ export default function ConnectionBar() {
         )}
 
         <div className="w-px h-3.5 bg-gray-800/40" />
+
+        {/* Coord format toggle */}
+        <button
+          onClick={toggleCoordFormat}
+          className={`p-1 rounded hover:bg-gray-800/30 transition-colors ${
+            coordFormat === 'mgrs' ? 'text-cyan-400/80' : 'text-gray-500/60 hover:text-gray-400'
+          }`}
+          title={coordFormat === 'mgrs' ? 'Switch to Lat/Lon' : 'Switch to MGRS'}
+        >
+          <Grid3X3 size={12} />
+        </button>
 
         {/* Theme toggle */}
         <button

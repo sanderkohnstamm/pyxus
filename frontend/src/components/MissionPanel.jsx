@@ -44,6 +44,8 @@ import {
 import useDroneStore from '../store/droneStore';
 import FenceSubPanel from './FenceSubPanel';
 import ElevationProfile from './ElevationProfile';
+import { haversineDistance } from '../utils/geo';
+import { formatCoord } from '../utils/formatCoord';
 
 const ITEM_TYPES = {
   waypoint: { label: 'Waypoint', icon: MapPin, color: 'sky' },
@@ -77,13 +79,28 @@ const STATUS_COLORS = {
 };
 
 function WaypointItem({ wp, index, onUpdate, onRemove }) {
+  const coordFormat = useDroneStore((s) => s.coordFormat);
+  const selectedWaypointId = useDroneStore((s) => s.selectedWaypointId);
+  const setSelectedWaypointId = useDroneStore((s) => s.setSelectedWaypointId);
   const itemType = ITEM_TYPES[wp.type] || ITEM_TYPES.waypoint;
   const colorClass = TYPE_COLORS[itemType.color];
-  const [expanded, setExpanded] = React.useState(false);
+  const expanded = selectedWaypointId === wp.id;
   const Icon = itemType.icon;
+  const itemRef = React.useRef(null);
+  const prevExpanded = React.useRef(false);
+
+  // Scroll into view when this item becomes expanded (e.g. from map click)
+  React.useEffect(() => {
+    if (expanded && !prevExpanded.current) {
+      requestAnimationFrame(() => {
+        itemRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+    }
+    prevExpanded.current = expanded;
+  }, [expanded]);
 
   return (
-    <div className={`rounded-lg border ${colorClass} overflow-hidden`}>
+    <div ref={itemRef} className={`rounded-lg border ${colorClass} overflow-hidden`}>
       {/* Header row */}
       <div className="flex items-center gap-2 px-2.5 py-2">
         <Icon size={13} className="shrink-0" />
@@ -106,11 +123,11 @@ function WaypointItem({ wp, index, onUpdate, onRemove }) {
         <span className="font-mono text-[10px] opacity-70 truncate flex-1 text-right">
           {wp.type === 'do_jump' ? `→ item ${wp.param1 || 1}` :
            wp.type === 'do_set_servo' ? `Servo ${wp.param1 || 1}: ${wp.param2 || 1500}µs` :
-           `${wp.lat.toFixed(5)}, ${wp.lon.toFixed(5)}`}
+           formatCoord(wp.lat, wp.lon, coordFormat, 5)}
         </span>
 
         <button
-          onClick={() => setExpanded(!expanded)}
+          onClick={() => setSelectedWaypointId(expanded ? null : wp.id)}
           className="opacity-50 hover:opacity-100 transition-opacity p-0.5"
         >
           {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
@@ -350,6 +367,52 @@ function SortableWaypointItem({ wp, index, onUpdate, onRemove }) {
       </button>
       <div className="flex-1 min-w-0">
         <WaypointItem wp={wp} index={index} onUpdate={onUpdate} onRemove={onRemove} />
+      </div>
+    </div>
+  );
+}
+
+const NAV_TYPES = new Set(['waypoint', 'takeoff', 'loiter_unlim', 'loiter_turns', 'loiter_time', 'land']);
+
+function MissionStats() {
+  const plannedWaypoints = useDroneStore((s) => s.plannedWaypoints);
+  const defaultSpeed = useDroneStore((s) => s.defaultSpeed);
+  const groundspeed = useDroneStore((s) => s.telemetry.groundspeed);
+  const connectionStatus = useDroneStore((s) => s.connectionStatus);
+
+  const navWaypoints = plannedWaypoints.filter((w) => NAV_TYPES.has(w.type));
+  if (navWaypoints.length < 2) return null;
+
+  let totalDist = 0;
+  for (let i = 1; i < navWaypoints.length; i++) {
+    totalDist += haversineDistance(
+      navWaypoints[i - 1].lat, navWaypoints[i - 1].lon,
+      navWaypoints[i].lat, navWaypoints[i].lon
+    );
+  }
+
+  const isConnected = connectionStatus === 'connected';
+  const speed = isConnected && groundspeed > 1 ? groundspeed : defaultSpeed;
+  const timeS = speed > 0 ? totalDist / speed : 0;
+  const minutes = Math.floor(timeS / 60);
+  const seconds = Math.round(timeS % 60);
+  const distStr = totalDist >= 1000 ? `${(totalDist / 1000).toFixed(2)} km` : `${Math.round(totalDist)} m`;
+  const timeStr = `${minutes}:${String(seconds).padStart(2, '0')}`;
+
+  return (
+    <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-800/50 mb-3">
+      <div className="flex items-center justify-between text-[10px]">
+        <div className="flex items-center gap-3">
+          <div>
+            <span className="text-gray-500">Distance </span>
+            <span className="text-gray-300 font-mono font-semibold">{distStr}</span>
+          </div>
+          <div>
+            <span className="text-gray-500">Est. time </span>
+            <span className="text-gray-300 font-mono font-semibold">{timeStr}</span>
+          </div>
+        </div>
+        <span className="text-[9px] text-gray-600">@ {speed.toFixed(1)} m/s</span>
       </div>
     </div>
   );
@@ -789,6 +852,9 @@ function MissionSubPanel() {
           </div>
         </div>
       </div>
+
+      {/* Mission stats */}
+      <MissionStats />
 
       {/* Waypoint list with DnD */}
       <div className="flex-1 overflow-y-auto mb-3 space-y-1.5 min-h-0">

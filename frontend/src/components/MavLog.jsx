@@ -37,8 +37,8 @@ export default function MavLog() {
         onClick={toggleMavLog}
         className={`px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all border backdrop-blur-md ${
           mavLogVisible
-            ? 'bg-gray-900/60 text-cyan-400 border-cyan-500/30'
-            : 'bg-gray-900/50 text-gray-500 hover:text-gray-300 border-gray-700/30'
+            ? 'bg-gray-900/15 text-cyan-400 border-cyan-500/20'
+            : 'bg-gray-900/10 text-gray-500 hover:text-gray-300 border-gray-700/15'
         }`}
       >
         <Terminal size={12} className="inline -mt-0.5" />
@@ -48,8 +48,8 @@ export default function MavLog() {
       </button>
 
       {mavLogVisible && (
-        <div className="absolute bottom-full left-0 mb-2 w-[420px] max-h-[280px] bg-gray-900/70 backdrop-blur-md rounded-lg border border-gray-700/30 shadow-2xl flex flex-col">
-          <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-700/30 shrink-0">
+        <div className="absolute bottom-full left-0 mb-2 w-[420px] max-h-[280px] bg-gray-900/15 backdrop-blur-md rounded-lg border border-gray-700/15 shadow-2xl flex flex-col">
+          <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-700/15 shrink-0">
             <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">MAVLink Log</span>
             <div className="flex items-center gap-1.5">
               <button

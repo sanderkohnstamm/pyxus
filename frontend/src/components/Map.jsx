@@ -7,8 +7,9 @@ import VideoOverlay from './VideoOverlay';
 import WeatherMapLayer from './WeatherMapLayer';
 import ManualControlOverlay from './ManualControlOverlay';
 import PatternModal from './PatternModal';
-import { Move, RotateCw, Maximize2, ArrowLeftRight, Grid3X3 } from 'lucide-react';
-import { centroid, transformMission } from '../utils/geo';
+import { Move, RotateCw, Maximize2, ArrowLeftRight, Grid3X3, Ruler } from 'lucide-react';
+import { centroid, transformMission, haversineDistance, bearing } from '../utils/geo';
+import { formatCoord } from '../utils/formatCoord';
 
 // Satellite imagery tiles
 const TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -150,10 +151,17 @@ function MapClickHandler() {
   const activeTab = useDroneStore((s) => s.activeTab);
   const planSubTab = useDroneStore((s) => s.planSubTab);
   const setFlyClickTarget = useDroneStore((s) => s.setFlyClickTarget);
+  const measureMode = useDroneStore((s) => s.measureMode);
+  const addMeasurePoint = useDroneStore((s) => s.addMeasurePoint);
 
   useMapEvents({
     click: (e) => {
-      // Pattern bounds drawing mode (highest priority)
+      // Measure mode (highest priority)
+      if (measureMode) {
+        addMeasurePoint(e.latlng.lat, e.latlng.lng);
+        return;
+      }
+      // Pattern bounds drawing mode
       if (patternDrawMode) {
         addPatternBoundsVertex(e.latlng.lat, e.latlng.lng);
         return;
@@ -176,21 +184,22 @@ function MapClickHandler() {
   return null;
 }
 
-// Set crosshair cursor when in add mode
+// Set crosshair cursor when in add mode or measure mode
 function AddModeCursor() {
   const map = useMap();
   const addWaypointMode = useDroneStore((s) => s.addWaypointMode);
   const activeTab = useDroneStore((s) => s.activeTab);
+  const measureMode = useDroneStore((s) => s.measureMode);
 
   useEffect(() => {
     const container = map.getContainer();
-    if (addWaypointMode && activeTab === 'planning') {
+    if (measureMode || (addWaypointMode && activeTab === 'planning')) {
       container.style.cursor = 'crosshair';
     } else {
       container.style.cursor = '';
     }
     return () => { container.style.cursor = ''; };
-  }, [addWaypointMode, activeTab, map]);
+  }, [addWaypointMode, activeTab, measureMode, map]);
 
   return null;
 }
@@ -391,6 +400,10 @@ function PlannedWaypointMarkers({ onContextMenu }) {
   const activeTab = useDroneStore((s) => s.activeTab);
   const updateWaypoint = useDroneStore((s) => s.updateWaypoint);
   const patternConfig = useDroneStore((s) => s.patternConfig);
+  const coordFormat = useDroneStore((s) => s.coordFormat);
+  const setSelectedWaypointId = useDroneStore((s) => s.setSelectedWaypointId);
+  const setPlanSubTab = useDroneStore((s) => s.setPlanSubTab);
+  const setSidebarCollapsed = useDroneStore((s) => s.setSidebarCollapsed);
 
   const isPlanning = activeTab === 'planning';
   const plannedOpacity = isPlanning ? 1 : 0.3;
@@ -425,13 +438,20 @@ function PlannedWaypointMarkers({ onContextMenu }) {
               const pos = e.target.getLatLng();
               updateWaypoint(wp.id, { lat: pos.lat, lon: pos.lng });
             },
+            click: () => {
+              if (isPlanning) {
+                setPlanSubTab('mission');
+                setSidebarCollapsed(false);
+                setSelectedWaypointId(wp.id);
+              }
+            },
           }}
         >
           <Popup>
             <div className="text-sm">
               <div className="font-semibold">{TYPE_LABELS[wp.type] || 'Waypoint'} {i + 1}</div>
               <div>Alt: {wp.alt}m</div>
-              <div className="text-xs opacity-70">{wp.lat.toFixed(6)}, {wp.lon.toFixed(6)}</div>
+              <div className="text-xs opacity-70">{formatCoord(wp.lat, wp.lon, coordFormat, 6)}</div>
             </div>
           </Popup>
         </Marker>
@@ -474,6 +494,7 @@ function FenceVertexMarkers() {
   const activeTab = useDroneStore((s) => s.activeTab);
   const planSubTab = useDroneStore((s) => s.planSubTab);
   const updateFenceVertex = useDroneStore((s) => s.updateFenceVertex);
+  const coordFormat = useDroneStore((s) => s.coordFormat);
 
   const isPlanning = activeTab === 'planning';
   const plannedOpacity = isPlanning ? 1 : 0.3;
@@ -517,7 +538,7 @@ function FenceVertexMarkers() {
           <Popup>
             <div className="text-sm">
               <div className="font-semibold">Fence Vertex {i + 1}</div>
-              <div className="text-xs opacity-70">{v.lat.toFixed(6)}, {v.lon.toFixed(6)}</div>
+              <div className="text-xs opacity-70">{formatCoord(v.lat, v.lon, coordFormat, 6)}</div>
             </div>
           </Popup>
         </Marker>
@@ -653,6 +674,7 @@ function DroneMissionMarkers() {
   const addAlert = useDroneStore((s) => s.addAlert);
   const missionSeq = useDroneStore((s) => s.telemetry.mission_seq);
   const autopilot = useDroneStore((s) => s.telemetry.autopilot);
+  const coordFormat = useDroneStore((s) => s.coordFormat);
 
   const isFlying = activeTab === 'flying';
   const droneOpacity = isFlying ? 1 : 0.3;
@@ -699,7 +721,7 @@ function DroneMissionMarkers() {
             <div className="text-sm">
               <div className="font-semibold">Drone {TYPE_LABELS[wp.item_type] || 'Waypoint'} {i + 1}</div>
               <div>Alt: {wp.alt}m</div>
-              <div className="text-xs opacity-70">{wp.lat.toFixed(6)}, {wp.lon.toFixed(6)}</div>
+              <div className="text-xs opacity-70">{formatCoord(wp.lat, wp.lon, coordFormat, 6)}</div>
               {isFlying && (
                 <button
                   onClick={() => handleSetCurrent(i)}
@@ -794,6 +816,54 @@ const flyTargetIcon = L.divIcon({
   iconSize: [12, 12],
   iconAnchor: [6, 6],
 });
+
+// Measure overlay: line + distance/bearing label
+function MeasureOverlay() {
+  const measurePoints = useDroneStore((s) => s.measurePoints);
+
+  if (measurePoints.length === 0) return null;
+
+  const dotIcon = (color = '#f97316') => L.divIcon({
+    html: `<div style="width:10px;height:10px;background:${color};border:2px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`,
+    className: '',
+    iconSize: [10, 10],
+    iconAnchor: [5, 5],
+  });
+
+  return (
+    <>
+      {measurePoints.map((p, i) => (
+        <Marker key={`measure-${i}`} position={[p.lat, p.lon]} icon={dotIcon()} />
+      ))}
+
+      {measurePoints.length === 2 && (() => {
+        const [a, b] = measurePoints;
+        const dist = haversineDistance(a.lat, a.lon, b.lat, b.lon);
+        const brng = bearing(a.lat, a.lon, b.lat, b.lon);
+        const midLat = (a.lat + b.lat) / 2;
+        const midLon = (a.lon + b.lon) / 2;
+        const distStr = dist >= 1000 ? `${(dist / 1000).toFixed(2)} km` : `${Math.round(dist)} m`;
+
+        const labelIcon = L.divIcon({
+          html: `<div style="display:inline-block;white-space:nowrap;background:rgba(15,23,42,0.85);color:#fb923c;padding:3px 7px;border-radius:4px;font-size:11px;font-weight:600;font-family:monospace;border:1px solid rgba(249,115,22,0.4);box-shadow:0 2px 8px rgba(0,0,0,0.3)">${distStr} | ${brng.toFixed(0)}&deg;</div>`,
+          className: '',
+          iconSize: [0, 0],
+          iconAnchor: [0, -8],
+        });
+
+        return (
+          <>
+            <Polyline
+              positions={[[a.lat, a.lon], [b.lat, b.lon]]}
+              pathOptions={{ color: '#f97316', weight: 2.5, opacity: 0.9, dashArray: '6 4' }}
+            />
+            <Marker position={[midLat, midLon]} icon={labelIcon} />
+          </>
+        );
+      })()}
+    </>
+  );
+}
 
 // Fly mode click target marker with Go To / Look At / Set Home
 function FlyClickTarget() {
@@ -903,7 +973,7 @@ function FlyClickTarget() {
       <Popup eventHandlers={{ remove: clearFlyClickTarget }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '140px' }}>
           <div style={{ fontSize: '9px', color: '#64748b', marginBottom: '2px', textAlign: 'center' }}>
-            {flyClickTarget.lat.toFixed(6)}, {flyClickTarget.lon.toFixed(6)}
+            {formatCoord(flyClickTarget.lat, flyClickTarget.lon, useDroneStore.getState().coordFormat, 6)}
           </div>
           <div style={{ display: 'flex', gap: '4px' }}>
             <button onClick={handleGoto} style={{ ...btnStyle, background: '#06b6d4' }}>
@@ -941,6 +1011,10 @@ export default function MapView() {
   const homePosition = useDroneStore((s) => s.homePosition);
   const setPatternConfig = useDroneStore((s) => s.setPatternConfig);
   const reverseWaypoints = useDroneStore((s) => s.reverseWaypoints);
+  const measureMode = useDroneStore((s) => s.measureMode);
+  const setMeasureMode = useDroneStore((s) => s.setMeasureMode);
+  const clearMeasure = useDroneStore((s) => s.clearMeasure);
+  const coordFormat = useDroneStore((s) => s.coordFormat);
 
   // Context menu and manipulation state
   const [contextMenu, setContextMenu] = useState(null);
@@ -1016,7 +1090,7 @@ export default function MapView() {
                 <div><span style={{color:'#94a3b8'}}>ALT</span> <span style={{color:'#e2e8f0'}}>{alt.toFixed(1)}m</span></div>
                 <div><span style={{color:'#94a3b8'}}>GS</span> <span style={{color:'#e2e8f0'}}>{groundspeed.toFixed(1)} m/s</span></div>
                 <div><span style={{color:'#94a3b8'}}>HDG</span> <span style={{color:'#e2e8f0'}}>{Math.round(yawDeg)}&deg;</span></div>
-                <div style={{borderTop:'1px solid rgba(100,116,139,0.3)',marginTop:'4px',paddingTop:'4px',fontSize:'9px',color:'#64748b'}}>{lat.toFixed(6)}, {lon.toFixed(6)}</div>
+                <div style={{borderTop:'1px solid rgba(100,116,139,0.3)',marginTop:'4px',paddingTop:'4px',fontSize:'9px',color:'#64748b'}}>{formatCoord(lat, lon, coordFormat, 6)}</div>
               </div>
             </Popup>
           </Marker>
@@ -1028,7 +1102,7 @@ export default function MapView() {
             <Popup>
               <div className="text-xs font-mono space-y-0.5">
                 <div className="font-semibold text-[11px] mb-1" style={{color:'#10b981'}}>Home / Return</div>
-                <div style={{fontSize:'9px',color:'#64748b'}}>{homePosition.lat.toFixed(6)}, {homePosition.lon.toFixed(6)}</div>
+                <div style={{fontSize:'9px',color:'#64748b'}}>{formatCoord(homePosition.lat, homePosition.lon, coordFormat, 6)}</div>
               </div>
             </Popup>
           </Marker>
@@ -1075,6 +1149,9 @@ export default function MapView() {
         {/* Fly mode click target */}
         <FlyClickTarget />
 
+        {/* Measure overlay */}
+        <MeasureOverlay />
+
         {/* Weather map overlay */}
         <WeatherMapLayer />
       </MapContainer>
@@ -1112,12 +1189,24 @@ export default function MapView() {
       )}
 
       {/* Bottom-left overlays */}
-      {isConnected && (
-        <div className="absolute bottom-3 left-3 z-[1000] flex items-end gap-1.5">
-          <MavLog />
-          <VideoOverlay />
-        </div>
-      )}
+      <div className="absolute bottom-3 left-3 z-[1000] flex items-end gap-1.5">
+        {isConnected && <MavLog />}
+        <button
+          onClick={() => {
+            if (measureMode) clearMeasure();
+            else setMeasureMode(true);
+          }}
+          className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all border backdrop-blur-md ${
+            measureMode
+              ? 'bg-orange-500/20 text-orange-300 border-orange-500/30 shadow-lg shadow-orange-500/10'
+              : 'bg-gray-900/60 text-gray-400 hover:text-gray-200 border-gray-700/40'
+          }`}
+          title="Measure distance & bearing"
+        >
+          <Ruler size={14} />
+        </button>
+        {isConnected && <VideoOverlay />}
+      </div>
 
       {/* Servo group quick buttons */}
       <ServoGroupButtons />

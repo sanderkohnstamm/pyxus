@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { transformMission } from '../utils/geo';
 
 const MAX_TRAIL_POINTS = 500;
+const MAX_BATTERY_SAMPLES = 300; // ~5 min at 1 sample/sec
 
 const INITIAL_TELEMETRY = {
   roll: 0, pitch: 0, yaw: 0,
@@ -28,6 +29,9 @@ const useDroneStore = create((set, get) => ({
   theme: localStorage.getItem('pyxus-theme') || 'dark', // dark | light
   colorScheme: localStorage.getItem('pyxus-color-scheme') || 'cyan', // cyan | emerald | violet | rose | amber | sky
 
+  // Coordinate format
+  coordFormat: localStorage.getItem('pyxus-coord-format') || 'latlon', // latlon | mgrs
+
   // Telemetry
   telemetry: { ...INITIAL_TELEMETRY },
 
@@ -53,6 +57,9 @@ const useDroneStore = create((set, get) => ({
 
   // Add waypoint mode
   addWaypointMode: false,
+
+  // Selected waypoint (for map → sidebar interaction)
+  selectedWaypointId: null,
 
   // Plan subtab
   planSubTab: 'mission', // 'mission' | 'fence'
@@ -152,6 +159,17 @@ const useDroneStore = create((set, get) => ({
   // Each group: { id, name, servos: [{servo, openPwm, closePwm}], openHotkey, closeHotkey, state }
   servoGroups: JSON.parse(localStorage.getItem('pyxus-servo-groups') || '[]'),
 
+  // Battery history for strip chart
+  batteryHistory: [], // [{ts, voltage, current}]
+  _lastBatterySampleTs: 0,
+
+  // Battery warnings
+  batteryWarnings: { low: false, critical: false },
+
+  // Measure tool
+  measureMode: false,
+  measurePoints: [], // [{lat, lon}] max 2
+
   // Home position
   homePosition: null, // {lat, lon, alt}
 
@@ -188,6 +206,11 @@ const useDroneStore = create((set, get) => ({
     localStorage.setItem('pyxus-color-scheme', scheme);
     set({ colorScheme: scheme });
   },
+  toggleCoordFormat: () => {
+    const next = get().coordFormat === 'latlon' ? 'mgrs' : 'latlon';
+    localStorage.setItem('pyxus-coord-format', next);
+    set({ coordFormat: next });
+  },
 
   setConnectionStatus: (status) => set({ connectionStatus: status }),
   setConnectionString: (str) => set({ connectionString: str }),
@@ -215,10 +238,21 @@ const useDroneStore = create((set, get) => ({
       }
     }
 
+    // Sample battery history (throttled to 1/sec)
+    const now = Date.now();
+    const { batteryHistory, _lastBatterySampleTs } = get();
+    let newBatteryHistory = batteryHistory;
+    if (data.voltage > 0 && now - _lastBatterySampleTs >= 1000) {
+      newBatteryHistory = [...batteryHistory, { ts: now, voltage: data.voltage, current: data.current }];
+      if (newBatteryHistory.length > MAX_BATTERY_SAMPLES) newBatteryHistory.shift();
+    }
+
     set({
       telemetry: { ...data },
       trail: newTrail,
       missionStatus: data.mission_status || 'idle',
+      batteryHistory: newBatteryHistory,
+      _lastBatterySampleTs: newBatteryHistory !== batteryHistory ? now : _lastBatterySampleTs,
     });
   },
 
@@ -284,6 +318,9 @@ const useDroneStore = create((set, get) => ({
   // Add waypoint mode
   setAddWaypointMode: (mode) => set({ addWaypointMode: mode }),
   toggleAddWaypointMode: () => set((s) => ({ addWaypointMode: !s.addWaypointMode })),
+
+  // Selected waypoint
+  setSelectedWaypointId: (id) => set({ selectedWaypointId: id }),
 
   // Drone mission (downloaded)
   setDroneMission: (waypoints) => set({ droneMission: waypoints }),
@@ -705,6 +742,23 @@ const useDroneStore = create((set, get) => ({
     set({ servoGroups: updated });
   },
 
+  // Battery warnings
+  setBatteryWarnings: (warnings) => set((s) => ({
+    batteryWarnings: { ...s.batteryWarnings, ...warnings }
+  })),
+
+  // Measure tool
+  setMeasureMode: (enabled) => set({ measureMode: enabled, measurePoints: enabled ? [] : [] }),
+  addMeasurePoint: (lat, lon) => {
+    const { measurePoints } = get();
+    if (measurePoints.length >= 2) {
+      set({ measurePoints: [{ lat, lon }] });
+    } else {
+      set({ measurePoints: [...measurePoints, { lat, lon }] });
+    }
+  },
+  clearMeasure: () => set({ measureMode: false, measurePoints: [] }),
+
   // Home position
   setHomePosition: (pos) => set({ homePosition: pos }),
 
@@ -808,6 +862,9 @@ const useDroneStore = create((set, get) => ({
       mavMessages: [],
       droneIdentity: { sysid: null, autopilot: null, platformType: null },
       calibrationStatus: { active: false, type: null, step: 0, messages: [] },
+      batteryHistory: [],
+      _lastBatterySampleTs: 0,
+      batteryWarnings: { low: false, critical: false },
     }),
 }));
 

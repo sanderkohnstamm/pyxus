@@ -7,6 +7,7 @@ import {
   Radio,
 } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
+import { formatCoord } from '../utils/formatCoord';
 
 const RC_CENTER = 1500;
 const RC_OFFSET = 300;
@@ -39,6 +40,7 @@ export default function Controls({ sendMessage }) {
   const addAlert = useDroneStore((s) => s.addAlert);
   const droneMission = useDroneStore((s) => s.droneMission);
   const setDroneMission = useDroneStore((s) => s.setDroneMission);
+  const coordFormat = useDroneStore((s) => s.coordFormat);
   const missionSeq = telemetry.mission_seq;
   const autopilot = telemetry.autopilot;
 
@@ -247,7 +249,7 @@ export default function Controls({ sendMessage }) {
                   </span>
                   <span className="text-gray-500 w-6">{TYPE_LABELS[wp.item_type] || 'WP'}</span>
                   <span className={`font-mono flex-1 truncate ${isActive ? 'text-gray-200' : 'text-gray-400'}`}>
-                    {wp.lat.toFixed(5)}, {wp.lon.toFixed(5)}
+                    {formatCoord(wp.lat, wp.lon, coordFormat, 5)}
                   </span>
                   <span className={isActive ? 'text-gray-300' : 'text-gray-500'}>{wp.alt}m</span>
                   {isActive && (

@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import { Upload, Trash2, X, Shield, Pentagon, Download, FolderOpen } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
+import { formatCoord } from '../utils/formatCoord';
 
 // Parse KML polygon coordinates
 function parseKmlPolygon(kmlText) {
@@ -78,6 +79,7 @@ export default function FenceSubPanel() {
   const removeFenceVertex = useDroneStore((s) => s.removeFenceVertex);
   const clearPlannedFence = useDroneStore((s) => s.clearPlannedFence);
   const setDroneFence = useDroneStore((s) => s.setDroneFence);
+  const coordFormat = useDroneStore((s) => s.coordFormat);
 
   const isConnected = connectionStatus === 'connected';
 
@@ -234,7 +236,7 @@ export default function FenceSubPanel() {
             </div>
           </div>
           <div className="text-[10px] text-gray-600 italic">
-            Center: {geofence.lat ? `${geofence.lat.toFixed(5)}, ${geofence.lon.toFixed(5)}` : 'drone position'}
+            Center: {geofence.lat ? formatCoord(geofence.lat, geofence.lon, coordFormat, 5) : 'drone position'}
           </div>
           <div className="grid grid-cols-2 gap-2">
             <button
@@ -275,7 +277,7 @@ export default function FenceSubPanel() {
               <div key={v.id} className="flex items-center gap-2 px-2 py-1 rounded bg-amber-500/5 border border-amber-500/10">
                 <span className="text-[10px] font-bold text-amber-400 w-4 text-center">{i + 1}</span>
                 <span className="font-mono text-[10px] text-gray-400 flex-1 truncate">
-                  {v.lat.toFixed(5)}, {v.lon.toFixed(5)}
+                  {formatCoord(v.lat, v.lon, coordFormat, 5)}
                 </span>
                 <button
                   onClick={() => removeFenceVertex(v.id)}

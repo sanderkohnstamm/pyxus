@@ -1,6 +1,7 @@
 import React from 'react';
 import { MapPin, Gauge, Battery, Satellite, Activity } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
+import { formatCoord } from '../utils/formatCoord';
 
 function TelemetryRow({ label, value, unit = '' }) {
   return (
@@ -40,6 +41,7 @@ const FIX_TYPES = {
 export default function Telemetry() {
   const t = useDroneStore((s) => s.telemetry);
   const connectionStatus = useDroneStore((s) => s.connectionStatus);
+  const coordFormat = useDroneStore((s) => s.coordFormat);
 
   if (connectionStatus !== 'connected') {
     return (
@@ -56,8 +58,14 @@ export default function Telemetry() {
       {/* Position + Speed combined */}
       <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-800/50">
         <SectionHeader icon={MapPin} label="Position & Speed" />
-        <TelemetryRow label="Lat" value={t.lat.toFixed(7)} />
-        <TelemetryRow label="Lon" value={t.lon.toFixed(7)} />
+        {coordFormat === 'mgrs' ? (
+          <TelemetryRow label="MGRS" value={formatCoord(t.lat, t.lon, 'mgrs')} />
+        ) : (
+          <>
+            <TelemetryRow label="Lat" value={t.lat.toFixed(7)} />
+            <TelemetryRow label="Lon" value={t.lon.toFixed(7)} />
+          </>
+        )}
         <TelemetryRow label="Alt (rel)" value={t.alt.toFixed(1)} unit="m" />
         <TelemetryRow label="Alt (MSL)" value={t.alt_msl.toFixed(1)} unit="m" />
         <div className="border-t border-gray-700/30 mt-1.5 pt-1.5" />

@@ -2,8 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { MapContainer, TileLayer, Marker, Polyline } from 'react-leaflet';
 import L from 'leaflet';
-import { X, Minimize2, Battery, Wifi, Gauge, Mountain, ArrowUp, Home, Keyboard, Gamepad2 } from 'lucide-react';
+import { X, Minimize2, Battery, Wifi, Keyboard, Gamepad2 } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
+import { formatCoord } from '../utils/formatCoord';
 import { apiUrl } from '../utils/api';
 import FlyOverlay from './FlyOverlay';
 
@@ -29,255 +30,196 @@ const miniHomeIcon = L.divIcon({
   iconAnchor: [5, 5],
 });
 
-function HorizonIndicator({ roll, pitch }) {
-  // Clamp pitch for display
-  const clampedPitch = Math.max(-45, Math.min(45, pitch));
-  const pitchOffset = clampedPitch * 2; // 2px per degree
-
-  return (
-    <div className="relative w-48 h-48 rounded-full overflow-hidden border-2 border-gray-700/50 bg-gradient-to-b from-cyan-900/30 to-amber-900/30">
-      {/* Sky/Ground - rotated */}
-      <div
-        className="absolute inset-0"
-        style={{ transform: `rotate(${-roll}deg)` }}
-      >
-        {/* Sky */}
-        <div
-          className="absolute w-[200%] h-[200%] left-1/2 bg-gradient-to-b from-sky-600 to-sky-400"
-          style={{
-            transform: `translate(-50%, ${-50 + pitchOffset}%)`,
-          }}
-        />
-        {/* Ground */}
-        <div
-          className="absolute w-[200%] h-[100%] left-1/2 bg-gradient-to-b from-amber-700 to-amber-900"
-          style={{
-            transform: `translate(-50%, ${50 + pitchOffset}%)`,
-          }}
-        />
-        {/* Horizon line */}
-        <div
-          className="absolute w-[200%] h-0.5 left-1/2 bg-white/80"
-          style={{
-            transform: `translate(-50%, ${pitchOffset}px)`,
-            top: '50%',
-          }}
-        />
-        {/* Pitch lines */}
-        {[-30, -20, -10, 10, 20, 30].map((deg) => (
-          <div
-            key={deg}
-            className="absolute w-16 h-px left-1/2 bg-white/40"
-            style={{
-              transform: `translate(-50%, ${pitchOffset - deg * 2}px)`,
-              top: '50%',
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Fixed aircraft reference */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="relative">
-          {/* Wings */}
-          <div className="absolute top-1/2 left-1/2 w-20 h-1 bg-yellow-400 -translate-x-1/2 -translate-y-1/2 rounded" />
-          {/* Center dot */}
-          <div className="w-3 h-3 bg-yellow-400 rounded-full border-2 border-yellow-300" />
-        </div>
-      </div>
-
-      {/* Roll indicator at top */}
-      <div className="absolute top-2 left-1/2 -translate-x-1/2">
-        <div className="w-0 h-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-yellow-400" />
-      </div>
-
-      {/* Roll scale */}
-      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100">
-        {[-60, -45, -30, -15, 0, 15, 30, 45, 60].map((deg) => {
-          const rad = ((deg - 90) * Math.PI) / 180;
-          const x1 = 50 + 44 * Math.cos(rad);
-          const y1 = 50 + 44 * Math.sin(rad);
-          const x2 = 50 + 48 * Math.cos(rad);
-          const y2 = 50 + 48 * Math.sin(rad);
-          return (
-            <line
-              key={deg}
-              x1={x1}
-              y1={y1}
-              x2={x2}
-              y2={y2}
-              stroke="white"
-              strokeWidth={deg === 0 ? 2 : 1}
-              opacity={0.6}
-            />
-          );
-        })}
-      </svg>
-    </div>
-  );
-}
-
-function CompassRose({ heading, homeHeading }) {
-  return (
-    <div className="relative w-32 h-32">
-      {/* Rotating compass */}
-      <div
-        className="absolute inset-0 rounded-full border-2 border-gray-700/50 bg-gray-900/50"
-        style={{ transform: `rotate(${-heading}deg)` }}
-      >
-        {/* Cardinal directions */}
-        {[
-          { dir: 'N', deg: 0, color: 'text-red-400' },
-          { dir: 'E', deg: 90, color: 'text-gray-400' },
-          { dir: 'S', deg: 180, color: 'text-gray-400' },
-          { dir: 'W', deg: 270, color: 'text-gray-400' },
-        ].map(({ dir, deg, color }) => {
-          const rad = ((deg - 90) * Math.PI) / 180;
-          const x = 50 + 38 * Math.cos(rad);
-          const y = 50 + 38 * Math.sin(rad);
-          return (
-            <div
-              key={dir}
-              className={`absolute text-xs font-bold ${color}`}
-              style={{
-                left: `${x}%`,
-                top: `${y}%`,
-                transform: `translate(-50%, -50%) rotate(${heading}deg)`,
-              }}
-            >
-              {dir}
-            </div>
-          );
-        })}
-
-        {/* Degree marks */}
-        <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100">
-          {Array.from({ length: 36 }, (_, i) => i * 10).map((deg) => {
-            const rad = ((deg - 90) * Math.PI) / 180;
-            const x1 = 50 + 46 * Math.cos(rad);
-            const y1 = 50 + 46 * Math.sin(rad);
-            const x2 = 50 + 49 * Math.cos(rad);
-            const y2 = 50 + 49 * Math.sin(rad);
-            return (
-              <line key={deg} x1={x1} y1={y1} x2={x2} y2={y2} stroke="white" strokeWidth={deg % 30 === 0 ? 2 : 1} opacity={0.4} />
-            );
-          })}
-        </svg>
-
-        {/* Home direction indicator */}
-        {homeHeading !== null && (
-          <div
-            className="absolute w-4 h-4 text-green-400"
-            style={{
-              left: '50%',
-              top: '50%',
-              transform: `translate(-50%, -50%) rotate(${homeHeading}deg) translateY(-20px)`,
-            }}
-          >
-            <Home size={14} />
-          </div>
-        )}
-      </div>
-
-      {/* Fixed heading indicator */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1">
-        <div className="w-0 h-0 border-l-[5px] border-r-[5px] border-b-[7px] border-l-transparent border-r-transparent border-b-cyan-400" />
-      </div>
-
-      {/* Center heading display */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-lg font-bold text-white tabular-nums">{Math.round(heading)}°</span>
-      </div>
-    </div>
-  );
-}
-
 function TelemetryHUD({ telemetry, homePosition }) {
+  const coordFormat = useDroneStore((s) => s.coordFormat);
   const { roll, pitch, heading, alt, alt_msl, groundspeed, airspeed, climb, voltage, remaining, lat, lon } = telemetry;
 
-  // Calculate home bearing
-  let homeHeading = null;
-  if (homePosition && lat && lon) {
-    const dLon = ((homePosition.lon - lon) * Math.PI) / 180;
-    const lat1 = (lat * Math.PI) / 180;
-    const lat2 = (homePosition.lat * Math.PI) / 180;
-    const y = Math.sin(dLon) * Math.cos(lat2);
-    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-    homeHeading = ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
-  }
-
-  // Convert rad to deg for display
   const rollDeg = (roll * 180) / Math.PI;
   const pitchDeg = (pitch * 180) / Math.PI;
 
+  // Home bearing
+  let homeBearing = null;
+  if (homePosition && lat && lon) {
+    const dLon = ((homePosition.lon - lon) * Math.PI) / 180;
+    const lat1r = (lat * Math.PI) / 180;
+    const lat2r = (homePosition.lat * Math.PI) / 180;
+    const yh = Math.sin(dLon) * Math.cos(lat2r);
+    const xh = Math.cos(lat1r) * Math.sin(lat2r) - Math.sin(lat1r) * Math.cos(lat2r) * Math.cos(dLon);
+    homeBearing = ((Math.atan2(yh, xh) * 180) / Math.PI + 360) % 360;
+  }
+
+  const pitchPx = 3.5;
+  const hdgPx = 3;
+
   return (
-    <div className="absolute inset-0 pointer-events-none">
-      {/* Top center - Mode and status */}
+    <div className="absolute inset-0 pointer-events-none select-none">
+
+      {/* Armed / Mode */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-3">
-        <div className={`px-3 py-1 rounded text-sm font-bold ${telemetry.armed ? 'bg-red-500/80 text-white' : 'bg-gray-800/80 text-gray-400'}`}>
+        <span className={`px-2.5 py-0.5 text-xs font-bold tracking-wider border ${
+          telemetry.armed
+            ? 'border-red-500/50 text-red-400 bg-red-950/30'
+            : 'border-gray-600/30 text-gray-500 bg-gray-950/20'
+        }`}>
           {telemetry.armed ? 'ARMED' : 'DISARMED'}
-        </div>
-        <div className="px-3 py-1 rounded bg-cyan-500/80 text-white text-sm font-bold">
-          {telemetry.mode || 'UNKNOWN'}
+        </span>
+        <span className="px-2.5 py-0.5 text-xs font-bold tracking-wider border border-cyan-400/50 text-cyan-300 bg-cyan-950/30">
+          {telemetry.mode || '---'}
+        </span>
+      </div>
+
+      {/* Heading Tape */}
+      <div className="absolute top-12 left-1/2 -translate-x-1/2" style={{ width: 360, height: 52 }}>
+        <svg width="360" height="36" viewBox="0 0 360 36">
+          {Array.from({ length: 121 }, (_, i) => {
+            const degOffset = i - 60;
+            const deg = ((Math.floor(heading) + degOffset) % 360 + 360) % 360;
+            const x = 180 + (degOffset - (heading % 1)) * hdgPx;
+            const major = deg % 10 === 0;
+            const cardinal = { 0: 'N', 90: 'E', 180: 'S', 270: 'W' }[deg];
+            if (!major && deg % 5 !== 0) return null;
+            return (
+              <g key={i}>
+                <line x1={x} y1={36} x2={x} y2={major ? (cardinal ? 10 : 18) : 28}
+                  stroke="#22d3ee" strokeWidth={cardinal ? 1.5 : 0.7} opacity={major ? 0.7 : 0.35} />
+                {major && (
+                  <text x={x} y={cardinal ? 8 : 15} textAnchor="middle" fill="#22d3ee"
+                    fontSize={cardinal ? 12 : 9} opacity={cardinal ? 0.9 : 0.5}
+                    style={{ fontFamily: 'monospace' }}>
+                    {cardinal || deg}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+          {homeBearing !== null && (() => {
+            let d = homeBearing - heading;
+            if (d > 180) d -= 360;
+            if (d < -180) d += 360;
+            if (Math.abs(d) > 60) return null;
+            const hx = 180 + d * hdgPx;
+            return <polygon points={`${hx - 4},36 ${hx + 4},36 ${hx},30`} fill="#34d399" opacity={0.7} />;
+          })()}
+          <polygon points="176,36 184,36 180,30" fill="#22d3ee" opacity={0.8} />
+        </svg>
+        <div className="absolute top-9 left-1/2 -translate-x-1/2 border border-cyan-400/50 bg-black/60 px-2.5 py-px">
+          <span className="text-sm font-bold text-cyan-300 tabular-nums" style={{ fontFamily: 'monospace' }}>
+            {String(Math.round(heading) % 360).padStart(3, '0')}&deg;
+          </span>
         </div>
       </div>
 
-      {/* Left side - Attitude */}
-      <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col items-center gap-4">
-        <HorizonIndicator roll={rollDeg} pitch={pitchDeg} />
-        <CompassRose heading={heading} homeHeading={homeHeading} />
+      {/* Attitude Indicator */}
+      <svg className="absolute top-1/2 left-1/2"
+        style={{ transform: 'translate(-50%, -50%)', width: 380, height: 310 }}
+        viewBox="0 0 380 310">
+        <defs>
+          <clipPath id="hudAtt"><rect x="40" y="25" width="300" height="240" rx="8" /></clipPath>
+        </defs>
+
+        {/* Pitch ladder + horizon, rotated by roll */}
+        <g clipPath="url(#hudAtt)">
+          <g transform={`rotate(${-rollDeg} 190 145)`}>
+            {/* Sky tint */}
+            <rect x="-200" y={-500 + 145 + pitchDeg * pitchPx} width="800" height="500" fill="#0c4a6e" opacity="0.15" />
+            {/* Ground tint */}
+            <rect x="-200" y={145 + pitchDeg * pitchPx} width="800" height="500" fill="#78350f" opacity="0.12" />
+            {/* Horizon line */}
+            <line x1="-100" y1={145 + pitchDeg * pitchPx} x2="500" y2={145 + pitchDeg * pitchPx}
+              stroke="#22d3ee" strokeWidth="1.2" opacity="0.5" />
+
+            {/* Pitch lines */}
+            {[-40, -30, -20, -10, -5, 5, 10, 20, 30, 40].map(deg => {
+              const py = 145 + pitchDeg * pitchPx - deg * pitchPx;
+              const major = Math.abs(deg) % 10 === 0;
+              const hw = major ? 55 : 25;
+              return (
+                <g key={deg}>
+                  <line x1={190 - hw} y1={py} x2={190 - 10} y2={py}
+                    stroke="#22d3ee" strokeWidth={major ? 1 : 0.6} opacity="0.45" />
+                  <line x1={190 + 10} y1={py} x2={190 + hw} y2={py}
+                    stroke="#22d3ee" strokeWidth={major ? 1 : 0.6} opacity="0.45" />
+                  {major && <>
+                    <text x={190 - hw - 5} y={py + 3.5} textAnchor="end" fill="#22d3ee"
+                      fontSize="9" opacity="0.5" style={{ fontFamily: 'monospace' }}>{deg}</text>
+                    <text x={190 + hw + 5} y={py + 3.5} textAnchor="start" fill="#22d3ee"
+                      fontSize="9" opacity="0.5" style={{ fontFamily: 'monospace' }}>{deg}</text>
+                  </>}
+                </g>
+              );
+            })}
+          </g>
+        </g>
+
+        {/* Roll arc ticks (fixed) */}
+        {[-60, -45, -30, -20, -10, 0, 10, 20, 30, 45, 60].map(deg => {
+          const rad = ((deg - 90) * Math.PI) / 180;
+          const r1 = 133, r2 = deg % 30 === 0 ? 143 : 139;
+          return (
+            <line key={deg}
+              x1={190 + r1 * Math.cos(rad)} y1={145 + r1 * Math.sin(rad)}
+              x2={190 + r2 * Math.cos(rad)} y2={145 + r2 * Math.sin(rad)}
+              stroke="#22d3ee" strokeWidth={deg === 0 ? 1.5 : 0.7} opacity="0.45"
+            />
+          );
+        })}
+
+        {/* Roll pointer (rotates with aircraft) */}
+        <g transform={`rotate(${rollDeg} 190 145)`}>
+          <polygon points="186,16 194,16 190,9" fill="#22d3ee" opacity="0.75" />
+        </g>
+
+        {/* Fixed aircraft reference symbol */}
+        <g stroke="#22d3ee" strokeWidth="2" opacity="0.85">
+          <line x1="120" y1="145" x2="172" y2="145" />
+          <line x1="120" y1="145" x2="120" y2="153" />
+          <line x1="208" y1="145" x2="260" y2="145" />
+          <line x1="260" y1="145" x2="260" y2="153" />
+          <circle cx="190" cy="145" r="3" fill="#22d3ee" />
+        </g>
+      </svg>
+
+      {/* Speed box (left of center) */}
+      <div className="absolute top-1/2 -translate-y-1/2" style={{ right: 'calc(50% + 195px)' }}>
+        <div className="flex items-center">
+          <div className="border border-cyan-400/40 bg-black/50 px-3 py-1.5 text-right" style={{ minWidth: 76 }}>
+            <div className="text-lg font-bold text-cyan-300 tabular-nums leading-tight">{groundspeed.toFixed(1)}</div>
+            <div className="text-[8px] text-cyan-500/50 tracking-widest">GS m/s</div>
+          </div>
+          <div className="w-0 h-0 border-t-[7px] border-b-[7px] border-l-[7px] border-t-transparent border-b-transparent border-l-cyan-400/40" />
+        </div>
+        <div className="text-[9px] text-cyan-500/35 text-right mt-0.5">AS {airspeed.toFixed(1)}</div>
       </div>
 
-      {/* Right side - Telemetry tape */}
-      <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-3 bg-gray-900/70 backdrop-blur-sm rounded-lg p-3 border border-gray-700/30">
-        {/* Altitude */}
-        <div className="flex items-center gap-2">
-          <Mountain size={14} className="text-cyan-400" />
-          <div>
-            <div className="text-2xl font-bold text-white tabular-nums">{alt.toFixed(1)}<span className="text-xs text-gray-400 ml-1">m AGL</span></div>
-            <div className="text-xs text-gray-500">{alt_msl.toFixed(0)}m MSL</div>
+      {/* Altitude box (right of center) */}
+      <div className="absolute top-1/2 -translate-y-1/2" style={{ left: 'calc(50% + 195px)' }}>
+        <div className="flex items-center">
+          <div className="w-0 h-0 border-t-[7px] border-b-[7px] border-r-[7px] border-t-transparent border-b-transparent border-r-cyan-400/40" />
+          <div className="border border-cyan-400/40 bg-black/50 px-3 py-1.5" style={{ minWidth: 76 }}>
+            <div className="text-lg font-bold text-cyan-300 tabular-nums leading-tight">{alt.toFixed(1)}</div>
+            <div className="text-[8px] text-cyan-500/50 tracking-widest">ALT m</div>
           </div>
         </div>
-
-        {/* Speed */}
-        <div className="flex items-center gap-2">
-          <Gauge size={14} className="text-emerald-400" />
-          <div>
-            <div className="text-2xl font-bold text-white tabular-nums">{groundspeed.toFixed(1)}<span className="text-xs text-gray-400 ml-1">m/s</span></div>
-            <div className="text-xs text-gray-500">Air: {airspeed.toFixed(1)} m/s</div>
-          </div>
-        </div>
-
-        {/* Climb rate */}
-        <div className="flex items-center gap-2">
-          <ArrowUp size={14} className={climb >= 0 ? 'text-green-400' : 'text-red-400'} style={{ transform: climb < 0 ? 'rotate(180deg)' : undefined }} />
-          <div className="text-xl font-bold text-white tabular-nums">
-            {climb >= 0 ? '+' : ''}{climb.toFixed(1)}<span className="text-xs text-gray-400 ml-1">m/s</span>
-          </div>
-        </div>
-
-        {/* Battery */}
-        <div className="flex items-center gap-2">
-          <Battery size={14} className={remaining > 20 ? 'text-emerald-400' : 'text-red-400'} />
-          <div>
-            <div className="text-xl font-bold text-white tabular-nums">{voltage.toFixed(1)}<span className="text-xs text-gray-400 ml-1">V</span></div>
-            {remaining >= 0 && <div className="text-xs text-gray-500">{remaining}%</div>}
-          </div>
+        <div className="text-[9px] mt-0.5 ml-3 tabular-nums flex items-center gap-1">
+          <span className={climb >= 0 ? 'text-green-400/50' : 'text-red-400/50'}>
+            {climb >= 0 ? '\u25B2' : '\u25BC'}{Math.abs(climb).toFixed(1)}
+          </span>
+          <span className="text-cyan-500/30">MSL {alt_msl.toFixed(0)}</span>
         </div>
       </div>
 
-      {/* Bottom left - Coordinates */}
-      <div className="absolute bottom-4 left-4 bg-gray-900/70 backdrop-blur-sm rounded-lg px-3 py-2 border border-gray-700/30">
-        <div className="text-xs font-mono text-gray-400">
-          <div>{lat.toFixed(6)}, {lon.toFixed(6)}</div>
-        </div>
-      </div>
-
-      {/* Bottom center - GPS status */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-gray-900/70 backdrop-blur-sm rounded-lg px-3 py-2 border border-gray-700/30">
-        <Wifi size={12} className={telemetry.fix_type >= 3 ? 'text-emerald-400' : 'text-amber-400'} />
-        <span className="text-xs text-gray-400">{telemetry.satellites} sats</span>
-        <span className="text-xs text-gray-500">HDOP {telemetry.hdop.toFixed(1)}</span>
+      {/* Bottom bar: coords / GPS / battery */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-5 text-[10px]">
+        <span className="text-cyan-400/50 tabular-nums">{formatCoord(lat, lon, coordFormat, 6)}</span>
+        <span className="flex items-center gap-1">
+          <Wifi size={10} className={telemetry.fix_type >= 3 ? 'text-green-400/60' : 'text-amber-400/60'} />
+          <span className="text-cyan-400/45">{telemetry.satellites} SAT</span>
+        </span>
+        <span className="flex items-center gap-1">
+          <Battery size={10} className={remaining > 20 ? 'text-green-400/60' : 'text-red-400/60'} />
+          <span className="text-cyan-400/45 tabular-nums">{voltage.toFixed(1)}V</span>
+          {remaining >= 0 && <span className="text-cyan-400/35">{remaining}%</span>}
+        </span>
       </div>
     </div>
   );
@@ -334,10 +276,10 @@ function ManualControlHUD() {
     if (keysPressed.a) keys.push('A');
     if (keysPressed.s) keys.push('S');
     if (keysPressed.d) keys.push('D');
-    if (keysPressed.arrowup) keys.push('↑');
-    if (keysPressed.arrowdown) keys.push('↓');
-    if (keysPressed.arrowleft) keys.push('←');
-    if (keysPressed.arrowright) keys.push('→');
+    if (keysPressed.arrowup) keys.push('\u2191');
+    if (keysPressed.arrowdown) keys.push('\u2193');
+    if (keysPressed.arrowleft) keys.push('\u2190');
+    if (keysPressed.arrowright) keys.push('\u2192');
     return keys;
   }, [keysPressed]);
 
@@ -429,7 +371,7 @@ export default function FullscreenVideo({ onClose }) {
           />
         ) : (
           <div className="flex flex-col items-center gap-4 text-gray-600">
-            <div className="text-6xl opacity-20">📹</div>
+            <div className="text-6xl opacity-20">{'\uD83D\uDCF9'}</div>
             <span className="text-xl">No video feed</span>
             <span className="text-sm opacity-50">Configure video URL in settings</span>
           </div>

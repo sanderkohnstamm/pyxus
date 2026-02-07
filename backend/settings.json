@@ -9,7 +9,14 @@
     "takeoff_alt": 10
   },
   "gamepad": {
-    "buttonMappings": {},
+    "buttonMappings": {
+      "0": "toggle_arm",
+      "1": "land",
+      "2": "mission_start",
+      "3": "takeoff",
+      "4": "mode:ALT_HOLD",
+      "5": "rtl"
+    },
     "axisMappings": {
       "0": {
         "channel": "yaw",

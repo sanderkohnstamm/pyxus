@@ -87,6 +87,8 @@ import MissionPanel from './components/MissionPanel';
 import ToolsPanel from './components/ToolsPanel';
 import FlyOverlay from './components/FlyOverlay';
 import AttitudeIndicator from './components/AttitudeIndicator';
+import BatteryMonitor from './components/BatteryMonitor';
+import BatteryChart from './components/BatteryChart';
 
 export default function App() {
   const { sendMessage, droneChangeDetected, dismissDroneChange, acceptDroneChange } = useWebSocket();
@@ -324,7 +326,7 @@ export default function App() {
         </button>
 
         {/* Right: Panels */}
-        <div className={`${sidebarCollapsed ? 'w-0 overflow-hidden' : 'w-96'} flex flex-col border-l border-gray-800/15 bg-gray-950/65 backdrop-blur-xl transition-all duration-200`}>
+        <div className={`${sidebarCollapsed ? 'w-0 overflow-hidden' : 'w-96'} flex flex-col border-l border-gray-800/10 bg-gray-950/15 backdrop-blur-xl transition-all duration-200`}>
           {/* Tab bar */}
           <div className="flex border-b border-gray-800/25 shrink-0">
             {[
@@ -357,6 +359,7 @@ export default function App() {
             ) : activeTab === 'flying' ? (
               <>
                 <Telemetry />
+                <BatteryChart />
                 <div className="px-4 pb-4">
                   <AttitudeIndicator />
                 </div>
@@ -388,6 +391,9 @@ export default function App() {
           </div>
         ))}
       </div>
+
+      {/* Battery monitor (headless) */}
+      <BatteryMonitor />
 
       {/* Drone change detection modal */}
       {droneChangeDetected && (
