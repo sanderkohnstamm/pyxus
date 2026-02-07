@@ -1,65 +1,95 @@
 // Pattern generation algorithms
-import { destinationPoint, bearing, haversineDistance, getBounds } from './geo';
+import { destinationPoint, bearing, haversineDistance, getBounds, centroid } from './geo';
 
 /**
- * Generate lawnmower/survey pattern
- * @param {object} bounds - {north, south, east, west} in degrees
+ * Generate lawnmower/survey pattern that fills a polygon
+ * @param {Array<{lat, lon}>} polygon - Polygon vertices
  * @param {number} spacing - Lane spacing in meters
  * @param {number} angle - Pattern angle in degrees (0=N-S, 90=E-W)
  * @param {number} altitude - Flight altitude
- * @param {number} overshoot - Add overshoot at turns (default 10m)
+ * @param {number} overshoot - Add overshoot at turns (default 0 for polygon)
  * @returns {Array<{lat, lon, alt, type}>}
  */
-export function lawnmowerPattern(bounds, spacing, angle, altitude, overshoot = 10) {
-  const waypoints = [];
+export function lawnmowerPattern(polygon, spacing, angle, altitude, overshoot = 0) {
+  // Handle both polygon array and bounds object
+  let vertices;
+  if (Array.isArray(polygon)) {
+    vertices = polygon;
+  } else if (polygon.north !== undefined) {
+    // Convert bounds to polygon
+    vertices = [
+      { lat: polygon.north, lon: polygon.west },
+      { lat: polygon.north, lon: polygon.east },
+      { lat: polygon.south, lon: polygon.east },
+      { lat: polygon.south, lon: polygon.west },
+    ];
+  } else {
+    return [];
+  }
 
-  // Calculate center of bounds
-  const centerLat = (bounds.north + bounds.south) / 2;
-  const centerLon = (bounds.east + bounds.west) / 2;
+  if (vertices.length < 3) return [];
+
+  const waypoints = [];
+  const bounds = getBounds(vertices);
+  const center = centroid(vertices);
 
   // Calculate dimensions
-  const height = haversineDistance(bounds.south, centerLon, bounds.north, centerLon);
-  const width = haversineDistance(centerLat, bounds.west, centerLat, bounds.east);
+  const height = haversineDistance(bounds.south, center.lon, bounds.north, center.lon);
+  const width = haversineDistance(center.lat, bounds.west, center.lat, bounds.east);
 
   // Effective coverage area (diagonal for angled patterns)
   const diagonal = Math.sqrt(width * width + height * height);
-  const coverDist = diagonal + overshoot * 2;
+  const coverDist = diagonal + 50; // Extra margin
 
   // Number of lanes
-  const numLanes = Math.ceil(coverDist / spacing);
+  const numLanes = Math.ceil(coverDist / spacing) + 2;
   const startOffset = -(numLanes - 1) * spacing / 2;
 
-  // Normalized angle (0-180, since 180-360 is same pattern reversed)
+  // Normalized angle (0-180)
   const normAngle = angle % 180;
 
   for (let i = 0; i < numLanes; i++) {
-    // Offset from center for this lane (perpendicular to flight direction)
     const laneOffset = startOffset + i * spacing;
-
-    // Calculate lane start and end points
-    // Flight direction is along the angle, offset is perpendicular
     const perpAngle = (normAngle + 90) % 360;
 
     // Lane center point
-    const laneCenter = destinationPoint(centerLat, centerLon, perpAngle, laneOffset);
+    const laneCenter = destinationPoint(center.lat, center.lon, perpAngle, laneOffset);
 
-    // Start and end of lane (along the flight direction)
-    const halfLen = coverDist / 2 + overshoot;
-    const startPoint = destinationPoint(laneCenter.lat, laneCenter.lon, normAngle + 180, halfLen);
-    const endPoint = destinationPoint(laneCenter.lat, laneCenter.lon, normAngle, halfLen);
+    // Create a long line through the lane center
+    const halfLen = coverDist;
+    const lineStart = destinationPoint(laneCenter.lat, laneCenter.lon, normAngle + 180, halfLen);
+    const lineEnd = destinationPoint(laneCenter.lat, laneCenter.lon, normAngle, halfLen);
 
-    // Clip to bounds with some margin
-    const clippedStart = clipToBounds(startPoint, bounds, overshoot);
-    const clippedEnd = clipToBounds(endPoint, bounds, overshoot);
+    // Find intersections with polygon
+    const intersections = linePolygonIntersections(lineStart, lineEnd, vertices);
 
-    if (clippedStart && clippedEnd) {
-      // Alternate direction for serpentine pattern
-      if (i % 2 === 0) {
-        waypoints.push({ ...clippedStart, alt: altitude, type: 'waypoint' });
-        waypoints.push({ ...clippedEnd, alt: altitude, type: 'waypoint' });
-      } else {
-        waypoints.push({ ...clippedEnd, alt: altitude, type: 'waypoint' });
-        waypoints.push({ ...clippedStart, alt: altitude, type: 'waypoint' });
+    if (intersections.length >= 2) {
+      // Sort intersections along the line direction
+      intersections.sort((a, b) => {
+        const distA = haversineDistance(lineStart.lat, lineStart.lon, a.lat, a.lon);
+        const distB = haversineDistance(lineStart.lat, lineStart.lon, b.lat, b.lon);
+        return distA - distB;
+      });
+
+      // Take pairs of intersections (entry/exit points)
+      for (let j = 0; j < intersections.length - 1; j += 2) {
+        let p1 = intersections[j];
+        let p2 = intersections[j + 1];
+
+        // Add overshoot if specified
+        if (overshoot > 0) {
+          p1 = destinationPoint(p1.lat, p1.lon, normAngle + 180, overshoot);
+          p2 = destinationPoint(p2.lat, p2.lon, normAngle, overshoot);
+        }
+
+        // Alternate direction for serpentine pattern
+        if (i % 2 === 0) {
+          waypoints.push({ lat: p1.lat, lon: p1.lon, alt: altitude, type: 'waypoint' });
+          waypoints.push({ lat: p2.lat, lon: p2.lon, alt: altitude, type: 'waypoint' });
+        } else {
+          waypoints.push({ lat: p2.lat, lon: p2.lon, alt: altitude, type: 'waypoint' });
+          waypoints.push({ lat: p1.lat, lon: p1.lon, alt: altitude, type: 'waypoint' });
+        }
       }
     }
   }
@@ -68,21 +98,47 @@ export function lawnmowerPattern(bounds, spacing, angle, altitude, overshoot = 1
 }
 
 /**
- * Helper to clip a point to bounds with margin
+ * Find intersections between a line segment and a polygon
  */
-function clipToBounds(point, bounds, margin) {
-  // Simple approach: just ensure point is within expanded bounds
-  const expandedBounds = {
-    north: bounds.north + margin / 111000,
-    south: bounds.south - margin / 111000,
-    east: bounds.east + margin / (111000 * Math.cos(point.lat * Math.PI / 180)),
-    west: bounds.west - margin / (111000 * Math.cos(point.lat * Math.PI / 180)),
-  };
+function linePolygonIntersections(lineStart, lineEnd, polygon) {
+  const intersections = [];
 
-  return {
-    lat: Math.max(expandedBounds.south, Math.min(expandedBounds.north, point.lat)),
-    lon: Math.max(expandedBounds.west, Math.min(expandedBounds.east, point.lon)),
-  };
+  for (let i = 0; i < polygon.length; i++) {
+    const p1 = polygon[i];
+    const p2 = polygon[(i + 1) % polygon.length];
+
+    const intersection = lineSegmentIntersection(
+      lineStart.lat, lineStart.lon,
+      lineEnd.lat, lineEnd.lon,
+      p1.lat, p1.lon,
+      p2.lat, p2.lon
+    );
+
+    if (intersection) {
+      intersections.push(intersection);
+    }
+  }
+
+  return intersections;
+}
+
+/**
+ * Find intersection point of two line segments
+ */
+function lineSegmentIntersection(x1, y1, x2, y2, x3, y3, x4, y4) {
+  const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+  if (Math.abs(denom) < 1e-10) return null; // Parallel
+
+  const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+  const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
+
+  if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+    return {
+      lat: x1 + t * (x2 - x1),
+      lon: y1 + t * (y2 - y1),
+    };
+  }
+  return null;
 }
 
 /**

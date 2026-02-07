@@ -75,7 +75,8 @@ export default function ElevationProfile() {
   const updateWaypoint = useDroneStore((s) => s.updateWaypoint);
   const [groundData, setGroundData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [dragging, setDragging] = useState(null); // { index, startY, startAlt }
+  const [dragging, setDragging] = useState(null); // { index, id, ground, startAlt }
+  const [dragAlt, setDragAlt] = useState(null); // Preview altitude during drag
   const svgRef = useRef(null);
 
   // Filter navigable waypoints (not ROI)
@@ -157,6 +158,17 @@ export default function ElevationProfile() {
   const x = useCallback((dist) => chartData ? padL + (dist / chartData.totalDist) * chartW : 0, [chartData]);
   const y = useCallback((h) => chartData ? padT + chartH - ((h - chartData.minH) / chartData.rangeH) * chartH : 0, [chartData]);
 
+  // Apply drag preview to wpPoints for smooth rendering
+  const displayWpPoints = useMemo(() => {
+    if (!chartData) return [];
+    if (!dragging || dragAlt === null) return chartData.wpPoints;
+    return chartData.wpPoints.map(w =>
+      w.index === dragging.index
+        ? { ...w, altMsl: w.ground + dragAlt, altRel: dragAlt }
+        : w
+    );
+  }, [chartData, dragging, dragAlt]);
+
   // Convert Y position back to altitude
   const yToAlt = useCallback((yPos, groundElev) => {
     if (!chartData) return 0;
@@ -164,12 +176,13 @@ export default function ElevationProfile() {
     return Math.max(1, Math.round(h - groundElev));
   }, [chartData]);
 
-  // Drag handlers
-  const handleMouseDown = useCallback((e, wpIndex, wpId, ground) => {
+  // Drag handlers - use local state during drag, commit on mouseup
+  const handleMouseDown = useCallback((e, wpIndex, wpId, ground, currentAlt) => {
     e.preventDefault();
-    const wp = navWaypoints[wpIndex];
-    setDragging({ index: wpIndex, id: wpId, startY: e.clientY, startAlt: wp.alt, ground });
-  }, [navWaypoints]);
+    e.stopPropagation();
+    setDragging({ index: wpIndex, id: wpId, ground });
+    setDragAlt(currentAlt);
+  }, []);
 
   const handleMouseMove = useCallback((e) => {
     if (!dragging || !svgRef.current) return;
@@ -177,18 +190,17 @@ export default function ElevationProfile() {
     const svg = svgRef.current;
     const rect = svg.getBoundingClientRect();
     const svgY = ((e.clientY - rect.top) / rect.height) * H;
-    const newAlt = yToAlt(svgY, dragging.ground);
-
-    // Find the original waypoint by id (not filtered index)
-    const originalWp = plannedWaypoints.find(w => w.id === dragging.id);
-    if (originalWp && Math.abs(newAlt - originalWp.alt) >= 1) {
-      updateWaypoint(dragging.id, { alt: Math.max(1, Math.min(500, newAlt)) });
-    }
-  }, [dragging, yToAlt, plannedWaypoints, updateWaypoint]);
+    const newAlt = Math.max(1, Math.min(500, yToAlt(svgY, dragging.ground)));
+    setDragAlt(newAlt);
+  }, [dragging, yToAlt]);
 
   const handleMouseUp = useCallback(() => {
+    if (dragging && dragAlt !== null) {
+      updateWaypoint(dragging.id, { alt: dragAlt });
+    }
     setDragging(null);
-  }, []);
+    setDragAlt(null);
+  }, [dragging, dragAlt, updateWaypoint]);
 
   // Global mouse events for drag
   useEffect(() => {
@@ -212,7 +224,7 @@ export default function ElevationProfile() {
   }
   if (!groundData || !chartData) return null;
 
-  const { totalDist, wpPoints, minH, maxH, rangeH } = chartData;
+  const { totalDist, minH, maxH, rangeH } = chartData;
 
   // Ground profile polygon
   const groundPath =
@@ -220,8 +232,8 @@ export default function ElevationProfile() {
     groundData.map((d) => `L ${x(d.dist)} ${y(d.ground)}`).join(' ') +
     ` L ${x(totalDist)} ${padT + chartH} L ${x(0)} ${padT + chartH} Z`;
 
-  // Waypoint altitude line
-  const wpLine = wpPoints.map((w, i) => `${i === 0 ? 'M' : 'L'} ${x(w.dist)} ${y(w.altMsl)}`).join(' ');
+  // Waypoint altitude line (uses displayWpPoints for smooth drag preview)
+  const wpLine = displayWpPoints.map((w, i) => `${i === 0 ? 'M' : 'L'} ${x(w.dist)} ${y(w.altMsl)}`).join(' ');
 
   // Y-axis labels (3-4 ticks)
   const yTicks = [];
@@ -260,7 +272,7 @@ export default function ElevationProfile() {
         <path d={wpLine} fill="none" stroke="#06b6d4" strokeWidth="1.5" strokeLinejoin="round" />
 
         {/* Waypoint dots + labels (draggable) */}
-        {wpPoints.map((w) => (
+        {displayWpPoints.map((w) => (
           <g key={w.index}>
             {/* Vertical line from ground to waypoint */}
             <line x1={x(w.dist)} y1={y(w.ground)} x2={x(w.dist)} y2={y(w.altMsl)} stroke="rgba(6,182,212,0.2)" strokeWidth="0.5" strokeDasharray="2 2" />
@@ -273,7 +285,7 @@ export default function ElevationProfile() {
               stroke={dragging?.index === w.index ? '#fff' : 'none'}
               strokeWidth="1"
               style={{ cursor: 'ns-resize' }}
-              onMouseDown={(e) => handleMouseDown(e, w.index, w.id, w.ground)}
+              onMouseDown={(e) => handleMouseDown(e, w.index, w.id, w.ground, w.altRel)}
             />
             {/* Index label */}
             <text x={x(w.dist)} y={y(w.altMsl) - 7} textAnchor="middle" fill="rgba(6,182,212,0.8)" fontSize="7" fontFamily="monospace">{w.index + 1}</text>

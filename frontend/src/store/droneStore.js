@@ -25,6 +25,7 @@ const useDroneStore = create((set, get) => ({
 
   // Theme
   theme: localStorage.getItem('pyxus-theme') || 'dark', // dark | light
+  colorScheme: localStorage.getItem('pyxus-color-scheme') || 'cyan', // cyan | emerald | violet | rose | amber | sky
 
   // Telemetry
   telemetry: { ...INITIAL_TELEMETRY },
@@ -178,6 +179,10 @@ const useDroneStore = create((set, get) => ({
     const next = get().theme === 'dark' ? 'light' : 'dark';
     localStorage.setItem('pyxus-theme', next);
     set({ theme: next });
+  },
+  setColorScheme: (scheme) => {
+    localStorage.setItem('pyxus-color-scheme', scheme);
+    set({ colorScheme: scheme });
   },
 
   setConnectionStatus: (status) => set({ connectionStatus: status }),

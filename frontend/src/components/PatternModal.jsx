@@ -117,15 +117,42 @@ export default function PatternModal() {
     return null;
   }, [patternBounds, plannedFence, plannedWaypoints, getCenter, lawnmowerUseCustomSize, lawnmowerWidth, lawnmowerHeight]);
 
+  // Get polygon for lawnmower (actual vertices, not just bounds)
+  const getPolygonVertices = useCallback(() => {
+    // Priority 1: Custom drawn polygon
+    if (patternBounds.length >= 3) {
+      return patternBounds;
+    }
+    // Priority 2: Use fence polygon
+    if (plannedFence.length >= 3) {
+      return plannedFence;
+    }
+    // Priority 3: Create rectangle from custom size or default
+    const center = getCenter();
+    if (center) {
+      const width = lawnmowerWidth;
+      const height = lawnmowerHeight;
+      const latDelta = (height / 2) / 111000;
+      const lonDelta = (width / 2) / (111000 * Math.cos(center.lat * Math.PI / 180));
+      return [
+        { lat: center.lat + latDelta, lon: center.lon - lonDelta },
+        { lat: center.lat + latDelta, lon: center.lon + lonDelta },
+        { lat: center.lat - latDelta, lon: center.lon + lonDelta },
+        { lat: center.lat - latDelta, lon: center.lon - lonDelta },
+      ];
+    }
+    return null;
+  }, [patternBounds, plannedFence, getCenter, lawnmowerWidth, lawnmowerHeight]);
+
   const generatePreview = useCallback(() => {
     let waypoints = [];
 
     switch (activeTab) {
       case 'lawnmower': {
-        const bounds = getPatternBounds();
-        if (bounds) {
+        const polygon = getPolygonVertices();
+        if (polygon && polygon.length >= 3) {
           waypoints = lawnmowerPattern(
-            bounds,
+            polygon,
             lawnmowerSpacing,
             lawnmowerAngle,
             lawnmowerAlt,
@@ -166,7 +193,7 @@ export default function PatternModal() {
     setPatternConfig({ preview: waypoints });
   }, [
     activeTab,
-    getPatternBounds,
+    getPolygonVertices,
     getCenter,
     lawnmowerSpacing,
     lawnmowerAngle,

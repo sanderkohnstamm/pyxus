@@ -129,11 +129,16 @@ export default function App() {
   const activeTab = useDroneStore((s) => s.activeTab);
   const setActiveTab = useDroneStore((s) => s.setActiveTab);
   const theme = useDroneStore((s) => s.theme);
+  const colorScheme = useDroneStore((s) => s.colorScheme);
   const sidebarCollapsed = useDroneStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useDroneStore((s) => s.toggleSidebar);
 
+  // Build class string with theme and color scheme
+  const themeClass = theme === 'light' ? 'light' : '';
+  const schemeClass = colorScheme !== 'cyan' ? `scheme-${colorScheme}` : '';
+
   return (
-    <div className={`h-full flex flex-col bg-gray-950 text-gray-100 ${theme === 'light' ? 'light' : ''}`}>
+    <div className={`h-full flex flex-col bg-gray-950 text-gray-100 ${themeClass} ${schemeClass}`}>
       {/* Top bar */}
       <ConnectionBar />
 
