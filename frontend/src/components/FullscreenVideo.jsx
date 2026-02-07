@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { MapContainer, TileLayer, Marker, Polyline } from 'react-leaflet';
 import L from 'leaflet';
-import { X, Minimize2, Battery, Wifi, Gauge, Compass, Mountain, ArrowUp, Home } from 'lucide-react';
+import { X, Minimize2, Battery, Wifi, Gauge, Mountain, ArrowUp, Home, Keyboard, Gamepad2 } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
 import { apiUrl } from '../utils/api';
+
+const RC_CENTER = 1500;
 
 // Mini drone icon for map
 const miniDroneIcon = L.divIcon({
@@ -275,6 +278,114 @@ function TelemetryHUD({ telemetry, homePosition }) {
   );
 }
 
+// Stick visualization for manual control
+function StickViz({ x, y, label, size = 48 }) {
+  const dotX = ((x + 1) / 2) * size;
+  const dotY = ((y + 1) / 2) * size;
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div
+        className="relative bg-gray-900/80 rounded-full border border-gray-600/50"
+        style={{ width: size, height: size }}
+      >
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="absolute w-full h-px bg-gray-600/50" />
+          <div className="absolute h-full w-px bg-gray-600/50" />
+        </div>
+        <div
+          className="absolute w-2.5 h-2.5 bg-cyan-400 rounded-full shadow-lg shadow-cyan-500/50 -translate-x-1/2 -translate-y-1/2 transition-all duration-75"
+          style={{ left: dotX, top: dotY }}
+        />
+      </div>
+      <span className="text-[8px] text-gray-500 font-medium">{label}</span>
+    </div>
+  );
+}
+
+// Manual control HUD overlay
+function ManualControlHUD() {
+  const keyboardEnabled = useDroneStore((s) => s.keyboardEnabled);
+  const setKeyboardEnabled = useDroneStore((s) => s.setKeyboardEnabled);
+  const gamepadEnabled = useDroneStore((s) => s.gamepadEnabled);
+  const manualControl = useDroneStore((s) => s.manualControl);
+  const keysPressed = useDroneStore((s) => s.keysPressed);
+
+  const [roll, pitch, throttle, yaw] = manualControl.lastRc;
+  const normalize = (v) => (v - RC_CENTER) / 500;
+
+  const leftX = normalize(yaw);
+  const leftY = -normalize(throttle);
+  const rightX = normalize(roll);
+  const rightY = normalize(pitch);
+
+  const isActive = keyboardEnabled || gamepadEnabled;
+  const hasInput = roll !== RC_CENTER || pitch !== RC_CENTER || throttle !== RC_CENTER || yaw !== RC_CENTER;
+
+  // Active keys display
+  const activeKeys = useMemo(() => {
+    const keys = [];
+    if (keysPressed.w) keys.push('W');
+    if (keysPressed.a) keys.push('A');
+    if (keysPressed.s) keys.push('S');
+    if (keysPressed.d) keys.push('D');
+    if (keysPressed.arrowup) keys.push('↑');
+    if (keysPressed.arrowdown) keys.push('↓');
+    if (keysPressed.arrowleft) keys.push('←');
+    if (keysPressed.arrowright) keys.push('→');
+    return keys;
+  }, [keysPressed]);
+
+  return (
+    <div className="absolute bottom-4 left-4 pointer-events-auto">
+      <div className="bg-gray-900/80 backdrop-blur-sm rounded-lg border border-gray-700/50 p-3">
+        {/* Toggle buttons */}
+        <div className="flex items-center gap-2 mb-2">
+          <button
+            onClick={() => setKeyboardEnabled(!keyboardEnabled)}
+            className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-all ${
+              keyboardEnabled
+                ? 'bg-cyan-500/30 text-cyan-300 border border-cyan-500/50'
+                : 'bg-gray-800/60 text-gray-500 border border-gray-700/50 hover:text-gray-300'
+            }`}
+          >
+            <Keyboard size={12} />
+            <span>KB</span>
+          </button>
+          <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs ${
+            gamepadEnabled ? 'text-cyan-300' : 'text-gray-600'
+          }`}>
+            <Gamepad2 size={12} />
+            <span>{gamepadEnabled ? 'ON' : 'OFF'}</span>
+          </div>
+          {isActive && hasInput && (
+            <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse" />
+          )}
+        </div>
+
+        {/* Stick visualization - always show when any control is active */}
+        {isActive && (
+          <div className="flex items-center gap-4">
+            <StickViz x={leftX} y={leftY} label="THR/YAW" />
+            <StickViz x={rightX} y={rightY} label="ROLL/PITCH" />
+          </div>
+        )}
+
+        {/* Active keys indicator */}
+        {keyboardEnabled && activeKeys.length > 0 && (
+          <div className="mt-2 flex items-center gap-1 justify-center">
+            {activeKeys.map((k) => (
+              <span key={k} className="px-1.5 py-0.5 bg-cyan-500/30 border border-cyan-500/50 rounded text-[9px] font-bold text-cyan-300">
+                {k}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function FullscreenVideo({ onClose }) {
   const videoUrl = useDroneStore((s) => s.videoUrl);
   const videoActive = useDroneStore((s) => s.videoActive);
@@ -297,8 +408,9 @@ export default function FullscreenVideo({ onClose }) {
     return () => window.removeEventListener('keydown', handleKey);
   }, [onClose]);
 
-  return (
-    <div className="fixed inset-0 z-[9999] bg-black flex items-center justify-center">
+  // Use portal to render at document body level (above everything)
+  return createPortal(
+    <div className="fixed inset-0 bg-black flex items-center justify-center" style={{ zIndex: 99999 }}>
       {/* Video feed - fullscreen background */}
       <div className="absolute inset-0 flex items-center justify-center bg-black">
         {streamUrl ? (
@@ -318,6 +430,9 @@ export default function FullscreenVideo({ onClose }) {
 
       {/* HUD Overlay */}
       <TelemetryHUD telemetry={telemetry} homePosition={homePosition} />
+
+      {/* Manual Control HUD - bottom left */}
+      <ManualControlHUD />
 
       {/* Minimap - bottom right */}
       <div className="absolute bottom-4 right-4 w-48 h-48 rounded-lg overflow-hidden border-2 border-gray-700/50 shadow-2xl pointer-events-auto">
@@ -363,6 +478,7 @@ export default function FullscreenVideo({ onClose }) {
         <Minimize2 size={12} />
         <span>Press ESC to exit</span>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
