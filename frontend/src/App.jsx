@@ -10,6 +10,7 @@ import MissionPanel from './components/MissionPanel';
 import VideoFeed from './components/VideoFeed';
 import ToolsPanel from './components/ToolsPanel';
 import FlyOverlay from './components/FlyOverlay';
+import AttitudeIndicator from './components/AttitudeIndicator';
 
 export default function App() {
   const { sendMessage, droneChangeDetected, dismissDroneChange, acceptDroneChange } = useWebSocket();
@@ -194,6 +195,9 @@ export default function App() {
             ) : activeTab === 'flying' ? (
               <>
                 <Telemetry />
+                <div className="px-4 pb-4">
+                  <AttitudeIndicator />
+                </div>
                 <Controls sendMessage={sendMessage} />
               </>
             ) : activeTab === 'video' ? (

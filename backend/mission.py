@@ -181,6 +181,24 @@ class MissionManager:
             print(f"Mission pause error: {e}")
             return False
 
+    def resume(self) -> bool:
+        """Resume the mission from current waypoint (switch back to auto)."""
+        if not self._drone.connected:
+            return False
+
+        try:
+            # Just switch back to AUTO mode - don't reset current waypoint
+            if self._drone.is_ardupilot:
+                self._drone.set_mode("AUTO")
+            else:
+                self._drone.set_mode("MISSION")
+
+            self._set_status("running")
+            return True
+        except Exception as e:
+            print(f"Mission resume error: {e}")
+            return False
+
     def clear(self) -> bool:
         """Clear all mission items from the vehicle."""
         if not self._drone.connected:
@@ -244,12 +262,24 @@ class MissionManager:
             print(f"Fence upload error: {e}")
             return False
 
+    def get_mission_seq_for_index(self, index: int) -> int:
+        """Convert a 0-based waypoint index to the correct MAVLink seq number.
+
+        ArduPilot: seq 0 is home, mission items start at seq 1
+        PX4: seq 0 is first mission item
+        """
+        if self._drone.is_ardupilot:
+            return index + 1  # ArduPilot: offset by 1 for home at seq 0
+        else:
+            return index  # PX4: no offset
+
     def download(self) -> list[dict]:
         """Download mission items from vehicle. Returns list of waypoint dicts."""
         if not self._drone.connected:
             return []
 
         self._drone.drain_mission_queue()
+        is_ardupilot = self._drone.is_ardupilot
 
         try:
             # Request mission list
@@ -261,13 +291,21 @@ class MissionManager:
                 return []
 
             count = msg.count
-            if count <= 1:
-                # Only home position or empty
-                return []
+
+            # ArduPilot: seq 0 is home, so need at least 2 items for 1 waypoint
+            # PX4: seq 0 is first waypoint, so need at least 1 item
+            if is_ardupilot:
+                if count <= 1:
+                    return []
+                start_seq = 1  # Skip home at seq 0
+            else:
+                if count == 0:
+                    return []
+                start_seq = 0  # PX4 starts at seq 0
 
             items = []
-            # Request items 1..count-1 (skip seq 0 = home)
-            for seq in range(1, count):
+            # Request mission items
+            for seq in range(start_seq, count):
                 self._drone.send_mission_cmd("mission_request_int", seq=seq)
 
                 deadline = time.time() + 5.0

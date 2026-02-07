@@ -52,9 +52,18 @@ function createWaypointIcon(index, type) {
   });
 }
 
-// Drone mission icon (dimmer, smaller)
-function createDroneMissionIcon(index, type) {
+// Drone mission icon (dimmer, smaller; active = highlighted with glow)
+function createDroneMissionIcon(index, type, isActive = false) {
   const config = MARKER_COLORS[type] || MARKER_COLORS.waypoint;
+  if (isActive) {
+    // Active waypoint: larger with glow
+    return L.divIcon({
+      html: `<div class="drone-mission-marker drone-mission-active" style="background-color:${config.bg};border-color:#fff;box-shadow:0 0 10px ${config.bg},0 0 20px ${config.bg}88;width:26px;height:26px;border-width:3px">${index + 1}</div>`,
+      className: '',
+      iconSize: [26, 26],
+      iconAnchor: [13, 13],
+    });
+  }
   return L.divIcon({
     html: `<div class="drone-mission-marker" style="background-color:${config.bg};border-color:${config.border}">${index + 1}</div>`,
     className: '',
@@ -591,39 +600,38 @@ function DroneMissionMarkers() {
   const droneMission = useDroneStore((s) => s.droneMission);
   const activeTab = useDroneStore((s) => s.activeTab);
   const addAlert = useDroneStore((s) => s.addAlert);
+  const missionSeq = useDroneStore((s) => s.telemetry.mission_seq);
+  const autopilot = useDroneStore((s) => s.telemetry.autopilot);
 
   const isFlying = activeTab === 'flying';
   const droneOpacity = isFlying ? 1 : 0.3;
+
+  // Convert mission_seq to 0-based index
+  // ArduPilot: seq 0 = home, mission items start at seq 1 -> index = seq - 1
+  // PX4: seq 0 = first mission item -> index = seq
+  const isArdupilot = autopilot === 'ardupilot';
+  const currentWaypointIndex = missionSeq >= 0 ? (isArdupilot ? missionSeq - 1 : missionSeq) : -1;
 
   const droneNavPositions = droneMission
     .filter((w) => (w.item_type || 'waypoint') !== 'roi')
     .map((w) => [w.lat, w.lon]);
 
-  const handleStartFrom = useCallback(async (index) => {
-    const seq = index + 1; // seq 0 is home
+  const handleSetCurrent = useCallback(async (index) => {
+    // Send 0-based index, backend will convert to correct seq based on autopilot type
     try {
-      const setRes = await fetch('/api/mission/set_current', {
+      const res = await fetch('/api/mission/set_current', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ seq }),
+        body: JSON.stringify({ index }),
       });
-      const setData = await setRes.json();
-      if (setData.status === 'error') {
-        addAlert(setData.error || 'Failed to set waypoint', 'error');
-        return;
-      }
-      const startRes = await fetch('/api/mission/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const startData = await startRes.json();
-      if (startData.status === 'error') {
-        addAlert(startData.error || 'Mission start failed', 'error');
+      const data = await res.json();
+      if (data.status === 'error') {
+        addAlert(data.error || 'Failed to set current waypoint', 'error');
       } else {
-        addAlert(`Mission starting from WP ${index + 1}`, 'success');
+        addAlert(`Current waypoint set to ${index + 1}`, 'success');
       }
     } catch (err) {
-      addAlert('Start from here failed: ' + err.message, 'error');
+      addAlert('Set current failed: ' + err.message, 'error');
     }
   }, [addAlert]);
 
@@ -633,7 +641,7 @@ function DroneMissionMarkers() {
         <Marker
           key={`dm-${i}`}
           position={[wp.lat, wp.lon]}
-          icon={createDroneMissionIcon(i, wp.item_type || 'waypoint')}
+          icon={createDroneMissionIcon(i, wp.item_type || 'waypoint', i === currentWaypointIndex)}
           opacity={droneOpacity}
         >
           <Popup>
@@ -643,13 +651,13 @@ function DroneMissionMarkers() {
               <div className="text-xs opacity-70">{wp.lat.toFixed(6)}, {wp.lon.toFixed(6)}</div>
               {isFlying && (
                 <button
-                  onClick={() => handleStartFrom(i)}
+                  onClick={() => handleSetCurrent(i)}
                   style={{
                     marginTop: '6px',
                     padding: '4px 10px',
                     fontSize: '11px',
                     fontWeight: 600,
-                    background: '#10b981',
+                    background: '#06b6d4',
                     color: 'white',
                     border: 'none',
                     borderRadius: '4px',
@@ -657,7 +665,7 @@ function DroneMissionMarkers() {
                     width: '100%',
                   }}
                 >
-                  Start From Here
+                  Set as Current
                 </button>
               )}
             </div>
@@ -782,20 +790,42 @@ function FlyClickTarget() {
 
   const handleSetHome = useCallback(async () => {
     const target = useDroneStore.getState().flyClickTarget;
+    const currentHome = useDroneStore.getState().homePosition;
     const altMsl = useDroneStore.getState().telemetry.alt_msl || 0;
     if (!target) return;
+
+    // Try to get ground elevation from Open-Meteo API
+    let alt = altMsl; // Default fallback
+    try {
+      const elevRes = await fetch(
+        `https://api.open-meteo.com/v1/elevation?latitude=${target.lat}&longitude=${target.lon}`
+      );
+      const elevData = await elevRes.json();
+      if (elevData.elevation && elevData.elevation[0] !== undefined) {
+        alt = elevData.elevation[0];
+      } else if (currentHome && currentHome.alt) {
+        // Fall back to current home altitude
+        alt = currentHome.alt;
+      }
+    } catch {
+      // If terrain fetch fails, use current home alt or alt_msl
+      if (currentHome && currentHome.alt) {
+        alt = currentHome.alt;
+      }
+    }
+
     try {
       const res = await fetch('/api/home/set', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat: target.lat, lon: target.lon, alt: altMsl }),
+        body: JSON.stringify({ lat: target.lat, lon: target.lon, alt }),
       });
       const data = await res.json();
       if (data.status === 'error') {
         addAlert(data.error || 'Set Home failed', 'error');
       } else {
-        setHomePosition({ lat: target.lat, lon: target.lon, alt: altMsl });
-        addAlert(`Home position set (alt: ${altMsl.toFixed(1)}m MSL)`, 'success');
+        setHomePosition({ lat: target.lat, lon: target.lon, alt });
+        addAlert(`Home position set (alt: ${alt.toFixed(1)}m)`, 'success');
       }
     } catch (err) {
       addAlert('Set Home failed: ' + err.message, 'error');

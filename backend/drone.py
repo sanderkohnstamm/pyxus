@@ -105,6 +105,9 @@ class TelemetryState:
     system_status: int = 0
     autopilot: str = "unknown"
 
+    # Mission
+    mission_seq: int = -1  # Current mission item seq (-1 = none)
+
     # Platform
     platform_type: str = "Unknown"
     last_heartbeat: float = 0.0
@@ -136,6 +139,7 @@ class TelemetryState:
             "mode": self.mode,
             "system_status": self.system_status,
             "autopilot": self.autopilot,
+            "mission_seq": self.mission_seq,
             "platform_type": self.platform_type,
             "heartbeat_age": heartbeat_age,
         }
@@ -873,6 +877,9 @@ class DroneConnection:
                 self._telemetry.voltage = msg.voltage_battery / 1000.0
                 self._telemetry.current = msg.current_battery / 100.0 if msg.current_battery != -1 else 0.0
                 self._telemetry.remaining = msg.battery_remaining
+
+            elif msg_type == "MISSION_CURRENT":
+                self._telemetry.mission_seq = msg.seq
 
     def arm(self):
         self._enqueue_cmd("arm")

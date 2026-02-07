@@ -847,14 +847,9 @@ function MissionSubPanel() {
             <Download size={12} /> Import
           </button>
           <button
-            onClick={() => {
-              clearWaypoints();
-              if (isConnected) {
-                apiCall('clear');
-              }
-            }}
+            onClick={clearWaypoints}
             disabled={plannedWaypoints.length === 0}
-            title="Clear all waypoints"
+            title="Clear planned waypoints"
             className="flex items-center justify-center gap-1.5 px-2 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 rounded-md text-xs font-semibold text-red-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-red-500/10 disabled:hover:border-red-500/20"
           >
             <Trash2 size={12} /> Clear

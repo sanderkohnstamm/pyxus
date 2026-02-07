@@ -277,6 +277,7 @@ export default function ConnectionBar() {
         <button
           onClick={toggleTheme}
           className="p-1 rounded hover:bg-gray-800/30 transition-colors text-gray-500/60 hover:text-gray-400"
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
         >
           {theme === 'dark' ? <Sun size={12} /> : <Moon size={12} />}
         </button>

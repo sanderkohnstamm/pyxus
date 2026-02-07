@@ -77,7 +77,7 @@ class PolygonFenceRequest(BaseModel):
 
 
 class MissionSetCurrentRequest(BaseModel):
-    seq: int
+    index: int  # 0-based waypoint index
 
 
 class GotoRequest(BaseModel):
@@ -341,6 +341,14 @@ async def api_mission_pause():
     return {"status": "ok" if success else "error", "command": "mission_pause"}
 
 
+@app.post("/api/mission/resume")
+async def api_mission_resume():
+    if not drone.connected:
+        return {"status": "error", "error": "Not connected"}
+    success = mission_mgr.resume()
+    return {"status": "ok" if success else "error", "command": "mission_resume"}
+
+
 @app.post("/api/mission/clear")
 async def api_mission_clear():
     if not drone.connected:
@@ -353,8 +361,12 @@ async def api_mission_clear():
 async def api_mission_set_current(req: MissionSetCurrentRequest):
     if not drone.connected:
         return {"status": "error", "error": "Not connected"}
-    drone.send_mission_cmd("set_current_mission", seq=req.seq)
-    return {"status": "ok", "command": "mission_set_current", "seq": req.seq}
+    # Convert 0-based index to correct MAVLink seq based on autopilot type
+    # ArduPilot: seq 0 is home, mission starts at seq 1
+    # PX4: seq 0 is first mission item
+    seq = mission_mgr.get_mission_seq_for_index(req.index)
+    drone.send_mission_cmd("set_current_mission", seq=seq)
+    return {"status": "ok", "command": "mission_set_current", "seq": seq, "index": req.index}
 
 
 # --- Mission Download ---

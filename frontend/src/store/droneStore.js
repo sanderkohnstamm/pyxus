@@ -12,6 +12,7 @@ const INITIAL_TELEMETRY = {
   fix_type: 0, satellites: 0, hdop: 99.99,
   armed: false, mode: '', system_status: 0, autopilot: 'unknown',
   platform_type: 'Unknown', heartbeat_age: -1,
+  mission_seq: -1,
 };
 
 const useDroneStore = create((set, get) => ({
@@ -70,6 +71,9 @@ const useDroneStore = create((set, get) => ({
   params: {},       // name -> {value, type, index}
   paramsTotal: 0,
   paramsLoading: false,
+  paramMeta: {},    // name -> {description, range, values, units, etc.}
+  paramMetaLoading: false,
+  paramMetaPlatform: null, // platform we fetched metadata for
 
   // Keyboard control
   keyboardEnabled: false,
@@ -496,6 +500,64 @@ const useDroneStore = create((set, get) => ({
   // Parameters
   setParams: (params, total) => set({ params, paramsTotal: total }),
   setParamsLoading: (loading) => set({ paramsLoading: loading }),
+  setParamMeta: (meta, platform) => set({ paramMeta: meta, paramMetaPlatform: platform }),
+  fetchParamMeta: async (platformType, autopilot) => {
+    // Only fetch for ArduPilot - PX4 metadata would require different approach
+    if (autopilot !== 'ardupilot') return;
+
+    const { paramMetaPlatform } = get();
+    // Don't refetch if already loaded for this platform
+    if (paramMetaPlatform === platformType) return;
+
+    // Map platform type to ArduPilot vehicle type
+    const vehicleMap = {
+      'Quadrotor': 'ArduCopter',
+      'Hexarotor': 'ArduCopter',
+      'Octorotor': 'ArduCopter',
+      'Tricopter': 'ArduCopter',
+      'Coaxial': 'ArduCopter',
+      'Helicopter': 'ArduCopter',
+      'Fixed Wing': 'ArduPlane',
+      'Ground Rover': 'Rover',
+      'Surface Boat': 'Rover',
+      'Submarine': 'ArduSub',
+      'Antenna Tracker': 'AntennaTracker',
+    };
+
+    const vehicle = vehicleMap[platformType] || 'ArduCopter';
+    const url = `https://autotest.ardupilot.org/Parameters/${vehicle}/apm.pdef.json`;
+
+    set({ paramMetaLoading: true });
+
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+
+      // Parse the ArduPilot pdef format
+      // It's a dict of param names -> {Description, Range, Values, Units, ...}
+      const meta = {};
+      for (const [name, info] of Object.entries(data)) {
+        if (typeof info === 'object' && info.Description) {
+          meta[name] = {
+            description: info.Description,
+            displayName: info.DisplayName,
+            range: info.Range,
+            values: info.Values,
+            units: info.Units,
+            increment: info.Increment,
+            rebootRequired: info.RebootRequired,
+            bitmask: info.Bitmask,
+          };
+        }
+      }
+
+      set({ paramMeta: meta, paramMetaPlatform: platformType, paramMetaLoading: false });
+    } catch (err) {
+      console.warn('Failed to fetch parameter metadata:', err);
+      set({ paramMetaLoading: false });
+    }
+  },
 
   // Keyboard
   setKeyboardEnabled: (enabled) => set({ keyboardEnabled: enabled }),

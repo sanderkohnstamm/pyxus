@@ -37,9 +37,10 @@ const SAFETY_PARAMS = {
   ],
 };
 
-function ParamRow({ name, param, onSet }) {
+function ParamRow({ name, param, meta, onSet }) {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
+  const [expanded, setExpanded] = useState(false);
 
   const startEdit = () => {
     setEditValue(String(param.value));
@@ -63,38 +64,109 @@ function ParamRow({ name, param, onSet }) {
     if (e.key === 'Escape') cancelEdit();
   };
 
+  const hasDetails = meta && (meta.description || meta.range || meta.values);
+
+  // Format value description if we have enum values
+  const getValueLabel = () => {
+    if (!meta?.values) return null;
+    const intVal = Math.round(param.value);
+    return meta.values[intVal];
+  };
+  const valueLabel = getValueLabel();
+
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-800/40 group">
-      <span className="text-[11px] font-mono text-gray-300 truncate flex-1 min-w-0">
-        {name}
-      </span>
-      {editing ? (
-        <div className="flex items-center gap-1 shrink-0">
-          <input
-            type="text"
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            autoFocus
-            className="w-24 bg-gray-800 border border-cyan-500/50 rounded px-1.5 py-0.5 text-[11px] font-mono text-gray-200 text-right focus:outline-none"
-          />
-          <button onClick={confirmEdit} className="text-emerald-400 hover:text-emerald-300 p-0.5">
-            <Check size={12} />
-          </button>
-          <button onClick={cancelEdit} className="text-red-400 hover:text-red-300 p-0.5">
-            <X size={12} />
-          </button>
-        </div>
-      ) : (
-        <span
-          onClick={startEdit}
-          className="text-[11px] font-mono text-cyan-300 cursor-pointer hover:text-cyan-200 tabular-nums shrink-0"
-          title="Click to edit"
-        >
-          {Number.isInteger(param.value) ? param.value : param.value.toFixed(
-            Math.abs(param.value) < 1 ? 6 : Math.abs(param.value) < 100 ? 4 : 2
+    <div className="hover:bg-gray-800/40 group">
+      <div
+        className={`flex items-center gap-2 px-3 py-1.5 ${hasDetails ? 'cursor-pointer' : ''}`}
+        onClick={() => hasDetails && !editing && setExpanded(!expanded)}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono text-gray-300 truncate">
+              {name}
+            </span>
+            {meta?.units && (
+              <span className="text-[9px] text-gray-600">[{meta.units}]</span>
+            )}
+          </div>
+          {meta?.displayName && (
+            <div className="text-[9px] text-gray-600 truncate">{meta.displayName}</div>
           )}
-        </span>
+        </div>
+        {editing ? (
+          <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+            <input
+              type="text"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              autoFocus
+              className="w-24 bg-gray-800 border border-cyan-500/50 rounded px-1.5 py-0.5 text-[11px] font-mono text-gray-200 text-right focus:outline-none"
+            />
+            <button onClick={confirmEdit} className="text-emerald-400 hover:text-emerald-300 p-0.5">
+              <Check size={12} />
+            </button>
+            <button onClick={cancelEdit} className="text-red-400 hover:text-red-300 p-0.5">
+              <X size={12} />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span
+              onClick={(e) => { e.stopPropagation(); startEdit(); }}
+              className="text-[11px] font-mono text-cyan-300 cursor-pointer hover:text-cyan-200 tabular-nums"
+              title="Click to edit"
+            >
+              {Number.isInteger(param.value) ? param.value : param.value.toFixed(
+                Math.abs(param.value) < 1 ? 6 : Math.abs(param.value) < 100 ? 4 : 2
+              )}
+            </span>
+            {valueLabel && (
+              <span className="text-[9px] text-amber-400 truncate max-w-[80px]" title={valueLabel}>
+                {valueLabel}
+              </span>
+            )}
+            {hasDetails && (
+              <ChevronDown size={10} className={`text-gray-600 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Expanded details */}
+      {expanded && meta && (
+        <div className="px-3 pb-2 text-[9px] text-gray-500 space-y-1 border-l-2 border-cyan-500/30 ml-3">
+          {meta.description && (
+            <div className="text-gray-400">{meta.description}</div>
+          )}
+          {meta.range && (
+            <div>Range: {meta.range.low} - {meta.range.high}{meta.increment ? ` (step ${meta.increment})` : ''}</div>
+          )}
+          {meta.values && (
+            <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+              {Object.entries(meta.values).map(([k, v]) => (
+                <span key={k} className={param.value == k ? 'text-cyan-400' : ''}>
+                  {k}={v}
+                </span>
+              ))}
+            </div>
+          )}
+          {meta.bitmask && (
+            <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+              {Object.entries(meta.bitmask).map(([bit, label]) => {
+                const isSet = (Math.floor(param.value) & (1 << parseInt(bit))) !== 0;
+                return (
+                  <span key={bit} className={isSet ? 'text-emerald-400' : ''}>
+                    [{bit}]{label}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          {meta.rebootRequired && (
+            <div className="text-amber-500">⚠ Reboot required</div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -152,10 +224,22 @@ export default function ParamsPanel() {
   const setParamsLoading = useDroneStore((s) => s.setParamsLoading);
   const addAlert = useDroneStore((s) => s.addAlert);
   const autopilot = useDroneStore((s) => s.telemetry.autopilot);
+  const platformType = useDroneStore((s) => s.telemetry.platform_type);
+  const paramMeta = useDroneStore((s) => s.paramMeta);
+  const paramMetaLoading = useDroneStore((s) => s.paramMetaLoading);
+  const fetchParamMeta = useDroneStore((s) => s.fetchParamMeta);
 
   const [search, setSearch] = useState('');
   const isConnected = connectionStatus === 'connected';
   const paramCount = Object.keys(params).length;
+  const metaCount = Object.keys(paramMeta).length;
+
+  // Fetch parameter metadata when connected and platform type is known
+  useEffect(() => {
+    if (isConnected && platformType && platformType !== 'Unknown') {
+      fetchParamMeta(platformType, autopilot);
+    }
+  }, [isConnected, platformType, autopilot, fetchParamMeta]);
 
   const fetchParams = useCallback(async () => {
     try {
@@ -232,9 +316,19 @@ export default function ParamsPanel() {
     if (!search.trim()) return entries.sort((a, b) => a[0].localeCompare(b[0]));
     const q = search.toUpperCase();
     return entries
-      .filter(([name]) => name.toUpperCase().includes(q))
+      .filter(([name]) => {
+        // Search in param name
+        if (name.toUpperCase().includes(q)) return true;
+        // Search in metadata description and display name
+        const meta = paramMeta[name];
+        if (meta) {
+          if (meta.displayName?.toUpperCase().includes(q)) return true;
+          if (meta.description?.toUpperCase().includes(q)) return true;
+        }
+        return false;
+      })
       .sort((a, b) => a[0].localeCompare(b[0]));
-  }, [params, search]);
+  }, [params, search, paramMeta]);
 
   if (!isConnected) {
     return (
@@ -323,7 +417,7 @@ export default function ParamsPanel() {
         ) : (
           <div className="divide-y divide-gray-800/30">
             {filtered.map(([name, param]) => (
-              <ParamRow key={name} name={name} param={param} onSet={handleSet} />
+              <ParamRow key={name} name={name} param={param} meta={paramMeta[name]} onSet={handleSet} />
             ))}
           </div>
         )}
@@ -331,8 +425,15 @@ export default function ParamsPanel() {
 
       {/* Footer */}
       {paramCount > 0 && (
-        <div className="px-3 py-2 border-t border-gray-800/50 text-[10px] text-gray-600">
-          {filtered.length} of {paramCount} parameters shown
+        <div className="px-3 py-2 border-t border-gray-800/50 text-[10px] text-gray-600 flex justify-between items-center">
+          <span>{filtered.length} of {paramCount} parameters shown</span>
+          {paramMetaLoading ? (
+            <span className="text-amber-400">Loading descriptions...</span>
+          ) : metaCount > 0 ? (
+            <span className="text-emerald-400">{metaCount} descriptions</span>
+          ) : autopilot === 'ardupilot' ? (
+            <span className="text-gray-600">No metadata</span>
+          ) : null}
         </div>
       )}
     </div>

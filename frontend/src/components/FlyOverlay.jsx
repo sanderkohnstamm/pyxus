@@ -7,6 +7,8 @@ import {
   Home,
   Play,
   Square,
+  Trash2,
+  FastForward,
 } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
 
@@ -28,6 +30,7 @@ export default function FlyOverlay() {
   const missionStatus = useDroneStore((s) => s.missionStatus);
   const addAlert = useDroneStore((s) => s.addAlert);
   const takeoffAlt = useDroneStore((s) => s.takeoffAlt);
+  const setDroneMission = useDroneStore((s) => s.setDroneMission);
 
   const isConnected = connectionStatus === 'connected';
 
@@ -60,12 +63,16 @@ export default function FlyOverlay() {
         const data = await res.json();
         if (data.status === 'error') {
           addAlert(data.error || `Mission ${endpoint} failed`, 'error');
+        } else if (endpoint === 'clear') {
+          // Clear drone mission from local store after successful clear
+          setDroneMission([]);
+          addAlert('Mission cleared from drone', 'success');
         }
       } catch (err) {
         addAlert(`Mission ${endpoint} failed: ${err.message}`, 'error');
       }
     },
-    [addAlert]
+    [addAlert, setDroneMission]
   );
 
   if (!isConnected) return null;
@@ -96,6 +103,20 @@ export default function FlyOverlay() {
           className={`${btn} bg-gray-800/50 hover:bg-gray-700/50 border-gray-700/30 hover:border-gray-600/40 text-gray-300`}
         >
           <Square size={9} className="inline -mt-0.5 mr-1" />Pause
+        </button>
+        <button
+          onClick={() => missionApiCall('resume')}
+          className={`${btn} bg-emerald-950/40 hover:bg-emerald-950/50 border-emerald-900/25 hover:border-emerald-800/35 text-emerald-400`}
+          title="Continue mission from current waypoint"
+        >
+          <FastForward size={10} className="inline -mt-0.5 mr-1" />Continue
+        </button>
+        <button
+          onClick={() => missionApiCall('clear')}
+          className={`${btn} bg-red-950/40 hover:bg-red-950/50 border-red-900/25 hover:border-red-800/35 text-red-400`}
+          title="Clear mission from drone"
+        >
+          <Trash2 size={9} className="inline -mt-0.5 mr-1" />Clear
         </button>
       </div>
 

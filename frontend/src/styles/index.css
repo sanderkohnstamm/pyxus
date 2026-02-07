@@ -224,6 +224,7 @@ html, body, #root {
 
 /* Waypoint marker */
 .waypoint-marker {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -234,10 +235,13 @@ html, body, #root {
   font-size: 11px;
   font-weight: 700;
   border: 2px solid;
+  cursor: pointer;
+  pointer-events: auto;
 }
 
 /* Drone mission marker (smaller, dimmer) */
 .drone-mission-marker {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -249,6 +253,19 @@ html, body, #root {
   font-weight: 700;
   border: 2px solid;
   opacity: 0.7;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* Active drone mission marker (current waypoint) */
+.drone-mission-marker.drone-mission-active {
+  opacity: 1;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 8px currentColor, 0 0 16px currentColor; }
+  50% { box-shadow: 0 0 12px currentColor, 0 0 24px currentColor; }
 }
 
 /* DnD drag overlay */
@@ -260,10 +277,37 @@ html, body, #root {
 /* Smooth marker dragging */
 .leaflet-marker-icon {
   will-change: transform;
+  cursor: pointer !important;
 }
 .leaflet-dragging .leaflet-marker-icon,
 .leaflet-marker-draggable {
   transition: none !important;
+}
+
+/* Ensure markers are clickable */
+.leaflet-marker-pane .leaflet-marker-icon {
+  pointer-events: auto !important;
+}
+
+/* Increase hit area for small markers */
+.drone-mission-marker::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  right: -6px;
+  bottom: -6px;
+  border-radius: 50%;
+}
+
+.waypoint-marker::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  border-radius: 50%;
 }
 
 /* Select option background fix */
