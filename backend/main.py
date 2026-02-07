@@ -149,15 +149,20 @@ class ConnectionManager:
             self.active_connections.remove(websocket)
 
     async def broadcast(self, data: dict):
+        if not self.active_connections:
+            return
         message = json.dumps(data)
-        disconnected = []
-        for ws in self.active_connections:
+        # Parallel broadcast to all clients
+        async def send_to(ws):
             try:
                 await ws.send_text(message)
+                return None
             except:
-                disconnected.append(ws)
-        for ws in disconnected:
-            self.disconnect(ws)
+                return ws
+        results = await asyncio.gather(*[send_to(ws) for ws in self.active_connections])
+        for ws in results:
+            if ws is not None:
+                self.disconnect(ws)
 
 
 ws_manager = ConnectionManager()
@@ -166,17 +171,39 @@ ws_manager = ConnectionManager()
 # --- Telemetry broadcast task ---
 
 async def telemetry_broadcast():
-    """Broadcast telemetry to all connected WebSocket clients at ~10Hz."""
+    """Broadcast telemetry to all connected WebSocket clients at ~10Hz with delta detection."""
+    last_telemetry = {}
+    last_mission_status = None
+
+    # Keys that change frequently and should always be checked
+    volatile_keys = {'lat', 'lon', 'alt', 'alt_msl', 'roll', 'pitch', 'yaw', 'heading',
+                     'groundspeed', 'airspeed', 'climb', 'voltage', 'current', 'heartbeat_age'}
+
     while True:
         if drone.connected and ws_manager.active_connections:
             telemetry = drone.get_telemetry()
-            telemetry["type"] = "telemetry"
-            telemetry["mission_status"] = mission_mgr.status
-            # Include pending STATUSTEXT messages
+            mission_status = mission_mgr.status
             status_msgs = drone.drain_statustext()
-            if status_msgs:
-                telemetry["statustext"] = status_msgs
-            await ws_manager.broadcast(telemetry)
+
+            # Check if anything changed
+            has_changes = (
+                status_msgs or  # Always send if there are status messages
+                mission_status != last_mission_status or
+                any(telemetry.get(k) != last_telemetry.get(k) for k in volatile_keys) or
+                telemetry.get('armed') != last_telemetry.get('armed') or
+                telemetry.get('mode') != last_telemetry.get('mode') or
+                telemetry.get('mission_seq') != last_telemetry.get('mission_seq')
+            )
+
+            if has_changes:
+                telemetry["type"] = "telemetry"
+                telemetry["mission_status"] = mission_status
+                if status_msgs:
+                    telemetry["statustext"] = status_msgs
+                await ws_manager.broadcast(telemetry)
+                last_telemetry = telemetry.copy()
+                last_mission_status = mission_status
+
         await asyncio.sleep(0.1)
 
 

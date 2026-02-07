@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import useDroneStore from '../store/droneStore';
 
 export default function useWeather() {
@@ -9,16 +9,32 @@ export default function useWeather() {
   const setWeatherPlatforms = useDroneStore((s) => s.setWeatherPlatforms);
   const setWeatherPlatform = useDroneStore((s) => s.setWeatherPlatform);
 
+  const debounceRef = useRef(null);
+  const lastFetchRef = useRef(null);
+
   // Fetch platforms on mount
   useEffect(() => {
     fetchPlatforms();
   }, []);
 
-  // Auto-refresh route weather when waypoints change
+  // Auto-refresh route weather when waypoints change (debounced)
   useEffect(() => {
-    if (weather.autoRefresh && plannedWaypoints.length >= 2) {
-      fetchRouteWeather();
-    }
+    if (!weather.autoRefresh || plannedWaypoints.length < 2) return;
+
+    // Debounce: wait 500ms after last change before fetching
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      // Deduplicate: don't refetch if waypoints haven't actually changed
+      const wpKey = JSON.stringify(plannedWaypoints.map(w => `${w.lat.toFixed(6)},${w.lon.toFixed(6)}`));
+      if (lastFetchRef.current !== wpKey) {
+        lastFetchRef.current = wpKey;
+        fetchRouteWeather();
+      }
+    }, 500);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, [plannedWaypoints, weather.autoRefresh, weather.forecastTime]);
 
   const fetchPlatforms = useCallback(async () => {

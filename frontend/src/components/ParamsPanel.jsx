@@ -282,13 +282,40 @@ export default function ParamsPanel() {
     }
   }, [addAlert, fetchParams]);
 
-  // Poll params periodically when loading
+  // Poll params with visibility detection and adaptive interval
   useEffect(() => {
     if (!isConnected) return;
-    fetchParams();
-    const interval = setInterval(fetchParams, 2000);
-    return () => clearInterval(interval);
-  }, [isConnected, fetchParams]);
+
+    let interval = null;
+    const startPolling = () => {
+      fetchParams();
+      // Poll faster while loading, slower when loaded
+      const pollInterval = paramsLoading ? 1000 : 5000;
+      interval = setInterval(() => {
+        // Only fetch if document is visible
+        if (!document.hidden) {
+          fetchParams();
+        }
+      }, pollInterval);
+    };
+
+    const handleVisibility = () => {
+      if (!document.hidden && !interval) {
+        startPolling();
+      } else if (document.hidden && interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+
+    startPolling();
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      if (interval) clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [isConnected, fetchParams, paramsLoading]);
 
   // Stop loading indicator when all params received
   useEffect(() => {

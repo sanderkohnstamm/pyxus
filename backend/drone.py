@@ -2,6 +2,7 @@ import threading
 import time
 import queue
 import math
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -1017,7 +1018,8 @@ class DroneConnection:
                     'rate': 0.0,
                     'last_data': {},
                 }
-                self._msg_history[key] = []
+                # Use deque with maxlen for automatic size limiting and O(1) popleft
+                self._msg_history[key] = deque(maxlen=100)
 
             stats = self._msg_stats[key]
             stats['count'] += 1
@@ -1027,10 +1029,10 @@ class DroneConnection:
             history = self._msg_history[key]
             history.append(now)
 
-            # Remove old timestamps outside the rate window
+            # Remove old timestamps outside the rate window (O(1) popleft with deque)
             cutoff = now - self._rate_window
             while history and history[0] < cutoff:
-                history.pop(0)
+                history.popleft()
 
             # Calculate rate (messages per second)
             if len(history) >= 2:

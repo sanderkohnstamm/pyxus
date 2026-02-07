@@ -126,34 +126,45 @@ export default function ConnectionBar() {
         // Zoom to drone after a brief delay for telemetry to arrive
         setTimeout(() => triggerZoomToDrone(), 500);
 
-        // Auto-download mission and fence from drone
-        try {
-          const missionRes = await fetch('/api/mission/download');
-          const missionData = await missionRes.json();
-          if (missionData.status === 'ok' && missionData.waypoints && missionData.waypoints.length > 0) {
-            setDroneMission(missionData.waypoints);
-            addAlert(`Downloaded ${missionData.waypoints.length} mission items from drone`, 'info');
-          }
-        } catch {}
+        // Auto-download mission, fence, and cameras in parallel
+        const [missionRes, fenceRes, camerasRes] = await Promise.all([
+          fetch('/api/mission/download').catch(() => null),
+          fetch('/api/fence/download').catch(() => null),
+          fetch('/api/cameras').catch(() => null),
+        ]);
 
-        try {
-          const fenceRes = await fetch('/api/fence/download');
-          const fenceData = await fenceRes.json();
-          if (fenceData.status === 'ok' && fenceData.fence_items && fenceData.fence_items.length > 0) {
-            setDroneFence(fenceData.fence_items);
-            addAlert(`Downloaded ${fenceData.fence_items.length} fence items from drone`, 'info');
-          }
-        } catch {}
+        // Process mission
+        if (missionRes) {
+          try {
+            const missionData = await missionRes.json();
+            if (missionData.status === 'ok' && missionData.waypoints?.length > 0) {
+              setDroneMission(missionData.waypoints);
+              addAlert(`Downloaded ${missionData.waypoints.length} mission items from drone`, 'info');
+            }
+          } catch {}
+        }
 
-        // Fetch cameras and gimbals
-        try {
-          const camerasRes = await fetch('/api/cameras');
-          const camerasData = await camerasRes.json();
-          if (camerasData.status === 'ok') {
-            setCameras(camerasData.cameras || []);
-            setGimbals(camerasData.gimbals || []);
-          }
-        } catch {}
+        // Process fence
+        if (fenceRes) {
+          try {
+            const fenceData = await fenceRes.json();
+            if (fenceData.status === 'ok' && fenceData.fence_items?.length > 0) {
+              setDroneFence(fenceData.fence_items);
+              addAlert(`Downloaded ${fenceData.fence_items.length} fence items from drone`, 'info');
+            }
+          } catch {}
+        }
+
+        // Process cameras
+        if (camerasRes) {
+          try {
+            const camerasData = await camerasRes.json();
+            if (camerasData.status === 'ok') {
+              setCameras(camerasData.cameras || []);
+              setGimbals(camerasData.gimbals || []);
+            }
+          } catch {}
+        }
       } else {
         setConnectionStatus('disconnected');
         addAlert(data.error || 'Connection failed', 'error');

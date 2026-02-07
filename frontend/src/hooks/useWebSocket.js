@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import useDroneStore from '../store/droneStore';
+import { wsUrl } from '../utils/api';
 
 const WS_RECONNECT_DELAY = 2000;
 
@@ -28,10 +29,7 @@ export default function useWebSocket() {
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
-
-    const ws = new WebSocket(wsUrl);
+    const ws = new WebSocket(wsUrl('/ws'));
 
     ws.onopen = () => {
       setWsConnected(true);
