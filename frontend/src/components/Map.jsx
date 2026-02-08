@@ -7,9 +7,36 @@ import VideoOverlay from './VideoOverlay';
 import WeatherMapLayer from './WeatherMapLayer';
 import ManualControlOverlay from './ManualControlOverlay';
 import PatternModal from './PatternModal';
-import { Move, RotateCw, Maximize2, ArrowLeftRight, Grid3X3, Ruler } from 'lucide-react';
+import { Move, RotateCw, Maximize2, ArrowLeftRight, Grid3X3, Ruler, Zap } from 'lucide-react';
 import { centroid, transformMission, haversineDistance, bearing } from '../utils/geo';
 import { formatCoord } from '../utils/formatCoord';
+
+// Navigation types that have map positions
+const NAV_TYPES = new Set(['waypoint', 'takeoff', 'loiter_unlim', 'loiter_turns', 'loiter_time', 'roi', 'land']);
+
+// Generate quadratic bezier arc between two points
+function generateArc(source, target, numPoints = 20) {
+  const dx = target[1] - source[1];
+  const dy = target[0] - source[0];
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len < 0.000001) return [source, target];
+
+  const midLat = (source[0] + target[0]) / 2;
+  const midLon = (source[1] + target[1]) / 2;
+  const offset = len * 0.25;
+  const ctrlLat = midLat + (-dx / len) * offset;
+  const ctrlLon = midLon + (dy / len) * offset;
+
+  const points = [];
+  for (let i = 0; i <= numPoints; i++) {
+    const t = i / numPoints;
+    points.push([
+      (1 - t) * (1 - t) * source[0] + 2 * (1 - t) * t * ctrlLat + t * t * target[0],
+      (1 - t) * (1 - t) * source[1] + 2 * (1 - t) * t * ctrlLon + t * t * target[1],
+    ]);
+  }
+  return points;
+}
 
 // Satellite imagery tiles
 const TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -153,10 +180,17 @@ function MapClickHandler() {
   const setFlyClickTarget = useDroneStore((s) => s.setFlyClickTarget);
   const measureMode = useDroneStore((s) => s.measureMode);
   const addMeasurePoint = useDroneStore((s) => s.addMeasurePoint);
+  const quickMissionMode = useDroneStore((s) => s.quickMissionMode);
+  const addQuickMissionWaypoint = useDroneStore((s) => s.addQuickMissionWaypoint);
 
   useMapEvents({
     click: (e) => {
-      // Measure mode (highest priority)
+      // Quick mission mode (highest priority in fly mode)
+      if (quickMissionMode) {
+        addQuickMissionWaypoint(e.latlng.lat, e.latlng.lng);
+        return;
+      }
+      // Measure mode
       if (measureMode) {
         addMeasurePoint(e.latlng.lat, e.latlng.lng);
         return;
@@ -190,16 +224,17 @@ function AddModeCursor() {
   const addWaypointMode = useDroneStore((s) => s.addWaypointMode);
   const activeTab = useDroneStore((s) => s.activeTab);
   const measureMode = useDroneStore((s) => s.measureMode);
+  const quickMissionMode = useDroneStore((s) => s.quickMissionMode);
 
   useEffect(() => {
     const container = map.getContainer();
-    if (measureMode || (addWaypointMode && activeTab === 'planning')) {
+    if (quickMissionMode || measureMode || (addWaypointMode && activeTab === 'planning')) {
       container.style.cursor = 'crosshair';
     } else {
       container.style.cursor = '';
     }
     return () => { container.style.cursor = ''; };
-  }, [addWaypointMode, activeTab, measureMode, map]);
+  }, [addWaypointMode, activeTab, measureMode, quickMissionMode, map]);
 
   return null;
 }
@@ -393,23 +428,85 @@ function ManipulationOverlay({ mode, onComplete, onCancel }) {
   );
 }
 
+// Jump arrow visualization for do_jump waypoints
+function JumpArrows({ waypoints, opacity = 1 }) {
+  const connections = useMemo(() => {
+    const result = [];
+    for (let i = 0; i < waypoints.length; i++) {
+      const wp = waypoints[i];
+      if (wp.type !== 'do_jump') continue;
+      const targetIdx = (wp.param1 || wp.jumpTarget || 1) - 1; // 0-based
+      // Find last positioned wp before this jump
+      let sourceIdx = -1;
+      for (let j = i - 1; j >= 0; j--) {
+        if (NAV_TYPES.has(waypoints[j].type) || (waypoints[j].lat && waypoints[j].lon)) {
+          sourceIdx = j;
+          break;
+        }
+      }
+      if (sourceIdx >= 0 && targetIdx >= 0 && targetIdx < waypoints.length) {
+        const target = waypoints[targetIdx];
+        const source = waypoints[sourceIdx];
+        if (source.lat && source.lon && target.lat && target.lon) {
+          result.push({
+            source: [source.lat, source.lon],
+            target: [target.lat, target.lon],
+            repeat: wp.param2 ?? wp.repeat ?? -1,
+            key: `jump-${i}`,
+          });
+        }
+      }
+    }
+    return result;
+  }, [waypoints]);
+
+  if (connections.length === 0) return null;
+
+  return (
+    <>
+      {connections.map(conn => {
+        const arcPts = generateArc(conn.source, conn.target);
+        const mid = arcPts[Math.floor(arcPts.length / 2)];
+        const repeatStr = conn.repeat === -1 ? '\u221E' : conn.repeat;
+        const labelIcon = L.divIcon({
+          html: `<div style="display:inline-block;white-space:nowrap;background:rgba(236,72,153,0.85);color:white;padding:2px 6px;border-radius:10px;font-size:9px;font-weight:700;font-family:monospace;border:1px solid rgba(236,72,153,0.5);box-shadow:0 2px 6px rgba(0,0,0,0.3)">Jump \u00d7${repeatStr}</div>`,
+          className: '',
+          iconSize: [0, 0],
+          iconAnchor: [0, 8],
+        });
+        return (
+          <React.Fragment key={conn.key}>
+            <Polyline
+              positions={arcPts}
+              pathOptions={{ color: '#ec4899', weight: 2.5, opacity: 0.8 * opacity, dashArray: '6 4' }}
+            />
+            <Marker position={mid} icon={labelIcon} interactive={false} />
+          </React.Fragment>
+        );
+      })}
+    </>
+  );
+}
+
 // Isolated component for planned waypoint markers - prevents telemetry re-renders from
 // recreating marker DOM (which kills in-progress drags)
 function PlannedWaypointMarkers({ onContextMenu }) {
   const plannedWaypoints = useDroneStore((s) => s.plannedWaypoints);
   const activeTab = useDroneStore((s) => s.activeTab);
   const updateWaypoint = useDroneStore((s) => s.updateWaypoint);
+  const addJumpWaypoint = useDroneStore((s) => s.addJumpWaypoint);
   const patternConfig = useDroneStore((s) => s.patternConfig);
   const coordFormat = useDroneStore((s) => s.coordFormat);
   const setSelectedWaypointId = useDroneStore((s) => s.setSelectedWaypointId);
   const setPlanSubTab = useDroneStore((s) => s.setPlanSubTab);
   const setSidebarCollapsed = useDroneStore((s) => s.setSidebarCollapsed);
+  const addWaypointMode = useDroneStore((s) => s.addWaypointMode);
 
   const isPlanning = activeTab === 'planning';
   const plannedOpacity = isPlanning ? 1 : 0.3;
 
   const plannedNavPositions = plannedWaypoints
-    .filter((w) => w.type !== 'roi')
+    .filter((w) => NAV_TYPES.has(w.type) && w.type !== 'roi')
     .map((w) => [w.lat, w.lon]);
 
   // Pattern preview positions
@@ -425,37 +522,63 @@ function PlannedWaypointMarkers({ onContextMenu }) {
 
   return (
     <>
-      {plannedWaypoints.map((wp, i) => (
-        <Marker
-          key={wp.id}
-          position={[wp.lat, wp.lon]}
-          icon={icons[i]}
-          draggable={isPlanning}
-          autoPan={false}
-          opacity={plannedOpacity}
-          eventHandlers={{
-            dragend: (e) => {
-              const pos = e.target.getLatLng();
-              updateWaypoint(wp.id, { lat: pos.lat, lon: pos.lng });
-            },
-            click: () => {
-              if (isPlanning) {
-                setPlanSubTab('mission');
-                setSidebarCollapsed(false);
-                setSelectedWaypointId(wp.id);
-              }
-            },
-          }}
-        >
-          <Popup>
-            <div className="text-sm">
-              <div className="font-semibold">{TYPE_LABELS[wp.type] || 'Waypoint'} {i + 1}</div>
-              <div>Alt: {wp.alt}m</div>
-              <div className="text-xs opacity-70">{formatCoord(wp.lat, wp.lon, coordFormat, 6)}</div>
-            </div>
-          </Popup>
-        </Marker>
-      ))}
+      {plannedWaypoints.map((wp, i) => {
+        // Skip non-positioned waypoints (do_jump, do_set_servo)
+        if (!MARKER_COLORS[wp.type]) return null;
+        return (
+          <Marker
+            key={wp.id}
+            position={[wp.lat, wp.lon]}
+            icon={icons[i]}
+            draggable={isPlanning}
+            autoPan={false}
+            opacity={plannedOpacity}
+            eventHandlers={{
+              dragend: (e) => {
+                const pos = e.target.getLatLng();
+                updateWaypoint(wp.id, { lat: pos.lat, lon: pos.lng });
+              },
+              click: () => {
+                if (isPlanning) {
+                  setPlanSubTab('mission');
+                  setSidebarCollapsed(false);
+                  setSelectedWaypointId(wp.id);
+                }
+              },
+            }}
+          >
+            <Popup>
+              <div className="text-sm">
+                <div className="font-semibold">{TYPE_LABELS[wp.type] || 'Waypoint'} {i + 1}</div>
+                <div>Alt: {wp.alt}m</div>
+                <div className="text-xs opacity-70">{formatCoord(wp.lat, wp.lon, coordFormat, 6)}</div>
+                {isPlanning && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      addJumpWaypoint(i + 1);
+                    }}
+                    style={{
+                      marginTop: '6px',
+                      padding: '4px 10px',
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      background: '#ec4899',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      width: '100%',
+                    }}
+                  >
+                    Add Jump to WP {i + 1}
+                  </button>
+                )}
+              </div>
+            </Popup>
+          </Marker>
+        );
+      })}
 
       {plannedNavPositions.length > 1 && (
         <Polyline
@@ -476,6 +599,9 @@ function PlannedWaypointMarkers({ onContextMenu }) {
           }}
         />
       )}
+
+      {/* Jump arrows */}
+      <JumpArrows waypoints={plannedWaypoints} opacity={plannedOpacity} />
 
       {/* Pattern preview */}
       {previewPositions.length > 1 && (
@@ -870,8 +996,10 @@ function FlyClickTarget() {
   const flyClickTarget = useDroneStore((s) => s.flyClickTarget);
   const clearFlyClickTarget = useDroneStore((s) => s.clearFlyClickTarget);
   const setHomePosition = useDroneStore((s) => s.setHomePosition);
+  const startQuickMission = useDroneStore((s) => s.startQuickMission);
   const alt = useDroneStore((s) => s.telemetry.alt);
   const addAlert = useDroneStore((s) => s.addAlert);
+  const addGcsLog = useDroneStore((s) => s.addGcsLog);
 
   const handleGoto = useCallback(async () => {
     const target = useDroneStore.getState().flyClickTarget;
@@ -883,13 +1011,19 @@ function FlyClickTarget() {
         body: JSON.stringify({ lat: target.lat, lon: target.lon, alt }),
       });
       const data = await res.json();
-      if (data.status === 'error') addAlert(data.error || 'Go To failed', 'error');
-      else addAlert('Going to location', 'success');
+      if (data.status === 'error') {
+        addAlert(data.error || 'Go To failed', 'error');
+        addGcsLog(`Go To: ${data.error || 'failed'}`, 'error');
+      } else {
+        addAlert('Going to location', 'success');
+        addGcsLog(`Go To location at ${alt.toFixed(0)}m`, 'info');
+      }
     } catch (err) {
       addAlert('Go To failed: ' + err.message, 'error');
+      addGcsLog(`Go To: ${err.message}`, 'error');
     }
     clearFlyClickTarget();
-  }, [alt, addAlert, clearFlyClickTarget]);
+  }, [alt, addAlert, addGcsLog, clearFlyClickTarget]);
 
   const handleRoi = useCallback(async () => {
     const target = useDroneStore.getState().flyClickTarget;
@@ -901,13 +1035,19 @@ function FlyClickTarget() {
         body: JSON.stringify({ lat: target.lat, lon: target.lon }),
       });
       const data = await res.json();
-      if (data.status === 'error') addAlert(data.error || 'Look At failed', 'error');
-      else addAlert('Looking at location', 'success');
+      if (data.status === 'error') {
+        addAlert(data.error || 'Look At failed', 'error');
+        addGcsLog(`Look At: ${data.error || 'failed'}`, 'error');
+      } else {
+        addAlert('Looking at location', 'success');
+        addGcsLog('Look At (ROI) set', 'info');
+      }
     } catch (err) {
       addAlert('Look At failed: ' + err.message, 'error');
+      addGcsLog(`Look At: ${err.message}`, 'error');
     }
     clearFlyClickTarget();
-  }, [addAlert, clearFlyClickTarget]);
+  }, [addAlert, addGcsLog, clearFlyClickTarget]);
 
   const handleSetHome = useCallback(async () => {
     const target = useDroneStore.getState().flyClickTarget;
@@ -944,15 +1084,25 @@ function FlyClickTarget() {
       const data = await res.json();
       if (data.status === 'error') {
         addAlert(data.error || 'Set Home failed', 'error');
+        addGcsLog(`Set Home: ${data.error || 'failed'}`, 'error');
       } else {
         setHomePosition({ lat: target.lat, lon: target.lon, alt });
         addAlert(`Home position set (alt: ${alt.toFixed(1)}m)`, 'success');
+        addGcsLog(`Home set at ${alt.toFixed(1)}m MSL`, 'info');
       }
     } catch (err) {
       addAlert('Set Home failed: ' + err.message, 'error');
+      addGcsLog(`Set Home: ${err.message}`, 'error');
     }
     clearFlyClickTarget();
-  }, [addAlert, clearFlyClickTarget, setHomePosition]);
+  }, [addAlert, addGcsLog, clearFlyClickTarget, setHomePosition]);
+
+  const handleQuickMission = useCallback(() => {
+    const target = useDroneStore.getState().flyClickTarget;
+    if (!target) return;
+    startQuickMission(target.lat, target.lon);
+    addGcsLog('Quick Mission mode started', 'info');
+  }, [startQuickMission, addGcsLog]);
 
   if (!flyClickTarget) return null;
 
@@ -986,9 +1136,217 @@ function FlyClickTarget() {
           <button onClick={handleSetHome} style={{ ...btnStyle, background: '#10b981' }}>
             Set Home/Return
           </button>
+          <button onClick={handleQuickMission} style={{ ...btnStyle, background: '#8b5cf6' }}>
+            Quick Mission
+          </button>
         </div>
       </Popup>
     </Marker>
+  );
+}
+
+// Quick mission waypoint markers (fly mode fast mission)
+function QuickMissionMarkers() {
+  const quickMissionMode = useDroneStore((s) => s.quickMissionMode);
+  const quickMissionWaypoints = useDroneStore((s) => s.quickMissionWaypoints);
+  const addQuickMissionJump = useDroneStore((s) => s.addQuickMissionJump);
+
+  if (!quickMissionMode || quickMissionWaypoints.length === 0) return null;
+
+  // Only position-based entries for markers / polyline
+  const navWaypoints = quickMissionWaypoints.filter(w => w.type !== 'do_jump');
+  const positions = navWaypoints.map(w => [w.lat, w.lon]);
+
+  // Build full list with positions for JumpArrows (map 1-based index to the full array)
+  const jumpArrowData = quickMissionWaypoints.map(wp => {
+    if (wp.type === 'do_jump') {
+      return { ...wp, param1: wp.jumpTarget, param2: wp.repeat };
+    }
+    return { ...wp, type: wp.type || 'waypoint' };
+  });
+
+  return (
+    <>
+      {quickMissionWaypoints.map((wp, i) => {
+        if (wp.type === 'do_jump') return null;
+        return (
+          <Marker
+            key={wp.id}
+            position={[wp.lat, wp.lon]}
+            icon={createWaypointIcon(i, 'waypoint')}
+          >
+            <Popup>
+              <div className="text-sm">
+                <div className="font-semibold">Quick WP {i + 1}</div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    addQuickMissionJump(i + 1);
+                  }}
+                  style={{
+                    marginTop: '4px',
+                    padding: '4px 10px',
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    background: '#ec4899',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    width: '100%',
+                  }}
+                >
+                  Add Jump to WP {i + 1}
+                </button>
+              </div>
+            </Popup>
+          </Marker>
+        );
+      })}
+      {positions.length > 1 && (
+        <Polyline
+          positions={positions}
+          pathOptions={{ color: '#8b5cf6', weight: 2.5, opacity: 0.8, dashArray: '6 3' }}
+        />
+      )}
+      <JumpArrows waypoints={jumpArrowData} />
+    </>
+  );
+}
+
+// Quick mission bottom overlay bar (send / undo / cancel)
+function QuickMissionOverlay() {
+  const quickMissionMode = useDroneStore((s) => s.quickMissionMode);
+  const quickMissionWaypoints = useDroneStore((s) => s.quickMissionWaypoints);
+  const cancelQuickMission = useDroneStore((s) => s.cancelQuickMission);
+  const removeLastQuickMissionWaypoint = useDroneStore((s) => s.removeLastQuickMissionWaypoint);
+  const alt = useDroneStore((s) => s.telemetry.alt);
+  const addAlert = useDroneStore((s) => s.addAlert);
+  const addGcsLog = useDroneStore((s) => s.addGcsLog);
+  const [sending, setSending] = useState(false);
+
+  const handleSend = useCallback(async () => {
+    const store = useDroneStore.getState();
+    const wps = store.quickMissionWaypoints;
+    const currentAlt = store.telemetry.alt;
+    if (wps.length === 0) return;
+
+    setSending(true);
+    const waypoints = wps.map(wp => {
+      if (wp.type === 'do_jump') {
+        return {
+          lat: 0, lon: 0, alt: 0,
+          item_type: 'do_jump',
+          param1: wp.jumpTarget,
+          param2: wp.repeat ?? -1,
+        };
+      }
+      return {
+        lat: wp.lat,
+        lon: wp.lon,
+        alt: currentAlt,
+        item_type: 'waypoint',
+      };
+    });
+
+    try {
+      const res = await fetch('/api/mission/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ waypoints }),
+      });
+      const data = await res.json();
+      if (data.status === 'error') {
+        addAlert(data.error || 'Quick mission upload failed', 'error');
+        addGcsLog(`Quick mission: ${data.error || 'upload failed'}`, 'error');
+      } else {
+        addAlert(`Quick mission uploaded (${wps.length} pts)`, 'success');
+        addGcsLog(`Quick mission uploaded: ${wps.length} pts at ${currentAlt.toFixed(0)}m`, 'info');
+
+        // Save as mission in savedMissions
+        const now = Date.now();
+        const navCount = wps.filter(w => w.type !== 'do_jump').length;
+        const missionWaypoints = wps.map((wp, i) => {
+          if (wp.type === 'do_jump') {
+            return {
+              lat: 0, lon: 0, alt: 0,
+              id: now + i, type: 'do_jump',
+              param1: wp.jumpTarget, param2: wp.repeat ?? -1, param3: 0, param4: 0,
+            };
+          }
+          return {
+            lat: wp.lat, lon: wp.lon, alt: currentAlt,
+            id: now + i, type: 'waypoint',
+            param1: 0, param2: 2, param3: 0, param4: 0,
+          };
+        });
+        const newMission = {
+          id: now,
+          name: `Quick ${new Date().toLocaleTimeString('en-GB', { hour12: false })}`,
+          waypoints: missionWaypoints,
+          defaults: { alt: currentAlt, speed: store.defaultSpeed },
+          createdAt: now,
+          updatedAt: now,
+        };
+        const updated = [...store.savedMissions, newMission];
+        localStorage.setItem('pyxus-saved-missions', JSON.stringify(updated));
+        useDroneStore.setState({ savedMissions: updated });
+
+        // Download mission from drone to sync display
+        try {
+          const dlRes = await fetch('/api/mission/download');
+          const dlData = await dlRes.json();
+          if (dlData.status === 'ok') {
+            useDroneStore.getState().setDroneMission(dlData.waypoints || []);
+          }
+        } catch {}
+
+        store.cancelQuickMission();
+      }
+    } catch (err) {
+      addAlert('Quick mission failed: ' + err.message, 'error');
+      addGcsLog(`Quick mission: ${err.message}`, 'error');
+    }
+    setSending(false);
+  }, [addAlert, addGcsLog]);
+
+  if (!quickMissionMode) return null;
+
+  return (
+    <div className="absolute bottom-14 left-1/2 -translate-x-1/2 z-[1001] bg-gray-900/80 backdrop-blur-md rounded-lg border border-violet-500/30 shadow-2xl px-4 py-2.5 flex items-center gap-3">
+      <Zap size={14} className="text-violet-400" />
+      <span className="text-violet-300 text-xs font-semibold">Quick Mission</span>
+      <span className="text-gray-400 text-xs tabular-nums">
+        {quickMissionWaypoints.filter(w => w.type !== 'do_jump').length} pts
+        {quickMissionWaypoints.some(w => w.type === 'do_jump') && (
+          <span className="text-pink-400"> +{quickMissionWaypoints.filter(w => w.type === 'do_jump').length} jump</span>
+        )}
+        <span> @ {alt.toFixed(0)}m</span>
+      </span>
+      <div className="w-px h-4 bg-gray-700/30" />
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={removeLastQuickMissionWaypoint}
+          disabled={quickMissionWaypoints.length <= 1}
+          className="px-2 py-1 rounded text-[10px] font-medium bg-gray-800/60 hover:bg-gray-700/60 text-gray-300 border border-gray-700/30 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+        >
+          Undo
+        </button>
+        <button
+          onClick={handleSend}
+          disabled={sending}
+          className="px-3 py-1 rounded text-[10px] font-semibold bg-violet-600/80 hover:bg-violet-500/80 text-white border border-violet-500/30 transition-all disabled:opacity-50"
+        >
+          {sending ? 'Sending...' : 'Send'}
+        </button>
+        <button
+          onClick={cancelQuickMission}
+          className="px-2 py-1 rounded text-[10px] font-medium bg-red-950/50 hover:bg-red-900/50 text-red-400 border border-red-800/30 transition-all"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -1149,6 +1507,9 @@ export default function MapView() {
         {/* Fly mode click target */}
         <FlyClickTarget />
 
+        {/* Quick mission markers */}
+        <QuickMissionMarkers />
+
         {/* Measure overlay */}
         <MeasureOverlay />
 
@@ -1217,6 +1578,9 @@ export default function MapView() {
         onClose={() => setContextMenu(null)}
         onAction={handleContextAction}
       />
+
+      {/* Quick mission overlay */}
+      <QuickMissionOverlay />
 
       {/* Pattern generation modal */}
       <PatternModal />

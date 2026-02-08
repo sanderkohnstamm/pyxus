@@ -29,13 +29,15 @@ export default function FlyOverlay() {
   const telemetry = useDroneStore((s) => s.telemetry);
   const missionStatus = useDroneStore((s) => s.missionStatus);
   const addAlert = useDroneStore((s) => s.addAlert);
+  const addGcsLog = useDroneStore((s) => s.addGcsLog);
   const takeoffAlt = useDroneStore((s) => s.takeoffAlt);
   const setDroneMission = useDroneStore((s) => s.setDroneMission);
 
   const isConnected = connectionStatus === 'connected';
 
   const apiCall = useCallback(
-    async (endpoint, body = {}) => {
+    async (endpoint, body = {}, logMsg) => {
+      const label = logMsg || endpoint;
       try {
         const res = await fetch(`/api/${endpoint}`, {
           method: 'POST',
@@ -45,12 +47,16 @@ export default function FlyOverlay() {
         const data = await res.json();
         if (data.status === 'error') {
           addAlert(data.error || `${endpoint} failed`, 'error');
+          addGcsLog(`${label}: ${data.error || 'failed'}`, 'error');
+        } else {
+          addGcsLog(`${label} command sent`, 'info');
         }
       } catch (err) {
         addAlert(`${endpoint} failed: ${err.message}`, 'error');
+        addGcsLog(`${label}: ${err.message}`, 'error');
       }
     },
-    [addAlert]
+    [addAlert, addGcsLog]
   );
 
   const missionApiCall = useCallback(
@@ -63,16 +69,20 @@ export default function FlyOverlay() {
         const data = await res.json();
         if (data.status === 'error') {
           addAlert(data.error || `Mission ${endpoint} failed`, 'error');
+          addGcsLog(`Mission ${endpoint}: ${data.error || 'failed'}`, 'error');
         } else if (endpoint === 'clear') {
-          // Clear drone mission from local store after successful clear
           setDroneMission([]);
           addAlert('Mission cleared from drone', 'success');
+          addGcsLog('Mission cleared from drone', 'info');
+        } else {
+          addGcsLog(`Mission ${endpoint} command sent`, 'info');
         }
       } catch (err) {
         addAlert(`Mission ${endpoint} failed: ${err.message}`, 'error');
+        addGcsLog(`Mission ${endpoint}: ${err.message}`, 'error');
       }
     },
-    [addAlert, setDroneMission]
+    [addAlert, addGcsLog, setDroneMission]
   );
 
   if (!isConnected) return null;
@@ -123,7 +133,7 @@ export default function FlyOverlay() {
       {/* Flight commands + mode */}
       <div className="flex items-center gap-1 bg-gray-900/70 backdrop-blur-md rounded-lg px-2 py-1.5 border border-gray-700/30 shadow-2xl">
         <button
-          onClick={() => apiCall('arm')}
+          onClick={() => apiCall('arm', {}, 'Arm')}
           className={`${btn} ${
             telemetry.armed
               ? 'bg-red-950/50 border-red-800/30 text-red-400'
@@ -133,7 +143,7 @@ export default function FlyOverlay() {
           <Shield size={10} className="inline -mt-0.5 mr-1" />Arm
         </button>
         <button
-          onClick={() => apiCall('disarm')}
+          onClick={() => apiCall('disarm', {}, 'Disarm')}
           className={`${btn} bg-gray-800/50 hover:bg-gray-700/50 border-gray-700/30 hover:border-gray-600/40 text-gray-300`}
         >
           <ShieldOff size={10} className="inline -mt-0.5 mr-1" />Disarm
@@ -142,19 +152,19 @@ export default function FlyOverlay() {
         <div className="w-px h-4 bg-gray-700/30 mx-0.5" />
 
         <button
-          onClick={() => apiCall('takeoff', { alt: takeoffAlt })}
+          onClick={() => apiCall('takeoff', { alt: takeoffAlt }, `Takeoff ${takeoffAlt}m`)}
           className={`${btn} bg-gray-800/50 hover:bg-gray-700/50 border-gray-700/30 hover:border-gray-600/40 text-gray-300`}
         >
           <ArrowUp size={10} className="inline -mt-0.5 mr-1" />Takeoff
         </button>
         <button
-          onClick={() => apiCall('land')}
+          onClick={() => apiCall('land', {}, 'Land')}
           className={`${btn} bg-gray-800/50 hover:bg-gray-700/50 border-gray-700/30 hover:border-gray-600/40 text-gray-300`}
         >
           <ArrowDown size={10} className="inline -mt-0.5 mr-1" />Land
         </button>
         <button
-          onClick={() => apiCall('rtl')}
+          onClick={() => apiCall('rtl', {}, 'RTL')}
           className={`${btn} bg-amber-950/40 hover:bg-amber-950/50 border-amber-900/25 hover:border-amber-800/35 text-amber-400`}
         >
           <Home size={10} className="inline -mt-0.5 mr-1" />RTL
@@ -164,7 +174,7 @@ export default function FlyOverlay() {
 
         <select
           value={telemetry.mode}
-          onChange={(e) => apiCall('mode', { mode: e.target.value })}
+          onChange={(e) => apiCall('mode', { mode: e.target.value }, `Mode \u2192 ${e.target.value}`)}
           className="bg-gray-800/60 text-gray-300 border border-gray-700/30 rounded px-2 py-1 text-[11px] font-medium focus:outline-none focus:border-gray-600/40 transition-colors"
         >
           {modes.map((m) => (

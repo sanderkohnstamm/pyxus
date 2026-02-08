@@ -50,7 +50,7 @@ export default function MavLog() {
       {mavLogVisible && (
         <div className="absolute bottom-full left-0 mb-2 w-[420px] max-h-[280px] bg-gray-900/15 backdrop-blur-md rounded-lg border border-gray-700/15 shadow-2xl flex flex-col">
           <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-700/15 shrink-0">
-            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">MAVLink Log</span>
+            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Log</span>
             <div className="flex items-center gap-1.5">
               <button
                 onClick={clearMavMessages}
@@ -77,10 +77,12 @@ export default function MavLog() {
                 const sevLabel = SEVERITY_LABELS[msg.severity] || 'UNK';
                 const sevColor = SEVERITY_COLORS[msg.severity] || 'text-gray-500';
                 const time = new Date(msg.ts).toLocaleTimeString('en-GB', { hour12: false });
+                const isGcs = msg.source === 'gcs';
 
                 return (
                   <div key={msg.id} className={`flex gap-2 py-px ${opacity}`}>
                     <span className="text-gray-700 shrink-0">{time}</span>
+                    <span className={`shrink-0 w-[26px] text-right text-[9px] ${isGcs ? 'text-cyan-600' : 'text-gray-700'}`}>{isGcs ? 'GCS' : 'MAV'}</span>
                     <span className={`shrink-0 w-[42px] text-right ${sevColor}`}>{sevLabel}</span>
                     <span className="text-gray-300 break-all">{msg.text}</span>
                   </div>

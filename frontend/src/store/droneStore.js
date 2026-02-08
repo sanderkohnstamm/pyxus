@@ -116,6 +116,10 @@ const useDroneStore = create((set, get) => ({
   // Fly click target
   flyClickTarget: null, // {lat, lon}
 
+  // Quick mission mode (fly mode fast waypoint selection)
+  quickMissionMode: false,
+  quickMissionWaypoints: [], // [{lat, lon, id}]
+
   // Drone identity (for change detection)
   droneIdentity: { sysid: null, autopilot: null, platformType: null },
 
@@ -294,6 +298,24 @@ const useDroneStore = create((set, get) => ({
     const { plannedWaypoints } = get();
     set({
       plannedWaypoints: plannedWaypoints.map((w) => (w.id === id ? { ...w, alt: parseFloat(alt) || 0 } : w)),
+    });
+  },
+
+  addJumpWaypoint: (targetIndex, repeat = -1) => {
+    const { plannedWaypoints } = get();
+    set({
+      plannedWaypoints: [
+        ...plannedWaypoints,
+        {
+          lat: 0, lon: 0, alt: 0,
+          id: Date.now(),
+          type: 'do_jump',
+          param1: targetIndex, // 1-based target item
+          param2: repeat,      // -1 = infinite
+          param3: 0,
+          param4: 0,
+        },
+      ],
     });
   },
 
@@ -639,7 +661,7 @@ const useDroneStore = create((set, get) => ({
   addMavMessages: (msgs) => {
     const { mavMessages } = get();
     const now = Date.now();
-    const newMsgs = msgs.map((m) => ({ ...m, id: now + Math.random(), ts: now }));
+    const newMsgs = msgs.map((m) => ({ ...m, id: now + Math.random(), ts: now, source: 'mav' }));
     const combined = [...mavMessages, ...newMsgs].slice(-200);
     set({ mavMessages: combined });
   },
@@ -647,12 +669,62 @@ const useDroneStore = create((set, get) => ({
   toggleMavLog: () => set((s) => ({ mavLogVisible: !s.mavLogVisible })),
   clearMavMessages: () => set({ mavMessages: [] }),
 
+  // GCS action log (merged into mavMessages)
+  addGcsLog: (text, level = 'info') => {
+    const severityMap = { info: 6, warn: 4, error: 3, success: 5 };
+    const { mavMessages } = get();
+    const now = Date.now();
+    const msg = {
+      id: now + Math.random(),
+      ts: now,
+      severity: severityMap[level] || 6,
+      text,
+      source: 'gcs',
+    };
+    const combined = [...mavMessages, msg].slice(-200);
+    set({ mavMessages: combined });
+  },
+
   // Video overlay
   toggleVideoOverlay: () => set((s) => ({ videoOverlayVisible: !s.videoOverlayVisible })),
 
   // Fly click target
   setFlyClickTarget: (target) => set({ flyClickTarget: target }),
   clearFlyClickTarget: () => set({ flyClickTarget: null }),
+
+  // Quick mission mode
+  startQuickMission: (lat, lon) => {
+    set({
+      quickMissionMode: true,
+      quickMissionWaypoints: [{ lat, lon, id: Date.now() }],
+      flyClickTarget: null,
+    });
+  },
+  addQuickMissionWaypoint: (lat, lon) => {
+    const { quickMissionWaypoints } = get();
+    set({
+      quickMissionWaypoints: [...quickMissionWaypoints, { lat, lon, id: Date.now() }],
+    });
+  },
+  removeLastQuickMissionWaypoint: () => {
+    const { quickMissionWaypoints } = get();
+    if (quickMissionWaypoints.length <= 1) return;
+    set({ quickMissionWaypoints: quickMissionWaypoints.slice(0, -1) });
+  },
+  addQuickMissionJump: (targetIndex, repeat = -1) => {
+    const { quickMissionWaypoints } = get();
+    set({
+      quickMissionWaypoints: [...quickMissionWaypoints, {
+        id: Date.now(),
+        type: 'do_jump',
+        jumpTarget: targetIndex, // 1-based
+        repeat,
+      }],
+    });
+  },
+  cancelQuickMission: () => {
+    set({ quickMissionMode: false, quickMissionWaypoints: [] });
+  },
 
   // Drone identity
   setDroneIdentity: (identity) => set({ droneIdentity: identity }),
@@ -865,6 +937,8 @@ const useDroneStore = create((set, get) => ({
       batteryHistory: [],
       _lastBatterySampleTs: 0,
       batteryWarnings: { low: false, critical: false },
+      quickMissionMode: false,
+      quickMissionWaypoints: [],
     }),
 }));
 
