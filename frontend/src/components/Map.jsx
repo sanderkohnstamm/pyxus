@@ -26,19 +26,23 @@ const MARKER_COLORS = {
   land: { bg: '#f97316', border: '#fb923c', label: 'LND' },
 };
 
-// SVG arrow drone icon
-function createDroneIcon(yawDeg) {
+// SVG arrow drone icon (parameterized with color for multi-vehicle)
+function createDroneIcon(yawDeg, color = '#06b6d4', isActive = false) {
+  const strokeColor = isActive ? '#ffffff' : color;
+  const strokeWidth = isActive ? '2' : '1.5';
+  const size = isActive ? 40 : 36;
+  const half = size / 2;
   const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="-18 -18 36 36">
+    <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="-${half} -${half} ${size} ${size}">
       <g transform="rotate(${yawDeg})">
-        <path d="M0,-13 L12,10 L0,3 L-12,10 Z" fill="#06b6d4" stroke="#22d3ee" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="M0,-13 L12,10 L0,3 L-12,10 Z" fill="${color}" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-linejoin="round"/>
       </g>
     </svg>`;
   return L.divIcon({
     html: svg,
     className: 'drone-marker-icon',
-    iconSize: [36, 36],
-    iconAnchor: [18, 18],
+    iconSize: [size, size],
+    iconAnchor: [half, half],
   });
 }
 
@@ -992,6 +996,72 @@ function FlyClickTarget() {
   );
 }
 
+// All vehicle markers (multi-drone) - renders every vehicle with its color + trail
+function AllVehicleMarkers() {
+  const vehicles = useDroneStore((s) => s.vehicles);
+  const activeVehicleId = useDroneStore((s) => s.activeVehicleId);
+  const setActiveVehicle = useDroneStore((s) => s.setActiveVehicle);
+  const coordFormat = useDroneStore((s) => s.coordFormat);
+
+  const entries = Object.entries(vehicles);
+  if (entries.length === 0) return null;
+
+  return (
+    <>
+      {entries.map(([vid, v]) => {
+        const t = v.telemetry || {};
+        const trail = v.trail || [];
+        const color = v.color || '#06b6d4';
+        if (!t.lat || (t.lat === 0 && t.lon === 0)) return null;
+
+        const isActive = vid === activeVehicleId;
+        const yawDeg = t.heading || ((t.yaw || 0) * 180 / Math.PI);
+        const icon = createDroneIcon(yawDeg, color, isActive);
+
+        return (
+          <React.Fragment key={`vehicle-${vid}`}>
+            {trail.length > 1 && (
+              <Polyline
+                positions={trail}
+                pathOptions={{ color, weight: 2, opacity: isActive ? 0.6 : 0.35 }}
+              />
+            )}
+            <Marker
+              position={[t.lat, t.lon]}
+              icon={icon}
+              zIndexOffset={isActive ? 1000 : 500}
+              eventHandlers={{
+                click: () => {
+                  if (!isActive) {
+                    setActiveVehicle(vid);
+                    fetch('/api/vehicles/active', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ vehicle_id: vid }),
+                    }).catch(() => {});
+                  }
+                },
+              }}
+            >
+              <Popup>
+                <div className="text-xs font-mono space-y-0.5">
+                  <div className="font-semibold text-[11px] mb-1" style={{ color }}>
+                    {t.platform_type || 'Vehicle'} #{vid} {isActive ? '(Active)' : ''}
+                  </div>
+                  <div><span style={{color:'#94a3b8'}}>ALT</span> <span style={{color:'#e2e8f0'}}>{(t.alt || 0).toFixed?.(1)}m</span></div>
+                  <div><span style={{color:'#94a3b8'}}>GS</span> <span style={{color:'#e2e8f0'}}>{(t.groundspeed || 0).toFixed?.(1)} m/s</span></div>
+                  <div><span style={{color:'#94a3b8'}}>HDG</span> <span style={{color:'#e2e8f0'}}>{Math.round(yawDeg)}&deg;</span></div>
+                  <div style={{borderTop:'1px solid rgba(100,116,139,0.3)',marginTop:'4px',paddingTop:'4px',fontSize:'9px',color:'#64748b'}}>{formatCoord(t.lat, t.lon, coordFormat, 6)}</div>
+                </div>
+              </Popup>
+            </Marker>
+          </React.Fragment>
+        );
+      })}
+    </>
+  );
+}
+
 export default function MapView() {
   const lat = useDroneStore((s) => s.telemetry.lat);
   const lon = useDroneStore((s) => s.telemetry.lon);
@@ -1073,28 +1143,8 @@ export default function MapView() {
         <MapClickHandler />
         <AddModeCursor />
 
-        {/* Trail */}
-        {trail.length > 1 && (
-          <Polyline
-            positions={trail}
-            pathOptions={{ color: '#06b6d4', weight: 2, opacity: 0.6 }}
-          />
-        )}
-
-        {/* Drone marker - zIndexOffset ensures it's on top of all other markers */}
-        {hasPosition && (
-          <Marker position={[lat, lon]} icon={droneIcon} zIndexOffset={1000}>
-            <Popup>
-              <div className="text-xs font-mono space-y-0.5">
-                <div className="font-semibold text-[11px] mb-1" style={{color:'#06b6d4'}}>Vehicle</div>
-                <div><span style={{color:'#94a3b8'}}>ALT</span> <span style={{color:'#e2e8f0'}}>{alt.toFixed(1)}m</span></div>
-                <div><span style={{color:'#94a3b8'}}>GS</span> <span style={{color:'#e2e8f0'}}>{groundspeed.toFixed(1)} m/s</span></div>
-                <div><span style={{color:'#94a3b8'}}>HDG</span> <span style={{color:'#e2e8f0'}}>{Math.round(yawDeg)}&deg;</span></div>
-                <div style={{borderTop:'1px solid rgba(100,116,139,0.3)',marginTop:'4px',paddingTop:'4px',fontSize:'9px',color:'#64748b'}}>{formatCoord(lat, lon, coordFormat, 6)}</div>
-              </div>
-            </Popup>
-          </Marker>
-        )}
+        {/* All vehicle markers with trails (multi-drone) */}
+        <AllVehicleMarkers />
 
         {/* Home position marker */}
         {hasHome && (

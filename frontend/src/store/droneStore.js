@@ -176,6 +176,11 @@ const useDroneStore = create((set, get) => ({
   // WebSocket
   wsConnected: false,
 
+  // Multi-vehicle
+  vehicles: {},          // { [vid]: { telemetry, trail, batteryHistory, _lastBatterySampleTs, missionStatus, color } }
+  activeVehicleId: null,
+  connections: [],
+
   // Weather
   weather: {
     routeAnalysis: null,           // RouteWeather data from backend
@@ -257,6 +262,88 @@ const useDroneStore = create((set, get) => ({
   },
 
   setWsConnected: (connected) => set({ wsConnected: connected }),
+
+  // Multi-vehicle telemetry
+  updateVehicleTelemetry: (vehicleId, data) => {
+    const { vehicles, activeVehicleId } = get();
+    const existing = vehicles[vehicleId] || {
+      telemetry: { ...INITIAL_TELEMETRY },
+      trail: [],
+      batteryHistory: [],
+      _lastBatterySampleTs: 0,
+      missionStatus: 'idle',
+      color: data.color || '#06b6d4',
+    };
+
+    // Update trail
+    const vTrail = [...existing.trail];
+    if (data.lat !== 0 && data.lon !== 0) {
+      const last = vTrail[vTrail.length - 1];
+      if (!last || last[0] !== data.lat || last[1] !== data.lon) {
+        vTrail.push([data.lat, data.lon]);
+        if (vTrail.length > MAX_TRAIL_POINTS) vTrail.shift();
+      }
+    }
+
+    // Battery history
+    const now = Date.now();
+    let vBattery = existing.batteryHistory;
+    let vBatteryTs = existing._lastBatterySampleTs;
+    if (data.voltage > 0 && now - vBatteryTs >= 1000) {
+      vBattery = [...existing.batteryHistory, { ts: now, voltage: data.voltage, current: data.current }];
+      if (vBattery.length > MAX_BATTERY_SAMPLES) vBattery.shift();
+      vBatteryTs = now;
+    }
+
+    const updatedVehicle = {
+      ...existing,
+      telemetry: { ...data },
+      trail: vTrail,
+      batteryHistory: vBattery,
+      _lastBatterySampleTs: vBatteryTs,
+      missionStatus: data.mission_status || 'idle',
+      color: data.color || existing.color || '#06b6d4',
+    };
+
+    const newVehicles = { ...vehicles, [vehicleId]: updatedVehicle };
+
+    // Mirror to top-level if this is the active vehicle
+    if (vehicleId === activeVehicleId) {
+      set({
+        vehicles: newVehicles,
+        telemetry: { ...data },
+        trail: vTrail,
+        missionStatus: data.mission_status || 'idle',
+        batteryHistory: vBattery,
+        _lastBatterySampleTs: vBatteryTs,
+      });
+    } else {
+      set({ vehicles: newVehicles });
+    }
+  },
+
+  setActiveVehicle: (vehicleId) => {
+    const { vehicles, activeVehicleId } = get();
+    if (vehicleId === activeVehicleId) return;
+    const vehicle = vehicles[vehicleId];
+    if (!vehicle) {
+      set({ activeVehicleId: vehicleId });
+      return;
+    }
+    set({
+      activeVehicleId: vehicleId,
+      telemetry: vehicle.telemetry || { ...INITIAL_TELEMETRY },
+      trail: vehicle.trail || [],
+      batteryHistory: vehicle.batteryHistory || [],
+      _lastBatterySampleTs: vehicle._lastBatterySampleTs || 0,
+      missionStatus: vehicle.missionStatus || 'idle',
+      // Clear per-vehicle data that needs re-download
+      droneMission: [],
+      droneFence: [],
+      params: {},
+      paramsTotal: 0,
+    });
+  },
 
   // Planned mission waypoints
   addWaypoint: (lat, lon, alt) => {
@@ -865,6 +952,9 @@ const useDroneStore = create((set, get) => ({
       batteryHistory: [],
       _lastBatterySampleTs: 0,
       batteryWarnings: { low: false, critical: false },
+      vehicles: {},
+      activeVehicleId: null,
+      connections: [],
     }),
 }));
 

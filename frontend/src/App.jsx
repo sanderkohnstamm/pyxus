@@ -261,6 +261,7 @@ export default function App() {
       if (isConnected) {
         sendMessage({
           type: 'rc_override',
+          vehicle_id: useDroneStore.getState().activeVehicleId,
           channels: rcChannels,
         });
       }
