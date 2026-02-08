@@ -5,13 +5,13 @@ import shutil
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
-from drone import DroneConnection
-from mission import MissionManager, Waypoint
+from registry import VehicleRegistry
+from mission import Waypoint
 from weather import (
     weather_client, route_analyzer, set_platform,
     PLATFORM_PROFILES, current_platform, MissionAnalyzer
@@ -128,10 +128,25 @@ class PlatformSelectRequest(BaseModel):
     platform_id: str
 
 
+class ActiveVehicleRequest(BaseModel):
+    vehicle_id: str
+
+
 # --- Globals ---
 
-drone = DroneConnection()
-mission_mgr = MissionManager(drone)
+registry = VehicleRegistry()
+
+
+# --- Helpers ---
+
+def get_vehicle(vehicle_id: str = None):
+    """Get specified vehicle or active vehicle. Raises HTTPException if not found."""
+    v = registry.get_vehicle_or_active(vehicle_id)
+    if v is None:
+        if vehicle_id:
+            raise HTTPException(status_code=404, detail=f"Vehicle '{vehicle_id}' not found")
+        raise HTTPException(status_code=400, detail="No active vehicle")
+    return v
 
 
 # --- WebSocket Manager ---
@@ -171,38 +186,45 @@ ws_manager = ConnectionManager()
 # --- Telemetry broadcast task ---
 
 async def telemetry_broadcast():
-    """Broadcast telemetry to all connected WebSocket clients at ~10Hz with delta detection."""
-    last_telemetry = {}
-    last_mission_status = None
+    """Broadcast telemetry for all vehicles at ~10Hz with delta detection."""
+    last_telemetry = {}  # {vehicle_id: {telemetry dict}}
 
     # Keys that change frequently and should always be checked
     volatile_keys = {'lat', 'lon', 'alt', 'alt_msl', 'roll', 'pitch', 'yaw', 'heading',
                      'groundspeed', 'airspeed', 'climb', 'voltage', 'current', 'heartbeat_age'}
 
     while True:
-        if drone.connected and ws_manager.active_connections:
-            telemetry = drone.get_telemetry()
-            mission_status = mission_mgr.status
-            status_msgs = drone.drain_statustext()
+        if registry.has_any_connection() and ws_manager.active_connections:
+            all_telem = registry.get_all_telemetry()
 
-            # Check if anything changed
-            has_changes = (
-                status_msgs or  # Always send if there are status messages
-                mission_status != last_mission_status or
-                any(telemetry.get(k) != last_telemetry.get(k) for k in volatile_keys) or
-                telemetry.get('armed') != last_telemetry.get('armed') or
-                telemetry.get('mode') != last_telemetry.get('mode') or
-                telemetry.get('mission_seq') != last_telemetry.get('mission_seq')
-            )
+            # Check for changes in any vehicle
+            has_changes = False
+
+            # Detect vehicle added/removed
+            if set(all_telem.keys()) != set(last_telemetry.keys()):
+                has_changes = True
+
+            if not has_changes:
+                for vid, telem in all_telem.items():
+                    last = last_telemetry.get(vid, {})
+                    if (
+                        telem.get('statustext') or
+                        any(telem.get(k) != last.get(k) for k in volatile_keys) or
+                        telem.get('armed') != last.get('armed') or
+                        telem.get('mode') != last.get('mode') or
+                        telem.get('mission_seq') != last.get('mission_seq') or
+                        telem.get('mission_status') != last.get('mission_status')
+                    ):
+                        has_changes = True
+                        break
 
             if has_changes:
-                telemetry["type"] = "telemetry"
-                telemetry["mission_status"] = mission_status
-                if status_msgs:
-                    telemetry["statustext"] = status_msgs
-                await ws_manager.broadcast(telemetry)
-                last_telemetry = telemetry.copy()
-                last_mission_status = mission_status
+                await ws_manager.broadcast({
+                    "type": "telemetry_multi",
+                    "active": registry.active_vehicle_id,
+                    "vehicles": all_telem,
+                })
+                last_telemetry = {vid: dict(t) for vid, t in all_telem.items()}
 
         await asyncio.sleep(0.1)
 
@@ -218,7 +240,7 @@ async def lifespan(app: FastAPI):
         await task
     except asyncio.CancelledError:
         pass
-    drone.disconnect()
+    registry.disconnect_all()
 
 
 # --- FastAPI App ---
@@ -226,116 +248,160 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Pyxus Drone Control", lifespan=lifespan)
 
 
-# --- REST Endpoints ---
+# --- Connection & Vehicle Management ---
 
 @app.get("/api/status")
 async def api_status():
-    if drone.connected:
-        telemetry = drone.get_telemetry()
+    v = registry.get_active_vehicle()
+    if v:
+        telem = v.get_telemetry()
         return {
             "status": "connected",
-            "autopilot": telemetry.get("autopilot", "unknown"),
+            "autopilot": telem.get("autopilot", "unknown"),
         }
     return {"status": "disconnected"}
 
 
 @app.post("/api/connect")
 async def api_connect(req: ConnectRequest):
-    success = drone.connect(req.connection_string)
-    if success:
-        return {"status": "connected", "autopilot": drone.get_telemetry()["autopilot"]}
-    return {"status": "failed", "error": "Could not connect. Check connection string and ensure vehicle is running."}
+    conn_id, result = registry.add_connection(req.connection_string)
+    if conn_id:
+        return {"status": "connected", "conn_id": conn_id, "vehicle_ids": result}
+    return {"status": "failed", "error": result}
 
 
 @app.post("/api/disconnect")
 async def api_disconnect():
-    drone.disconnect()
+    registry.disconnect_all()
     return {"status": "disconnected"}
 
 
+@app.post("/api/connections")
+async def api_add_connection(req: ConnectRequest):
+    conn_id, result = registry.add_connection(req.connection_string)
+    if conn_id:
+        return {"status": "ok", "conn_id": conn_id, "vehicle_ids": result}
+    return {"status": "error", "error": result}
+
+
+@app.delete("/api/connections/{conn_id}")
+async def api_remove_connection(conn_id: str):
+    success = registry.remove_connection(conn_id)
+    if success:
+        return {"status": "ok"}
+    return {"status": "error", "error": "Connection not found"}
+
+
+@app.get("/api/connections")
+async def api_list_connections():
+    return {"status": "ok", "connections": registry.list_connections()}
+
+
+@app.get("/api/vehicles")
+async def api_list_vehicles():
+    return {
+        "status": "ok",
+        "vehicles": registry.list_vehicles(),
+        "active": registry.active_vehicle_id,
+    }
+
+
+@app.post("/api/vehicles/active")
+async def api_set_active_vehicle(req: ActiveVehicleRequest):
+    success = registry.set_active_vehicle(req.vehicle_id)
+    if success:
+        return {"status": "ok", "active": req.vehicle_id}
+    return {"status": "error", "error": f"Vehicle '{req.vehicle_id}' not found"}
+
+
+# --- Command Endpoints (active vehicle + vehicle-scoped) ---
+
 @app.post("/api/arm")
-async def api_arm():
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    drone.arm()
+@app.post("/api/v/{vehicle_id}/arm")
+async def api_arm(vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    v.connection.arm(v)
     return {"status": "ok", "command": "arm"}
 
 
 @app.post("/api/disarm")
-async def api_disarm():
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    drone.disarm()
+@app.post("/api/v/{vehicle_id}/disarm")
+async def api_disarm(vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    v.connection.disarm(v)
     return {"status": "ok", "command": "disarm"}
 
 
 @app.post("/api/takeoff")
-async def api_takeoff(req: TakeoffRequest):
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    # Set GUIDED mode for ArduPilot before takeoff
-    if drone.is_ardupilot:
-        drone.set_mode("GUIDED")
+@app.post("/api/v/{vehicle_id}/takeoff")
+async def api_takeoff(req: TakeoffRequest, vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    if v.is_ardupilot:
+        v.connection.set_mode(v, "GUIDED")
         await asyncio.sleep(0.5)
-    drone.takeoff(req.alt)
+    v.connection.takeoff(v, req.alt)
     return {"status": "ok", "command": "takeoff", "alt": req.alt}
 
 
 @app.post("/api/land")
-async def api_land():
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    drone.land()
+@app.post("/api/v/{vehicle_id}/land")
+async def api_land(vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    v.connection.land(v)
     return {"status": "ok", "command": "land"}
 
 
 @app.post("/api/rtl")
-async def api_rtl():
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    drone.rtl()
+@app.post("/api/v/{vehicle_id}/rtl")
+async def api_rtl(vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    v.connection.rtl(v)
     return {"status": "ok", "command": "rtl"}
 
 
 @app.post("/api/mode")
-async def api_mode(req: ModeRequest):
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    drone.set_mode(req.mode)
+@app.post("/api/v/{vehicle_id}/mode")
+async def api_mode(req: ModeRequest, vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    v.connection.set_mode(v, req.mode)
     return {"status": "ok", "command": "mode", "mode": req.mode}
 
 
 @app.post("/api/goto")
-async def api_goto(req: GotoRequest):
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    if drone.is_ardupilot:
-        drone.set_mode("GUIDED")
+@app.post("/api/v/{vehicle_id}/goto")
+async def api_goto(req: GotoRequest, vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    if v.is_ardupilot:
+        v.connection.set_mode(v, "GUIDED")
         await asyncio.sleep(0.3)
-    drone.goto(req.lat, req.lon, req.alt)
+    v.connection.goto(v, req.lat, req.lon, req.alt)
     return {"status": "ok", "command": "goto", "lat": req.lat, "lon": req.lon, "alt": req.alt}
 
 
 @app.post("/api/roi")
-async def api_roi(req: RoiRequest):
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    drone.set_roi(req.lat, req.lon, req.alt)
+@app.post("/api/v/{vehicle_id}/roi")
+async def api_roi(req: RoiRequest, vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    v.connection.set_roi(v, req.lat, req.lon, req.alt)
     return {"status": "ok", "command": "roi", "lat": req.lat, "lon": req.lon}
 
 
 @app.post("/api/home/set")
-async def api_set_home(req: SetHomeRequest):
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    drone.set_home(req.lat, req.lon, req.alt)
+@app.post("/api/v/{vehicle_id}/home/set")
+async def api_set_home(req: SetHomeRequest, vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    v.connection.set_home(v, req.lat, req.lon, req.alt)
     return {"status": "ok", "command": "set_home", "lat": req.lat, "lon": req.lon, "alt": req.alt}
 
 
+# --- Mission Endpoints ---
+
 @app.post("/api/mission/upload")
-async def api_mission_upload(req: MissionUploadRequest):
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+@app.post("/api/v/{vehicle_id}/mission/upload")
+async def api_mission_upload(req: MissionUploadRequest, vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    if not v.mission_manager:
+        return {"status": "error", "error": "No mission manager"}
     waypoints = [
         Waypoint(
             lat=w.lat, lon=w.lon, alt=w.alt,
@@ -344,100 +410,112 @@ async def api_mission_upload(req: MissionUploadRequest):
         )
         for w in req.waypoints
     ]
-    # Run upload in thread to avoid blocking
     loop = asyncio.get_event_loop()
-    success = await loop.run_in_executor(None, mission_mgr.upload, waypoints)
+    success = await loop.run_in_executor(None, v.mission_manager.upload, waypoints)
     if success:
         return {"status": "ok", "command": "mission_upload", "count": len(waypoints)}
     return {"status": "error", "error": "Mission upload failed"}
 
 
 @app.post("/api/mission/start")
-async def api_mission_start():
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    success = mission_mgr.start()
+@app.post("/api/v/{vehicle_id}/mission/start")
+async def api_mission_start(vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    if not v.mission_manager:
+        return {"status": "error", "error": "No mission manager"}
+    success = v.mission_manager.start()
     return {"status": "ok" if success else "error", "command": "mission_start"}
 
 
 @app.post("/api/mission/pause")
-async def api_mission_pause():
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    success = mission_mgr.pause()
+@app.post("/api/v/{vehicle_id}/mission/pause")
+async def api_mission_pause(vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    if not v.mission_manager:
+        return {"status": "error", "error": "No mission manager"}
+    success = v.mission_manager.pause()
     return {"status": "ok" if success else "error", "command": "mission_pause"}
 
 
 @app.post("/api/mission/resume")
-async def api_mission_resume():
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    success = mission_mgr.resume()
+@app.post("/api/v/{vehicle_id}/mission/resume")
+async def api_mission_resume(vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    if not v.mission_manager:
+        return {"status": "error", "error": "No mission manager"}
+    success = v.mission_manager.resume()
     return {"status": "ok" if success else "error", "command": "mission_resume"}
 
 
 @app.post("/api/mission/clear")
-async def api_mission_clear():
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    success = mission_mgr.clear()
+@app.post("/api/v/{vehicle_id}/mission/clear")
+async def api_mission_clear(vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    if not v.mission_manager:
+        return {"status": "error", "error": "No mission manager"}
+    success = v.mission_manager.clear()
     return {"status": "ok" if success else "error", "command": "mission_clear"}
 
 
 @app.post("/api/mission/set_current")
-async def api_mission_set_current(req: MissionSetCurrentRequest):
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    # Convert 0-based index to correct MAVLink seq based on autopilot type
-    # ArduPilot: seq 0 is home, mission starts at seq 1
-    # PX4: seq 0 is first mission item
-    seq = mission_mgr.get_mission_seq_for_index(req.index)
-    drone.send_mission_cmd("set_current_mission", seq=seq)
+@app.post("/api/v/{vehicle_id}/mission/set_current")
+async def api_mission_set_current(req: MissionSetCurrentRequest, vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    if not v.mission_manager:
+        return {"status": "error", "error": "No mission manager"}
+    seq = v.mission_manager.get_mission_seq_for_index(req.index)
+    v.connection.send_mission_cmd(v, "set_current_mission", seq=seq)
     return {"status": "ok", "command": "mission_set_current", "seq": seq, "index": req.index}
 
 
-# --- Mission Download ---
-
 @app.get("/api/mission/download")
-async def api_mission_download():
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+@app.get("/api/v/{vehicle_id}/mission/download")
+async def api_mission_download(vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    if not v.mission_manager:
+        return {"status": "error", "error": "No mission manager"}
     loop = asyncio.get_event_loop()
-    waypoints = await loop.run_in_executor(None, mission_mgr.download)
+    waypoints = await loop.run_in_executor(None, v.mission_manager.download)
     return {"status": "ok", "waypoints": waypoints}
 
 
 # --- Geofence ---
 
 @app.get("/api/fence/download")
-async def api_fence_download():
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+@app.get("/api/v/{vehicle_id}/fence/download")
+async def api_fence_download(vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    if not v.mission_manager:
+        return {"status": "error", "error": "No mission manager"}
     loop = asyncio.get_event_loop()
-    fence_items = await loop.run_in_executor(None, mission_mgr.download_fence)
+    fence_items = await loop.run_in_executor(None, v.mission_manager.download_fence)
     return {"status": "ok", "fence_items": fence_items}
 
 
 @app.post("/api/fence/upload_polygon")
-async def api_fence_upload_polygon(req: PolygonFenceRequest):
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+@app.post("/api/v/{vehicle_id}/fence/upload_polygon")
+async def api_fence_upload_polygon(req: PolygonFenceRequest, vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    if not v.mission_manager:
+        return {"status": "error", "error": "No mission manager"}
     if len(req.vertices) < 3:
         return {"status": "error", "error": "Need at least 3 vertices"}
     loop = asyncio.get_event_loop()
-    success = await loop.run_in_executor(None, mission_mgr.upload_polygon_fence, req.vertices)
+    success = await loop.run_in_executor(None, v.mission_manager.upload_polygon_fence, req.vertices)
     if success:
         return {"status": "ok", "command": "polygon_fence_upload"}
     return {"status": "error", "error": "Polygon fence upload failed"}
 
 
 @app.post("/api/fence/upload")
-async def api_fence_upload(req: FenceUploadRequest):
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+@app.post("/api/v/{vehicle_id}/fence/upload")
+async def api_fence_upload(req: FenceUploadRequest, vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    if not v.mission_manager:
+        return {"status": "error", "error": "No mission manager"}
     loop = asyncio.get_event_loop()
     success = await loop.run_in_executor(
-        None, mission_mgr.upload_fence, req.lat, req.lon, req.radius
+        None, v.mission_manager.upload_fence, req.lat, req.lon, req.radius
     )
     if success:
         return {"status": "ok", "command": "fence_upload"}
@@ -445,26 +523,27 @@ async def api_fence_upload(req: FenceUploadRequest):
 
 
 @app.post("/api/fence/clear")
-async def api_fence_clear():
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    success = mission_mgr.clear_fence()
+@app.post("/api/v/{vehicle_id}/fence/clear")
+async def api_fence_clear(vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    if not v.mission_manager:
+        return {"status": "error", "error": "No mission manager"}
+    success = v.mission_manager.clear_fence()
     return {"status": "ok" if success else "error", "command": "fence_clear"}
 
 
 # --- Motor / Servo Test ---
 
 @app.post("/api/motor/test")
-async def api_motor_test(req: MotorTestRequest):
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-
-    # Check if vehicle is armed - motor test requires disarmed state
-    telemetry = drone.get_telemetry()
+@app.post("/api/v/{vehicle_id}/motor/test")
+async def api_motor_test(req: MotorTestRequest, vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    telemetry = v.get_telemetry()
     if telemetry.get("armed", False):
         return {"status": "error", "error": "Vehicle must be disarmed for motor test"}
 
-    drone.motor_test(
+    v.connection.motor_test(
+        v,
         motor=req.motor,
         throttle=req.throttle,
         duration=req.duration,
@@ -475,10 +554,10 @@ async def api_motor_test(req: MotorTestRequest):
 
 
 @app.post("/api/servo/test")
-async def api_servo_test(req: ServoTestRequest):
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    drone.servo_set(servo=req.servo, pwm=req.pwm)
+@app.post("/api/v/{vehicle_id}/servo/test")
+async def api_servo_test(req: ServoTestRequest, vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    v.connection.servo_set(v, servo=req.servo, pwm=req.pwm)
     return {"status": "ok", "command": "servo_test", "servo": req.servo, "pwm": req.pwm}
 
 
@@ -492,32 +571,31 @@ class GimbalControlRequest(BaseModel):
 
 
 @app.get("/api/cameras")
-async def api_cameras():
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    # Request camera info first
-    drone.request_camera_info()
-    await asyncio.sleep(0.5)  # Brief wait for responses
-    cameras = drone.get_cameras()
-    gimbals = drone.get_gimbals()
+@app.get("/api/v/{vehicle_id}/cameras")
+async def api_cameras(vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    v.connection.request_camera_info(v)
+    await asyncio.sleep(0.5)
+    cameras = v.get_cameras()
+    gimbals = v.get_gimbals()
     return {"status": "ok", "cameras": cameras, "gimbals": gimbals}
 
 
 @app.post("/api/gimbal/control")
-async def api_gimbal_control(req: GimbalControlRequest):
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    drone.set_gimbal_pitch_yaw(req.pitch, req.yaw, req.pitch_rate, req.yaw_rate)
+@app.post("/api/v/{vehicle_id}/gimbal/control")
+async def api_gimbal_control(req: GimbalControlRequest, vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    v.connection.set_gimbal_pitch_yaw(v, req.pitch, req.yaw, req.pitch_rate, req.yaw_rate)
     return {"status": "ok", "command": "gimbal_control", "pitch": req.pitch, "yaw": req.yaw}
 
 
 # --- Parameters ---
 
 @app.get("/api/params")
-async def api_params():
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    params, total = drone.get_params()
+@app.get("/api/v/{vehicle_id}/params")
+async def api_params(vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    params, total = v.get_params()
     return {
         "status": "ok",
         "params": params,
@@ -527,18 +605,18 @@ async def api_params():
 
 
 @app.post("/api/params/refresh")
-async def api_params_refresh():
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    drone.request_params()
+@app.post("/api/v/{vehicle_id}/params/refresh")
+async def api_params_refresh(vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    v.connection.request_params(v)
     return {"status": "ok", "command": "param_request_list"}
 
 
 @app.post("/api/params/set")
-async def api_params_set(req: ParamSetRequest):
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    drone.set_param(req.param_id, req.value)
+@app.post("/api/v/{vehicle_id}/params/set")
+async def api_params_set(req: ParamSetRequest, vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    v.connection.set_param(v, req.param_id, req.value)
     return {"status": "ok", "command": "param_set", "param_id": req.param_id, "value": req.value}
 
 
@@ -629,36 +707,51 @@ async def api_params_metadata(vehicle: str):
 
 @app.get("/api/mavlink/stats")
 async def api_mavlink_stats():
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    stats = drone.get_message_stats()
+    v = registry.get_active_vehicle()
+    if not v:
+        return {"status": "error", "error": "No active vehicle"}
+    conn = v.connection
+    stats = conn.get_message_stats()
     return {
         "status": "ok",
         "messages": stats,
-        "target_system": drone.target_system,
-        "target_component": drone.target_component,
+        "target_system": v.target_system,
+        "target_component": v.target_component,
     }
 
 
 @app.post("/api/mavlink/stats/clear")
 async def api_mavlink_stats_clear():
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    drone.clear_message_stats()
+    v = registry.get_active_vehicle()
+    if not v:
+        return {"status": "error", "error": "No active vehicle"}
+    v.connection.clear_message_stats()
     return {"status": "ok"}
 
 
 @app.get("/api/mavlink/components")
 async def api_mavlink_components():
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    components = drone.get_components()
+    v = registry.get_active_vehicle()
+    if not v:
+        return {"status": "error", "error": "No active vehicle"}
+    conn = v.connection
+    components = conn.get_components()
     return {
         "status": "ok",
         "components": components,
-        "target_system": drone.target_system,
-        "target_component": drone.target_component,
+        "target_system": v.target_system,
+        "target_component": v.target_component,
     }
+
+
+# --- Calibration ---
+
+@app.post("/api/calibrate")
+@app.post("/api/v/{vehicle_id}/calibrate")
+async def api_calibrate(req: CalibrationRequest, vehicle_id: str = None):
+    v = get_vehicle(vehicle_id)
+    v.connection.calibrate(v, req.type)
+    return {"status": "ok", "command": "calibrate", "type": req.type}
 
 
 # --- Settings ---
@@ -679,16 +772,6 @@ async def api_settings_put(req: dict):
             current[key] = val
     save_settings(current)
     return {"status": "ok"}
-
-
-# --- Calibration ---
-
-@app.post("/api/calibrate")
-async def api_calibrate(req: CalibrationRequest):
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
-    drone.calibrate(req.type)
-    return {"status": "ok", "command": "calibrate", "type": req.type}
 
 
 # --- Weather ---
@@ -876,10 +959,13 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_text()
             try:
                 msg = json.loads(data)
-                if msg.get("type") == "rc_override" and drone.connected:
-                    channels = msg.get("channels", [])
-                    if channels:
-                        drone.rc_override(channels)
+                if msg.get("type") == "rc_override":
+                    vid = msg.get("vehicle_id")
+                    v = registry.get_vehicle_or_active(vid)
+                    if v and v.connection.connected:
+                        channels = msg.get("channels", [])
+                        if channels:
+                            v.connection.rc_override(v, channels)
             except json.JSONDecodeError:
                 pass
     except WebSocketDisconnect:

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect } from 'react';
 import { Wifi, WifiOff, Plug, Unplug, Heart, Sun, Moon, Grid3X3 } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
+import VehicleBar from './VehicleBar';
 
 function HeartbeatIndicator({ age }) {
   if (age < 0) return null;
@@ -123,7 +124,8 @@ export default function ConnectionBar() {
       const data = await res.json();
       if (data.status === 'connected') {
         setConnectionStatus('connected');
-        addAlert(`Connected (${data.autopilot})`, 'success');
+        const vids = data.vehicle_ids || [];
+        addAlert(`Connected${vids.length ? ` — ${vids.length} vehicle(s)` : ''}`, 'success');
 
         // Zoom to drone after a brief delay for telemetry to arrive
         setTimeout(() => triggerZoomToDrone(), 500);
@@ -181,7 +183,8 @@ export default function ConnectionBar() {
   const isConnecting = connectionStatus === 'connecting';
 
   return (
-    <div className="flex items-center gap-2.5 px-3 py-1.5 bg-gray-950/70 border-b border-gray-800/20 backdrop-blur-xl shrink-0">
+    <div className="shrink-0">
+    <div className="flex items-center gap-2.5 px-3 py-1.5 bg-gray-950/70 border-b border-gray-800/20 backdrop-blur-xl">
       {/* Logo */}
       <span className="text-[13px] font-bold text-cyan-400/90 tracking-[0.15em] mr-0.5">PYXUS</span>
 
@@ -306,6 +309,8 @@ export default function ConnectionBar() {
           {theme === 'dark' ? <Sun size={12} /> : <Moon size={12} />}
         </button>
       </div>
+    </div>
+    <VehicleBar />
     </div>
   );
 }

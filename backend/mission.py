@@ -37,8 +37,9 @@ COMMAND_ITEM_TYPES = {v: k for k, v in ITEM_TYPE_COMMANDS.items()}
 
 
 class MissionManager:
-    def __init__(self, drone):
-        self._drone = drone
+    def __init__(self, vehicle):
+        """Accept a Vehicle instance (has .connection, .is_ardupilot, .mission_msg_queue, etc.)."""
+        self._vehicle = vehicle
         self._status = "idle"
         self._lock = threading.Lock()
 
@@ -51,11 +52,18 @@ class MissionManager:
         with self._lock:
             self._status = status
 
+    def _send_cmd(self, cmd_type: str, **kwargs):
+        """Send a mission command via the vehicle's connection."""
+        self._vehicle.connection.send_mission_cmd(self._vehicle, cmd_type, **kwargs)
+
+    def _set_mode(self, mode: str):
+        self._vehicle.connection.set_mode(self._vehicle, mode)
+
     def _send_mission_item(self, seq: int, waypoints: list[Waypoint]):
         """Send a single mission item for the given sequence number."""
         if seq == 0:
             # Home position - always first waypoint location at ground level
-            self._drone.send_mission_cmd(
+            self._send_cmd(
                 "mission_item_int",
                 seq=0,
                 frame=mavutil.mavlink.MAV_FRAME_GLOBAL_INT,
@@ -73,7 +81,7 @@ class MissionManager:
                 wp.item_type,
                 mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
             )
-            self._drone.send_mission_cmd(
+            self._send_cmd(
                 "mission_item_int",
                 seq=seq,
                 frame=mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
@@ -91,25 +99,23 @@ class MissionManager:
 
     def upload(self, waypoints: list[Waypoint]) -> bool:
         """Upload mission waypoints using MAVLink mission protocol."""
-        if not self._drone.connected or not waypoints:
+        if not self._vehicle.connection.connected or not waypoints:
             return False
 
         self._set_status("uploading")
-        self._drone.drain_mission_queue()
+        self._vehicle.drain_mission_queue()
 
         try:
             # Total count = home (seq 0) + user items
             total_count = len(waypoints) + 1
 
             # Send MISSION_COUNT
-            self._drone.send_mission_cmd(
-                "mission_count", count=total_count
-            )
+            self._send_cmd("mission_count", count=total_count)
 
             # Event-driven loop: process messages until ACK or timeout
             deadline = time.time() + 30  # 30s total timeout
             while time.time() < deadline:
-                msg = self._drone.recv_mission_msg(timeout=5.0)
+                msg = self._vehicle.recv_mission_msg(timeout=5.0)
                 if msg is None:
                     self._set_status("upload_failed")
                     return False
@@ -144,19 +150,19 @@ class MissionManager:
 
     def start(self) -> bool:
         """Start the uploaded mission."""
-        if not self._drone.connected:
+        if not self._vehicle.connection.connected:
             return False
 
         try:
             # Set mission to first waypoint
-            self._drone.send_mission_cmd("set_current_mission", seq=1)
+            self._send_cmd("set_current_mission", seq=1)
             time.sleep(0.2)
 
             # Switch to auto mode
-            if self._drone.is_ardupilot:
-                self._drone.set_mode("AUTO")
+            if self._vehicle.is_ardupilot:
+                self._set_mode("AUTO")
             else:
-                self._drone.set_mode("MISSION")
+                self._set_mode("MISSION")
 
             self._set_status("running")
             return True
@@ -166,14 +172,14 @@ class MissionManager:
 
     def pause(self) -> bool:
         """Pause the current mission (switch to loiter/hold)."""
-        if not self._drone.connected:
+        if not self._vehicle.connection.connected:
             return False
 
         try:
-            if self._drone.is_ardupilot:
-                self._drone.set_mode("LOITER")
+            if self._vehicle.is_ardupilot:
+                self._set_mode("LOITER")
             else:
-                self._drone.set_mode("HOLD")
+                self._set_mode("HOLD")
 
             self._set_status("paused")
             return True
@@ -183,15 +189,14 @@ class MissionManager:
 
     def resume(self) -> bool:
         """Resume the mission from current waypoint (switch back to auto)."""
-        if not self._drone.connected:
+        if not self._vehicle.connection.connected:
             return False
 
         try:
-            # Just switch back to AUTO mode - don't reset current waypoint
-            if self._drone.is_ardupilot:
-                self._drone.set_mode("AUTO")
+            if self._vehicle.is_ardupilot:
+                self._set_mode("AUTO")
             else:
-                self._drone.set_mode("MISSION")
+                self._set_mode("MISSION")
 
             self._set_status("running")
             return True
@@ -201,11 +206,11 @@ class MissionManager:
 
     def clear(self) -> bool:
         """Clear all mission items from the vehicle."""
-        if not self._drone.connected:
+        if not self._vehicle.connection.connected:
             return False
 
         try:
-            self._drone.send_mission_cmd("mission_clear")
+            self._send_cmd("mission_clear")
             self._set_status("idle")
             return True
         except Exception as e:
@@ -214,22 +219,19 @@ class MissionManager:
 
     def upload_fence(self, lat: float, lon: float, radius: float) -> bool:
         """Upload a circular inclusion geofence."""
-        if not self._drone.connected:
+        if not self._vehicle.connection.connected:
             return False
 
-        self._drone.drain_mission_queue()
+        self._vehicle.drain_mission_queue()
         fence_type = mavutil.mavlink.MAV_MISSION_TYPE_FENCE
 
         try:
-            self._drone.send_mission_cmd(
-                "mission_count", count=1, mission_type=fence_type
-            )
+            self._send_cmd("mission_count", count=1, mission_type=fence_type)
 
             # Event-driven loop for fence upload
             deadline = time.time() + 15
-            item_sent = False
             while time.time() < deadline:
-                msg = self._drone.recv_mission_msg(timeout=5.0)
+                msg = self._vehicle.recv_mission_msg(timeout=5.0)
                 if msg is None:
                     return False
 
@@ -237,12 +239,12 @@ class MissionManager:
 
                 if msg_type == "MISSION_ACK":
                     if msg.type == mavutil.mavlink.MAV_MISSION_ACCEPTED:
-                        self._drone.send_mission_cmd("fence_enable", enable=1)
+                        self._send_cmd("fence_enable", enable=1)
                         return True
                     return False
 
                 if msg_type in ("MISSION_REQUEST_INT", "MISSION_REQUEST"):
-                    self._drone.send_mission_cmd(
+                    self._send_cmd(
                         "mission_item_int",
                         seq=0,
                         frame=mavutil.mavlink.MAV_FRAME_GLOBAL,
@@ -263,56 +265,46 @@ class MissionManager:
             return False
 
     def get_mission_seq_for_index(self, index: int) -> int:
-        """Convert a 0-based waypoint index to the correct MAVLink seq number.
-
-        ArduPilot: seq 0 is home, mission items start at seq 1
-        PX4: seq 0 is first mission item
-        """
-        if self._drone.is_ardupilot:
-            return index + 1  # ArduPilot: offset by 1 for home at seq 0
+        """Convert a 0-based waypoint index to the correct MAVLink seq number."""
+        if self._vehicle.is_ardupilot:
+            return index + 1
         else:
-            return index  # PX4: no offset
+            return index
 
     def download(self) -> list[dict]:
         """Download mission items from vehicle. Returns list of waypoint dicts."""
-        if not self._drone.connected:
+        if not self._vehicle.connection.connected:
             return []
 
-        self._drone.drain_mission_queue()
-        is_ardupilot = self._drone.is_ardupilot
+        self._vehicle.drain_mission_queue()
+        is_ardupilot = self._vehicle.is_ardupilot
 
         try:
-            # Request mission list
-            self._drone.send_mission_cmd("mission_request_list")
+            self._send_cmd("mission_request_list")
 
-            # Wait for MISSION_COUNT
-            msg = self._drone.recv_mission_msg(timeout=5.0)
+            msg = self._vehicle.recv_mission_msg(timeout=5.0)
             if msg is None or msg.get_type() != "MISSION_COUNT":
                 return []
 
             count = msg.count
 
-            # ArduPilot: seq 0 is home, so need at least 2 items for 1 waypoint
-            # PX4: seq 0 is first waypoint, so need at least 1 item
             if is_ardupilot:
                 if count <= 1:
                     return []
-                start_seq = 1  # Skip home at seq 0
+                start_seq = 1
             else:
                 if count == 0:
                     return []
-                start_seq = 0  # PX4 starts at seq 0
+                start_seq = 0
 
             items = []
-            # Request mission items
             for seq in range(start_seq, count):
-                self._drone.send_mission_cmd("mission_request_int", seq=seq)
+                self._send_cmd("mission_request_int", seq=seq)
 
                 deadline = time.time() + 5.0
                 while time.time() < deadline:
-                    item_msg = self._drone.recv_mission_msg(timeout=3.0)
+                    item_msg = self._vehicle.recv_mission_msg(timeout=3.0)
                     if item_msg is None:
-                        # Send ACK with error and bail
                         return []
                     if item_msg.get_type() == "MISSION_ITEM_INT" and item_msg.seq == seq:
                         item_type = COMMAND_ITEM_TYPES.get(item_msg.command, "waypoint")
@@ -328,8 +320,7 @@ class MissionManager:
                         })
                         break
 
-            # Send ACK
-            self._drone.send_mission_cmd("mission_ack")
+            self._send_cmd("mission_ack")
             return items
 
         except Exception as e:
@@ -338,16 +329,16 @@ class MissionManager:
 
     def download_fence(self) -> list[dict]:
         """Download fence items from vehicle."""
-        if not self._drone.connected:
+        if not self._vehicle.connection.connected:
             return []
 
         fence_type = mavutil.mavlink.MAV_MISSION_TYPE_FENCE
-        self._drone.drain_mission_queue()
+        self._vehicle.drain_mission_queue()
 
         try:
-            self._drone.send_mission_cmd("mission_request_list", mission_type=fence_type)
+            self._send_cmd("mission_request_list", mission_type=fence_type)
 
-            msg = self._drone.recv_mission_msg(timeout=5.0)
+            msg = self._vehicle.recv_mission_msg(timeout=5.0)
             if msg is None or msg.get_type() != "MISSION_COUNT":
                 return []
 
@@ -357,11 +348,11 @@ class MissionManager:
 
             items = []
             for seq in range(count):
-                self._drone.send_mission_cmd("mission_request_int", seq=seq, mission_type=fence_type)
+                self._send_cmd("mission_request_int", seq=seq, mission_type=fence_type)
 
                 deadline = time.time() + 5.0
                 while time.time() < deadline:
-                    item_msg = self._drone.recv_mission_msg(timeout=3.0)
+                    item_msg = self._vehicle.recv_mission_msg(timeout=3.0)
                     if item_msg is None:
                         return []
                     if item_msg.get_type() == "MISSION_ITEM_INT" and item_msg.seq == seq:
@@ -377,7 +368,7 @@ class MissionManager:
                         })
                         break
 
-            self._drone.send_mission_cmd("mission_ack", mission_type=fence_type)
+            self._send_cmd("mission_ack", mission_type=fence_type)
             return items
 
         except Exception as e:
@@ -385,20 +376,20 @@ class MissionManager:
             return []
 
     def upload_polygon_fence(self, vertices: list[dict]) -> bool:
-        """Upload polygon inclusion fence using MAV_CMD_NAV_FENCE_POLYGON_VERTEX_INCLUSION."""
-        if not self._drone.connected or len(vertices) < 3:
+        """Upload polygon inclusion fence."""
+        if not self._vehicle.connection.connected or len(vertices) < 3:
             return False
 
         fence_type = mavutil.mavlink.MAV_MISSION_TYPE_FENCE
-        self._drone.drain_mission_queue()
+        self._vehicle.drain_mission_queue()
 
         try:
             count = len(vertices)
-            self._drone.send_mission_cmd("mission_count", count=count, mission_type=fence_type)
+            self._send_cmd("mission_count", count=count, mission_type=fence_type)
 
             deadline = time.time() + 30
             while time.time() < deadline:
-                msg = self._drone.recv_mission_msg(timeout=5.0)
+                msg = self._vehicle.recv_mission_msg(timeout=5.0)
                 if msg is None:
                     return False
 
@@ -406,7 +397,7 @@ class MissionManager:
 
                 if msg_type == "MISSION_ACK":
                     if msg.type == mavutil.mavlink.MAV_MISSION_ACCEPTED:
-                        self._drone.send_mission_cmd("fence_enable", enable=1)
+                        self._send_cmd("fence_enable", enable=1)
                         return True
                     return False
 
@@ -414,7 +405,7 @@ class MissionManager:
                     seq = msg.seq
                     if seq < count:
                         v = vertices[seq]
-                        self._drone.send_mission_cmd(
+                        self._send_cmd(
                             "mission_item_int",
                             seq=seq,
                             frame=mavutil.mavlink.MAV_FRAME_GLOBAL,
@@ -436,13 +427,13 @@ class MissionManager:
 
     def clear_fence(self) -> bool:
         """Clear geofence from the vehicle."""
-        if not self._drone.connected:
+        if not self._vehicle.connection.connected:
             return False
 
         try:
-            self._drone.send_mission_cmd("fence_enable", enable=0)
+            self._send_cmd("fence_enable", enable=0)
             time.sleep(0.1)
-            self._drone.send_mission_cmd(
+            self._send_cmd(
                 "mission_clear",
                 mission_type=mavutil.mavlink.MAV_MISSION_TYPE_FENCE,
             )

@@ -38,53 +38,68 @@ export default function useWebSocket() {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type === 'telemetry') {
-          // Extract statustext before passing to telemetry
-          if (data.statustext && data.statustext.length > 0) {
-            addMavMessages(data.statustext);
 
-            // Route calibration messages
-            const { calibrationStatus, addCalibrationMessage, setCalibrationStep } = useDroneStore.getState();
-            if (calibrationStatus.active) {
-              data.statustext.forEach(msg => {
-                if (isCalibrationMessage(msg.text)) {
-                  addCalibrationMessage(msg);
+        if (data.type === 'telemetry_multi') {
+          const state = useDroneStore.getState();
+          const { updateVehicleTelemetry, activeVehicleId, setActiveVehicle } = state;
 
-                  // Detect accel calibration steps
-                  if (calibrationStatus.type === 'accel') {
-                    const text = msg.text.toLowerCase();
-                    if (text.includes('level')) setCalibrationStep(0);
-                    else if (text.includes('left')) setCalibrationStep(1);
-                    else if (text.includes('right')) setCalibrationStep(2);
-                    else if (text.includes('nose down')) setCalibrationStep(3);
-                    else if (text.includes('nose up')) setCalibrationStep(4);
-                    else if (text.includes('back') || text.includes('belly')) setCalibrationStep(5);
+          // Set active vehicle if not set yet
+          if (!activeVehicleId && data.active) {
+            setActiveVehicle(data.active);
+          }
+
+          const currentActive = activeVehicleId || data.active;
+
+          for (const [vid, vdata] of Object.entries(data.vehicles)) {
+            updateVehicleTelemetry(vid, vdata);
+
+            // Process statustext only for active vehicle
+            if (vid === currentActive && vdata.statustext?.length > 0) {
+              addMavMessages(vdata.statustext);
+
+              // Route calibration messages
+              const { calibrationStatus, addCalibrationMessage, setCalibrationStep } = useDroneStore.getState();
+              if (calibrationStatus.active) {
+                vdata.statustext.forEach(msg => {
+                  if (isCalibrationMessage(msg.text)) {
+                    addCalibrationMessage(msg);
+                    if (calibrationStatus.type === 'accel') {
+                      const text = msg.text.toLowerCase();
+                      if (text.includes('level')) setCalibrationStep(0);
+                      else if (text.includes('left')) setCalibrationStep(1);
+                      else if (text.includes('right')) setCalibrationStep(2);
+                      else if (text.includes('nose down')) setCalibrationStep(3);
+                      else if (text.includes('nose up')) setCalibrationStep(4);
+                      else if (text.includes('back') || text.includes('belly')) setCalibrationStep(5);
+                    }
                   }
-                }
-              });
+                });
+              }
             }
           }
 
-          // Check for drone identity change
-          const { droneIdentity, checkDroneChange, setDroneIdentity } = useDroneStore.getState();
-          const newIdentity = {
-            sysid: data.system_id || null,
-            autopilot: data.autopilot,
-            platformType: data.platform_type,
-          };
-
-          if (checkDroneChange(newIdentity)) {
-            setDroneChangeDetected({
-              old: droneIdentity,
-              new: newIdentity,
-            });
+          // Check for drone identity change (active vehicle)
+          const activeData = data.vehicles[currentActive];
+          if (activeData) {
+            const { droneIdentity, checkDroneChange, setDroneIdentity } = useDroneStore.getState();
+            const newIdentity = {
+              sysid: currentActive,
+              autopilot: activeData.autopilot,
+              platformType: activeData.platform_type,
+            };
+            if (checkDroneChange(newIdentity)) {
+              setDroneChangeDetected({ old: droneIdentity, new: newIdentity });
+            }
+            if (droneIdentity.sysid === null && newIdentity.autopilot && newIdentity.autopilot !== 'unknown') {
+              setDroneIdentity(newIdentity);
+            }
           }
-
-          // Update identity if not set
-          if (droneIdentity.sysid === null && newIdentity.autopilot && newIdentity.autopilot !== 'unknown') {
-            setDroneIdentity(newIdentity);
+        }
+        // Backward compat: single telemetry message
+        else if (data.type === 'telemetry') {
+          if (data.statustext && data.statustext.length > 0) {
+            addMavMessages(data.statustext);
           }
-
           updateTelemetry(data);
         }
       } catch {
