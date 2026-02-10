@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { X, Grid3X3, Circle, Target, Square, RotateCw } from 'lucide-react';
-import useDroneStore from '../store/droneStore';
+import useDroneStore, { INITIAL_TELEMETRY } from '../store/droneStore';
 import {
   lawnmowerPattern,
   spiralPattern,
@@ -29,7 +29,7 @@ export default function PatternModal() {
   const setPatternDrawMode = useDroneStore((s) => s.setPatternDrawMode);
   const clearPatternBounds = useDroneStore((s) => s.clearPatternBounds);
   const defaultAlt = useDroneStore((s) => s.defaultAlt);
-  const telemetry = useDroneStore((s) => s.telemetry);
+  const telemetry = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry : null) || INITIAL_TELEMETRY;
 
   const [activeTab, setActiveTab] = useState('lawnmower');
   const [replaceMode, setReplaceMode] = useState(true);

@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import { Upload, Trash2, X, Shield, Pentagon, Download, FolderOpen } from 'lucide-react';
-import useDroneStore from '../store/droneStore';
+import useDroneStore, { INITIAL_TELEMETRY } from '../store/droneStore';
+import { droneApi } from '../utils/api';
 import { formatCoord } from '../utils/formatCoord';
 
 // Parse KML polygon coordinates
@@ -70,10 +71,10 @@ function generateKml(vertices, name = 'Geofence') {
 }
 
 export default function FenceSubPanel() {
-  const connectionStatus = useDroneStore((s) => s.connectionStatus);
+  const activeDroneId = useDroneStore((s) => s.activeDroneId);
   const geofence = useDroneStore((s) => s.geofence);
   const setGeofence = useDroneStore((s) => s.setGeofence);
-  const telemetry = useDroneStore((s) => s.telemetry);
+  const telemetry = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry : INITIAL_TELEMETRY) || INITIAL_TELEMETRY;
   const addAlert = useDroneStore((s) => s.addAlert);
   const plannedFence = useDroneStore((s) => s.plannedFence);
   const removeFenceVertex = useDroneStore((s) => s.removeFenceVertex);
@@ -81,15 +82,16 @@ export default function FenceSubPanel() {
   const setDroneFence = useDroneStore((s) => s.setDroneFence);
   const coordFormat = useDroneStore((s) => s.coordFormat);
 
-  const isConnected = connectionStatus === 'connected';
+  const isConnected = !!activeDroneId;
 
   // Reload fence from drone
   const reloadDroneFence = useCallback(async () => {
     try {
-      const res = await fetch('/api/fence/download');
+      const droneId = useDroneStore.getState().activeDroneId;
+      const res = await fetch(droneApi('/api/fence/download'));
       const data = await res.json();
-      if (data.status === 'ok') {
-        setDroneFence(data.fence_items || []);
+      if (data.status === 'ok' && droneId) {
+        setDroneFence(droneId, data.fence_items || []);
       }
     } catch {}
   }, [setDroneFence]);
@@ -97,7 +99,7 @@ export default function FenceSubPanel() {
   const fenceApiCall = useCallback(
     async (endpoint, body = {}, clearPlannedOnSuccess = false) => {
       try {
-        const res = await fetch(`/api/fence/${endpoint}`, {
+        const res = await fetch(droneApi(`/api/fence/${endpoint}`), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
@@ -135,7 +137,8 @@ export default function FenceSubPanel() {
   const handleCircularFenceClear = useCallback(async () => {
     setGeofence({ enabled: false });
     await fenceApiCall('clear');
-    setDroneFence([]); // Clear local display
+    const droneId = useDroneStore.getState().activeDroneId;
+    if (droneId) setDroneFence(droneId, []); // Clear local display
   }, [fenceApiCall, setGeofence, setDroneFence]);
 
   const handlePolygonFenceUpload = useCallback(async () => {

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Video, Play, X, Link, Camera, Crosshair, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
-import useDroneStore from '../store/droneStore';
+import useDroneStore, { EMPTY_ARRAY } from '../store/droneStore';
+import { droneApi } from '../utils/api';
 
 const EXAMPLE_URLS = [
   { label: 'RTSP', value: 'rtsp://192.168.1.1:8554/stream' },
@@ -10,15 +11,15 @@ const EXAMPLE_URLS = [
 
 function GimbalControl() {
   const addAlert = useDroneStore((s) => s.addAlert);
-  const connectionStatus = useDroneStore((s) => s.connectionStatus);
+  const activeDroneId = useDroneStore((s) => s.activeDroneId);
   const [pitch, setPitch] = useState(0);
   const [yaw, setYaw] = useState(0);
-  const isConnected = connectionStatus === 'connected';
+  const isConnected = !!activeDroneId;
 
   const sendGimbalCommand = useCallback(async (p, y) => {
     if (!isConnected) return;
     try {
-      await fetch('/api/gimbal/control', {
+      await fetch(droneApi('/api/gimbal/control'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pitch: p, yaw: y }),
@@ -86,28 +87,29 @@ function GimbalControl() {
 }
 
 function CameraList() {
-  const cameras = useDroneStore((s) => s.cameras);
-  const gimbals = useDroneStore((s) => s.gimbals);
-  const connectionStatus = useDroneStore((s) => s.connectionStatus);
-  const setCameras = useDroneStore((s) => s.setCameras);
-  const setGimbals = useDroneStore((s) => s.setGimbals);
+  const cameras = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.cameras ?? EMPTY_ARRAY : EMPTY_ARRAY);
+  const gimbals = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.gimbals ?? EMPTY_ARRAY : EMPTY_ARRAY);
+  const activeDroneId = useDroneStore((s) => s.activeDroneId);
+  const setDroneCameras = useDroneStore((s) => s.setDroneCameras);
   const [expanded, setExpanded] = useState(true);
   const [loading, setLoading] = useState(false);
-  const isConnected = connectionStatus === 'connected';
+  const isConnected = !!activeDroneId;
 
   const refreshDevices = useCallback(async () => {
     if (!isConnected) return;
     setLoading(true);
     try {
-      const res = await fetch('/api/cameras');
+      const res = await fetch(droneApi('/api/cameras'));
       const data = await res.json();
       if (data.status === 'ok') {
-        setCameras(data.cameras || []);
-        setGimbals(data.gimbals || []);
+        const currentDroneId = useDroneStore.getState().activeDroneId;
+        if (currentDroneId) {
+          setDroneCameras(currentDroneId, data.cameras || [], data.gimbals || []);
+        }
       }
     } catch {}
     setLoading(false);
-  }, [isConnected, setCameras, setGimbals]);
+  }, [isConnected, setDroneCameras]);
 
   useEffect(() => {
     if (isConnected) {
@@ -212,7 +214,7 @@ export default function VideoFeed() {
   const addAlert = useDroneStore((s) => s.addAlert);
 
   const streamUrl = videoActive && videoUrl
-    ? `/api/video/stream?url=${encodeURIComponent(videoUrl)}`
+    ? droneApi(`/api/video/stream?url=${encodeURIComponent(videoUrl)}`)
     : null;
 
   const handleStart = useCallback(() => {

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import useDroneStore from '../store/droneStore';
+import { INITIAL_TELEMETRY, EMPTY_OBJECT } from '../store/droneStore';
 
 function playBeep(frequency = 800, duration = 0.3) {
   try {
@@ -18,10 +19,10 @@ function playBeep(frequency = 800, duration = 0.3) {
 }
 
 export default function BatteryMonitor() {
-  const voltage = useDroneStore((s) => s.telemetry.voltage);
-  const remaining = useDroneStore((s) => s.telemetry.remaining);
-  const connectionStatus = useDroneStore((s) => s.connectionStatus);
-  const params = useDroneStore((s) => s.params);
+  const voltage = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry?.voltage : 0) || 0;
+  const remaining = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry?.remaining : -1) ?? -1;
+  const activeDroneId = useDroneStore((s) => s.activeDroneId);
+  const params = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.params ?? EMPTY_OBJECT : EMPTY_OBJECT);
   const batteryWarnings = useDroneStore((s) => s.batteryWarnings);
   const setBatteryWarnings = useDroneStore((s) => s.setBatteryWarnings);
   const addAlert = useDroneStore((s) => s.addAlert);
@@ -29,7 +30,7 @@ export default function BatteryMonitor() {
 
   useEffect(() => {
     // Reset warnings on disconnect
-    if (connectionStatus !== 'connected') {
+    if (!activeDroneId) {
       if (batteryWarnings.low || batteryWarnings.critical) {
         setBatteryWarnings({ low: false, critical: false });
       }
@@ -65,7 +66,7 @@ export default function BatteryMonitor() {
     }
 
     prevVoltageRef.current = voltage;
-  }, [voltage, remaining, connectionStatus, params, batteryWarnings, setBatteryWarnings, addAlert]);
+  }, [voltage, remaining, activeDroneId, params, batteryWarnings, setBatteryWarnings, addAlert]);
 
   return null;
 }

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { MapContainer, TileLayer, Marker, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import { X, Minimize2, Battery, Wifi, Keyboard, Gamepad2 } from 'lucide-react';
-import useDroneStore from '../store/droneStore';
+import useDroneStore, { INITIAL_TELEMETRY, EMPTY_ARRAY } from '../store/droneStore';
 import { formatCoord } from '../utils/formatCoord';
 import { apiUrl } from '../utils/api';
 import FlyOverlay from './FlyOverlay';
@@ -336,9 +336,9 @@ function ManualControlHUD() {
 export default function FullscreenVideo({ onClose }) {
   const videoUrl = useDroneStore((s) => s.videoUrl);
   const videoActive = useDroneStore((s) => s.videoActive);
-  const telemetry = useDroneStore((s) => s.telemetry);
+  const telemetry = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry : null) || INITIAL_TELEMETRY;
   const homePosition = useDroneStore((s) => s.homePosition);
-  const trail = useDroneStore((s) => s.trail);
+  const trail = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.trail ?? EMPTY_ARRAY : EMPTY_ARRAY);
 
   const streamUrl = videoActive && videoUrl
     ? apiUrl(`/api/video/stream?url=${encodeURIComponent(videoUrl)}`)

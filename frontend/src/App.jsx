@@ -1,7 +1,9 @@
 import React, { useEffect, useCallback, useRef } from 'react';
-import { Map as MapIcon, Plane, Wrench, PanelRightClose, PanelRightOpen, AlertTriangle } from 'lucide-react';
+import { Map as MapIcon, Plane, Wrench, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import useWebSocket from './hooks/useWebSocket';
 import useDroneStore from './store/droneStore';
+import { INITIAL_TELEMETRY } from './store/droneStore';
+import { droneApi } from './utils/api';
 
 const RC_CENTER = 1500;
 const RC_MIN = 1000;
@@ -33,7 +35,7 @@ async function executeGamepadAction(action, addAlert) {
   if (action.startsWith('mode:')) {
     const mode = action.slice(5);
     try {
-      await fetch('/api/mode', {
+      await fetch(droneApi('/api/mode'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode }),
@@ -54,10 +56,12 @@ async function executeGamepadAction(action, addAlert) {
   };
 
   if (action === 'toggle_arm') {
-    const armed = useDroneStore.getState().telemetry.armed;
+    const store = useDroneStore.getState();
+    const activeDrone = store.activeDroneId ? store.drones[store.activeDroneId] : null;
+    const armed = activeDrone?.telemetry?.armed || false;
     const ep = armed ? 'disarm' : 'arm';
     try {
-      await fetch(`/api/${ep}`, {
+      await fetch(droneApi(`/api/${ep}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -70,7 +74,7 @@ async function executeGamepadAction(action, addAlert) {
   const ep = endpoints[action];
   if (ep) {
     try {
-      await fetch(`/api/${ep}`, {
+      await fetch(droneApi(`/api/${ep}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(action === 'takeoff' ? { alt: 10 } : {}),
@@ -91,16 +95,16 @@ import BatteryMonitor from './components/BatteryMonitor';
 import BatteryChart from './components/BatteryChart';
 
 export default function App() {
-  const { sendMessage, droneChangeDetected, dismissDroneChange, acceptDroneChange } = useWebSocket();
-  const connectionStatus = useDroneStore((s) => s.connectionStatus);
+  const { sendMessage } = useWebSocket();
+  const activeDroneId = useDroneStore((s) => s.activeDroneId);
   const commandHotkeys = useDroneStore((s) => s.commandHotkeys);
   const servoGroups = useDroneStore((s) => s.servoGroups);
   const setServoGroupState = useDroneStore((s) => s.setServoGroupState);
   const addAlertStore = useDroneStore((s) => s.addAlert);
-  const telemetry = useDroneStore((s) => s.telemetry);
+  const telemetry = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry : INITIAL_TELEMETRY) || INITIAL_TELEMETRY;
   const homePosition = useDroneStore((s) => s.homePosition);
   const setHomePosition = useDroneStore((s) => s.setHomePosition);
-  const isConnected = connectionStatus === 'connected';
+  const isConnected = !!activeDroneId;
 
   // Set home position from first valid GPS position
   useEffect(() => {
@@ -115,7 +119,7 @@ export default function App() {
     try {
       if (command.startsWith('mode:')) {
         const mode = command.slice(5);
-        await fetch('/api/mode', {
+        await fetch(droneApi('/api/mode'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mode }),
@@ -128,7 +132,7 @@ export default function App() {
         };
         const ep = endpoints[command];
         if (ep) {
-          await fetch(`/api/${ep}`, {
+          await fetch(droneApi(`/api/${ep}`), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(command === 'takeoff' ? { alt: 10 } : {}),
@@ -148,7 +152,7 @@ export default function App() {
     try {
       for (const s of servos) {
         const pwm = action === 'open' ? s.openPwm : s.closePwm;
-        await fetch('/api/servo/test', {
+        await fetch(droneApi('/api/servo/test'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ servo: s.servo, pwm }),
@@ -395,52 +399,6 @@ export default function App() {
       {/* Battery monitor (headless) */}
       <BatteryMonitor />
 
-      {/* Drone change detection modal */}
-      {droneChangeDetected && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-gray-900 border border-amber-500/30 rounded-xl p-6 max-w-md shadow-2xl">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
-                <AlertTriangle size={20} className="text-amber-400" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-100">Different Vehicle Detected</h3>
-                <p className="text-sm text-gray-400">A different vehicle has connected</p>
-              </div>
-            </div>
-
-            <div className="bg-gray-800/50 rounded-lg p-3 mb-4 text-sm space-y-2">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Previous:</span>
-                <span className="text-gray-300">{droneChangeDetected.old.platformType || 'Unknown'} ({droneChangeDetected.old.autopilot})</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">New:</span>
-                <span className="text-amber-300">{droneChangeDetected.new.platformType || 'Unknown'} ({droneChangeDetected.new.autopilot})</span>
-              </div>
-            </div>
-
-            <p className="text-xs text-gray-500 mb-4">
-              Reloading will clear the current mission plan, drone mission, and parameters. You can also keep the current session if this was expected.
-            </p>
-
-            <div className="flex gap-3">
-              <button
-                onClick={dismissDroneChange}
-                className="flex-1 py-2 px-4 rounded-lg text-sm font-medium bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 transition-colors"
-              >
-                Keep Session
-              </button>
-              <button
-                onClick={acceptDroneChange}
-                className="flex-1 py-2 px-4 rounded-lg text-sm font-medium bg-amber-600 hover:bg-amber-500 text-white transition-colors"
-              >
-                Reload Connection
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

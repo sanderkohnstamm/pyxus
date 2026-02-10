@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { SlidersHorizontal, RefreshCw, Search, Check, X, Download, Shield, ChevronDown, ChevronUp } from 'lucide-react';
-import useDroneStore from '../store/droneStore';
+import useDroneStore, { EMPTY_OBJECT } from '../store/droneStore';
+import { droneApi } from '../utils/api';
 
 // Key safety parameters for ArduPilot and PX4
 const SAFETY_PARAMS = {
@@ -226,22 +227,21 @@ function SafetySection({ params, autopilot, onSet }) {
 }
 
 export default function ParamsPanel() {
-  const connectionStatus = useDroneStore((s) => s.connectionStatus);
-  const params = useDroneStore((s) => s.params);
-  const paramsTotal = useDroneStore((s) => s.paramsTotal);
-  const paramsLoading = useDroneStore((s) => s.paramsLoading);
-  const setParams = useDroneStore((s) => s.setParams);
-  const setParamsLoading = useDroneStore((s) => s.setParamsLoading);
+  const activeDroneId = useDroneStore((s) => s.activeDroneId);
+  const params = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.params ?? EMPTY_OBJECT : EMPTY_OBJECT);
+  const paramsTotal = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.paramsTotal : 0) || 0;
+  const setDroneParams = useDroneStore((s) => s.setDroneParams);
   const addAlert = useDroneStore((s) => s.addAlert);
-  const autopilot = useDroneStore((s) => s.telemetry.autopilot);
-  const platformType = useDroneStore((s) => s.telemetry.platform_type);
+  const autopilot = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry?.autopilot : 'unknown') || 'unknown';
+  const platformType = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry?.platform_type : 'Unknown') || 'Unknown';
   const paramMeta = useDroneStore((s) => s.paramMeta);
   const paramMetaLoading = useDroneStore((s) => s.paramMetaLoading);
   const fetchParamMeta = useDroneStore((s) => s.fetchParamMeta);
 
   const [search, setSearch] = useState('');
-  const isConnected = connectionStatus === 'connected';
+  const isConnected = !!activeDroneId;
   const paramCount = Object.keys(params).length;
+  const paramsLoading = paramCount < paramsTotal && paramsTotal > 0;
   const metaCount = Object.keys(paramMeta).length;
 
   // Fetch parameter metadata when connected and platform type is known
@@ -252,29 +252,30 @@ export default function ParamsPanel() {
   }, [isConnected, platformType, autopilot, fetchParamMeta]);
 
   const fetchParams = useCallback(async () => {
+    const droneId = useDroneStore.getState().activeDroneId;
+    if (!droneId) return;
     try {
-      const res = await fetch('/api/params');
+      const res = await fetch(droneApi('/api/params'));
       const data = await res.json();
       if (data.status === 'ok') {
-        setParams(data.params, data.total);
+        setDroneParams(droneId, data.params, data.total);
       }
     } catch {}
-  }, [setParams]);
+  }, [setDroneParams]);
 
   const requestRefresh = useCallback(async () => {
     if (!isConnected) return;
-    setParamsLoading(true);
     try {
-      await fetch('/api/params/refresh', { method: 'POST' });
+      await fetch(droneApi('/api/params/refresh'), { method: 'POST' });
       addAlert('Requesting parameters...', 'info');
     } catch (err) {
       addAlert('Failed to request params', 'error');
     }
-  }, [isConnected, setParamsLoading, addAlert]);
+  }, [isConnected, addAlert]);
 
   const handleSet = useCallback(async (paramId, value) => {
     try {
-      const res = await fetch('/api/params/set', {
+      const res = await fetch(droneApi('/api/params/set'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ param_id: paramId, value }),
@@ -326,13 +327,6 @@ export default function ParamsPanel() {
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [isConnected, fetchParams, paramsLoading]);
-
-  // Stop loading indicator when all params received
-  useEffect(() => {
-    if (paramsLoading && paramsTotal > 0 && paramCount >= paramsTotal) {
-      setParamsLoading(false);
-    }
-  }, [paramsLoading, paramsTotal, paramCount, setParamsLoading]);
 
   const handleDownload = useCallback(() => {
     const entries = Object.entries(params).sort((a, b) => a[0].localeCompare(b[0]));

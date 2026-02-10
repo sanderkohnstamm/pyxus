@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import useDroneStore from '../store/droneStore';
+import useDroneStore, { EMPTY_ARRAY } from '../store/droneStore';
 
 const W = 340;
 const H = 80;
@@ -11,7 +11,7 @@ const chartW = W - padL - padR;
 const chartH = H - padT - padB;
 
 export default function BatteryChart() {
-  const batteryHistory = useDroneStore((s) => s.batteryHistory);
+  const batteryHistory = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.batteryHistory ?? EMPTY_ARRAY : EMPTY_ARRAY);
 
   const chartData = useMemo(() => {
     if (batteryHistory.length < 2) return null;

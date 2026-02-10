@@ -10,7 +10,8 @@ import {
   Trash2,
   FastForward,
 } from 'lucide-react';
-import useDroneStore from '../store/droneStore';
+import useDroneStore, { INITIAL_TELEMETRY } from '../store/droneStore';
+import { droneApi } from '../utils/api';
 
 const ARDUPILOT_MODES = ['STABILIZE', 'ALT_HOLD', 'LOITER', 'GUIDED', 'AUTO', 'RTL', 'LAND', 'POSHOLD', 'ACRO'];
 const PX4_MODES = ['MANUAL', 'ALTCTL', 'POSCTL', 'OFFBOARD', 'STABILIZED', 'AUTO_MISSION', 'AUTO_RTL', 'AUTO_LAND', 'AUTO_LOITER'];
@@ -25,21 +26,21 @@ const STATUS_COLORS = {
 };
 
 export default function FlyOverlay() {
-  const connectionStatus = useDroneStore((s) => s.connectionStatus);
-  const telemetry = useDroneStore((s) => s.telemetry);
-  const missionStatus = useDroneStore((s) => s.missionStatus);
+  const activeDroneId = useDroneStore((s) => s.activeDroneId);
+  const telemetry = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry : INITIAL_TELEMETRY) || INITIAL_TELEMETRY;
+  const missionStatus = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.missionStatus : 'idle') || 'idle';
   const addAlert = useDroneStore((s) => s.addAlert);
   const addGcsLog = useDroneStore((s) => s.addGcsLog);
   const takeoffAlt = useDroneStore((s) => s.takeoffAlt);
   const setDroneMission = useDroneStore((s) => s.setDroneMission);
 
-  const isConnected = connectionStatus === 'connected';
+  const isConnected = !!activeDroneId;
 
   const apiCall = useCallback(
     async (endpoint, body = {}, logMsg) => {
       const label = logMsg || endpoint;
       try {
-        const res = await fetch(`/api/${endpoint}`, {
+        const res = await fetch(droneApi(`/api/${endpoint}`), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
@@ -62,7 +63,7 @@ export default function FlyOverlay() {
   const missionApiCall = useCallback(
     async (endpoint) => {
       try {
-        const res = await fetch(`/api/mission/${endpoint}`, {
+        const res = await fetch(droneApi(`/api/mission/${endpoint}`), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
         });
@@ -71,7 +72,8 @@ export default function FlyOverlay() {
           addAlert(data.error || `Mission ${endpoint} failed`, 'error');
           addGcsLog(`Mission ${endpoint}: ${data.error || 'failed'}`, 'error');
         } else if (endpoint === 'clear') {
-          setDroneMission([]);
+          const droneId = useDroneStore.getState().activeDroneId;
+          if (droneId) setDroneMission(droneId, []);
           addAlert('Mission cleared from drone', 'success');
           addGcsLog('Mission cleared from drone', 'info');
         } else {

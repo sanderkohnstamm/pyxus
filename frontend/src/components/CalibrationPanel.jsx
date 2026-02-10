@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Compass, Activity, ArrowDownToLine, Gauge, Loader2, X, Check, ChevronRight } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
+import { droneApi } from '../utils/api';
 
 // Accel calibration positions (ArduPilot order)
 const ACCEL_POSITIONS = [
@@ -94,12 +95,12 @@ const COLOR_CLASSES = {
 };
 
 export default function CalibrationPanel() {
-  const connectionStatus = useDroneStore((s) => s.connectionStatus);
+  const activeDroneId = useDroneStore((s) => s.activeDroneId);
   const addAlert = useDroneStore((s) => s.addAlert);
   const calibrationStatus = useDroneStore((s) => s.calibrationStatus);
   const setCalibrationActive = useDroneStore((s) => s.setCalibrationActive);
   const clearCalibrationStatus = useDroneStore((s) => s.clearCalibrationStatus);
-  const isConnected = connectionStatus === 'connected';
+  const isConnected = !!activeDroneId;
 
   const [localRunning, setLocalRunning] = useState(null);
 
@@ -115,7 +116,7 @@ export default function CalibrationPanel() {
     setCalibrationActive(true, type);
 
     try {
-      const res = await fetch('/api/calibrate', {
+      const res = await fetch(droneApi('/api/calibrate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type }),
@@ -149,7 +150,7 @@ export default function CalibrationPanel() {
   const cancelCalibration = useCallback(async () => {
     try {
       // Send cancel command (all zeros cancels calibration)
-      await fetch('/api/calibrate', {
+      await fetch(droneApi('/api/calibrate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'cancel' }),
@@ -289,7 +290,7 @@ export default function CalibrationPanel() {
                   <button
                     onClick={async () => {
                       try {
-                        await fetch('/api/calibrate', {
+                        await fetch(droneApi('/api/calibrate'), {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ type: 'next_step' }),

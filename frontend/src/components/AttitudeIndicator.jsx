@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Home } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
+import { INITIAL_TELEMETRY } from '../store/droneStore';
 
 // Calculate bearing from point A to point B
 function calculateBearing(lat1, lon1, lat2, lon2) {
@@ -230,7 +231,7 @@ function CompassIndicator({ heading, homeBearing }) {
 }
 
 export default function AttitudeIndicator() {
-  const telemetry = useDroneStore((s) => s.telemetry);
+  const telemetry = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry : INITIAL_TELEMETRY) || INITIAL_TELEMETRY;
   const homePosition = useDroneStore((s) => s.homePosition);
 
   const { roll, pitch, heading, lat, lon } = telemetry;

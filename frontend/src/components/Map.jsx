@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useCallback, useState } from 'react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, Circle, Polygon, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import useDroneStore from '../store/droneStore';
+import { INITIAL_TELEMETRY, EMPTY_ARRAY } from '../store/droneStore';
+import { droneApi } from '../utils/api';
 import MavLog from './MavLog';
 import VideoOverlay from './VideoOverlay';
 import WeatherMapLayer from './WeatherMapLayer';
@@ -53,12 +55,12 @@ const MARKER_COLORS = {
   land: { bg: '#f97316', border: '#fb923c', label: 'LND' },
 };
 
-// SVG arrow drone icon
-function createDroneIcon(yawDeg) {
+// SVG arrow drone icon (active = cyan, inactive = gray)
+function createDroneIcon(yawDeg, fill = '#06b6d4', stroke = '#22d3ee') {
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="-18 -18 36 36">
       <g transform="rotate(${yawDeg})">
-        <path d="M0,-13 L12,10 L0,3 L-12,10 Z" fill="#06b6d4" stroke="#22d3ee" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="M0,-13 L12,10 L0,3 L-12,10 Z" fill="${fill}" stroke="${stroke}" stroke-width="1.5" stroke-linejoin="round"/>
       </g>
     </svg>`;
   return L.divIcon({
@@ -66,6 +68,17 @@ function createDroneIcon(yawDeg) {
     className: 'drone-marker-icon',
     iconSize: [36, 36],
     iconAnchor: [18, 18],
+  });
+}
+
+// Name label icon for drones on the map
+function createDroneNameIcon(name, isActive) {
+  const bg = isActive ? 'rgba(6,182,212,0.85)' : 'rgba(100,116,139,0.75)';
+  return L.divIcon({
+    html: `<div style="white-space:nowrap;background:${bg};color:white;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600;font-family:monospace;text-align:center">${name}</div>`,
+    className: '',
+    iconSize: [0, 0],
+    iconAnchor: [0, -22],
   });
 }
 
@@ -136,11 +149,11 @@ function MapResizer() {
   return null;
 }
 
-// Component to follow drone position
+// Component to follow active drone position
 function DroneFollower() {
   const map = useMap();
-  const lat = useDroneStore((s) => s.telemetry.lat);
-  const lon = useDroneStore((s) => s.telemetry.lon);
+  const lat = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry?.lat : 0) || 0;
+  const lon = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry?.lon : 0) || 0;
   const followDrone = useDroneStore((s) => s.followDrone);
   const setFollowDrone = useDroneStore((s) => s.setFollowDrone);
   const zoomToDrone = useDroneStore((s) => s.zoomToDrone);
@@ -173,7 +186,7 @@ function MapClickHandler() {
   const addFenceVertex = useDroneStore((s) => s.addFenceVertex);
   const addPatternBoundsVertex = useDroneStore((s) => s.addPatternBoundsVertex);
   const patternDrawMode = useDroneStore((s) => s.patternDrawMode);
-  const connectionStatus = useDroneStore((s) => s.connectionStatus);
+  const activeDroneId = useDroneStore((s) => s.activeDroneId);
   const addWaypointMode = useDroneStore((s) => s.addWaypointMode);
   const activeTab = useDroneStore((s) => s.activeTab);
   const planSubTab = useDroneStore((s) => s.planSubTab);
@@ -209,7 +222,7 @@ function MapClickHandler() {
         }
       }
       // Flying mode requires connection
-      else if (activeTab === 'flying' && connectionStatus === 'connected') {
+      else if (activeTab === 'flying' && activeDroneId) {
         setFlyClickTarget({ lat: e.latlng.lat, lon: e.latlng.lng });
       }
     },
@@ -675,7 +688,7 @@ function FenceVertexMarkers() {
 
 // Drone fence downloaded from vehicle (read-only display)
 function DroneFenceDisplay() {
-  const droneFence = useDroneStore((s) => s.droneFence);
+  const droneFence = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.droneFence ?? EMPTY_ARRAY : EMPTY_ARRAY);
 
   if (!droneFence || droneFence.length === 0) return null;
 
@@ -795,11 +808,11 @@ function PatternBoundsPolygon() {
 
 // Drone mission markers with "Start From Here" in fly mode
 function DroneMissionMarkers() {
-  const droneMission = useDroneStore((s) => s.droneMission);
+  const droneMission = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.droneMission ?? EMPTY_ARRAY : EMPTY_ARRAY);
   const activeTab = useDroneStore((s) => s.activeTab);
   const addAlert = useDroneStore((s) => s.addAlert);
-  const missionSeq = useDroneStore((s) => s.telemetry.mission_seq);
-  const autopilot = useDroneStore((s) => s.telemetry.autopilot);
+  const missionSeq = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry?.mission_seq : -1) ?? -1;
+  const autopilot = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry?.autopilot : 'unknown') || 'unknown';
   const coordFormat = useDroneStore((s) => s.coordFormat);
 
   const isFlying = activeTab === 'flying';
@@ -818,7 +831,7 @@ function DroneMissionMarkers() {
   const handleSetCurrent = useCallback(async (index) => {
     // Send 0-based index, backend will convert to correct seq based on autopilot type
     try {
-      const res = await fetch('/api/mission/set_current', {
+      const res = await fetch(droneApi('/api/mission/set_current'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ index }),
@@ -885,12 +898,11 @@ function DroneMissionMarkers() {
 // Servo group quick action buttons
 function ServoGroupButtons() {
   const servoGroups = useDroneStore((s) => s.servoGroups);
-  const connectionStatus = useDroneStore((s) => s.connectionStatus);
+  const activeDroneId = useDroneStore((s) => s.activeDroneId);
   const addAlert = useDroneStore((s) => s.addAlert);
-  const isConnected = connectionStatus === 'connected';
   const [groupStates, setGroupStates] = React.useState({});
 
-  if (!isConnected || servoGroups.length === 0) return null;
+  if (!activeDroneId || servoGroups.length === 0) return null;
 
   const toggleGroup = async (group) => {
     const currentState = groupStates[group.id] || 'closed';
@@ -898,7 +910,7 @@ function ServoGroupButtons() {
     const pwm = isOpen ? group.closePwm : group.openPwm;
 
     try {
-      await fetch('/api/servo/test', {
+      await fetch(droneApi('/api/servo/test'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ servo: group.servo, pwm }),
@@ -997,7 +1009,7 @@ function FlyClickTarget() {
   const clearFlyClickTarget = useDroneStore((s) => s.clearFlyClickTarget);
   const setHomePosition = useDroneStore((s) => s.setHomePosition);
   const startQuickMission = useDroneStore((s) => s.startQuickMission);
-  const alt = useDroneStore((s) => s.telemetry.alt);
+  const alt = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry?.alt : 0) || 0;
   const addAlert = useDroneStore((s) => s.addAlert);
   const addGcsLog = useDroneStore((s) => s.addGcsLog);
 
@@ -1005,7 +1017,7 @@ function FlyClickTarget() {
     const target = useDroneStore.getState().flyClickTarget;
     if (!target) return;
     try {
-      const res = await fetch('/api/goto', {
+      const res = await fetch(droneApi('/api/goto'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lat: target.lat, lon: target.lon, alt }),
@@ -1029,7 +1041,7 @@ function FlyClickTarget() {
     const target = useDroneStore.getState().flyClickTarget;
     if (!target) return;
     try {
-      const res = await fetch('/api/roi', {
+      const res = await fetch(droneApi('/api/roi'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lat: target.lat, lon: target.lon }),
@@ -1076,7 +1088,7 @@ function FlyClickTarget() {
     }
 
     try {
-      const res = await fetch('/api/home/set', {
+      const res = await fetch(droneApi('/api/home/set'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lat: target.lat, lon: target.lon, alt }),
@@ -1220,7 +1232,7 @@ function QuickMissionOverlay() {
   const quickMissionWaypoints = useDroneStore((s) => s.quickMissionWaypoints);
   const cancelQuickMission = useDroneStore((s) => s.cancelQuickMission);
   const removeLastQuickMissionWaypoint = useDroneStore((s) => s.removeLastQuickMissionWaypoint);
-  const alt = useDroneStore((s) => s.telemetry.alt);
+  const alt = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry?.alt : 0) || 0;
   const addAlert = useDroneStore((s) => s.addAlert);
   const addGcsLog = useDroneStore((s) => s.addGcsLog);
   const [sending, setSending] = useState(false);
@@ -1228,7 +1240,8 @@ function QuickMissionOverlay() {
   const handleSend = useCallback(async () => {
     const store = useDroneStore.getState();
     const wps = store.quickMissionWaypoints;
-    const currentAlt = store.telemetry.alt;
+    const activeDrone = store.activeDroneId ? store.drones[store.activeDroneId] : null;
+    const currentAlt = activeDrone?.telemetry?.alt || 0;
     if (wps.length === 0) return;
 
     setSending(true);
@@ -1250,7 +1263,7 @@ function QuickMissionOverlay() {
     });
 
     try {
-      const res = await fetch('/api/mission/upload', {
+      const res = await fetch(droneApi('/api/mission/upload'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ waypoints }),
@@ -1294,10 +1307,10 @@ function QuickMissionOverlay() {
 
         // Download mission from drone to sync display
         try {
-          const dlRes = await fetch('/api/mission/download');
+          const dlRes = await fetch(droneApi('/api/mission/download'));
           const dlData = await dlRes.json();
-          if (dlData.status === 'ok') {
-            useDroneStore.getState().setDroneMission(dlData.waypoints || []);
+          if (dlData.status === 'ok' && store.activeDroneId) {
+            useDroneStore.getState().setDroneMission(store.activeDroneId, dlData.waypoints || []);
           }
         } catch {}
 
@@ -1351,17 +1364,12 @@ function QuickMissionOverlay() {
 }
 
 export default function MapView() {
-  const lat = useDroneStore((s) => s.telemetry.lat);
-  const lon = useDroneStore((s) => s.telemetry.lon);
-  const alt = useDroneStore((s) => s.telemetry.alt);
-  const groundspeed = useDroneStore((s) => s.telemetry.groundspeed);
-  const yaw = useDroneStore((s) => s.telemetry.yaw);
-  const heading = useDroneStore((s) => s.telemetry.heading);
-  const trail = useDroneStore((s) => s.trail);
+  const drones = useDroneStore((s) => s.drones);
+  const activeDroneId = useDroneStore((s) => s.activeDroneId);
+  const setActiveDrone = useDroneStore((s) => s.setActiveDrone);
   const geofence = useDroneStore((s) => s.geofence);
   const followDrone = useDroneStore((s) => s.followDrone);
   const setFollowDrone = useDroneStore((s) => s.setFollowDrone);
-  const connectionStatus = useDroneStore((s) => s.connectionStatus);
   const activeTab = useDroneStore((s) => s.activeTab);
   const addWaypointMode = useDroneStore((s) => s.addWaypointMode);
   const toggleAddWaypointMode = useDroneStore((s) => s.toggleAddWaypointMode);
@@ -1378,16 +1386,16 @@ export default function MapView() {
   const [contextMenu, setContextMenu] = useState(null);
   const [manipMode, setManipMode] = useState(null);
 
-  const hasPosition = lat !== 0 && lon !== 0;
+  // Active drone telemetry
+  const activeDrone = activeDroneId ? drones[activeDroneId] : null;
+  const activeTelemetry = activeDrone?.telemetry || INITIAL_TELEMETRY;
+  const hasPosition = activeTelemetry.lat !== 0 && activeTelemetry.lon !== 0;
   const hasHome = homePosition && homePosition.lat !== 0 && homePosition.lon !== 0;
-  const yawDeg = heading || (yaw * 180) / Math.PI;
-
-  const droneIcon = useMemo(() => createDroneIcon(yawDeg), [yawDeg]);
 
   const isPlanning = activeTab === 'planning';
-  const isConnected = connectionStatus === 'connected';
+  const isConnected = !!activeDroneId;
 
-  const center = hasPosition ? [lat, lon] : [0, 0];
+  const center = hasPosition ? [activeTelemetry.lat, activeTelemetry.lon] : [0, 0];
   const zoom = hasPosition ? 17 : 3;
 
   // Handle context menu actions
@@ -1431,28 +1439,58 @@ export default function MapView() {
         <MapClickHandler />
         <AddModeCursor />
 
-        {/* Trail */}
-        {trail.length > 1 && (
-          <Polyline
-            positions={trail}
-            pathOptions={{ color: '#06b6d4', weight: 2, opacity: 0.6 }}
-          />
-        )}
+        {/* All drone trails + markers */}
+        {Object.entries(drones).map(([droneId, drone]) => {
+          const t = drone.telemetry || INITIAL_TELEMETRY;
+          const isActive = droneId === activeDroneId;
+          const dHasPos = t.lat !== 0 && t.lon !== 0;
+          const dYawDeg = t.heading || (t.yaw * 180) / Math.PI;
+          const trailColor = isActive ? '#06b6d4' : '#64748b';
+          const fillColor = isActive ? '#06b6d4' : '#64748b';
+          const strokeColor = isActive ? '#22d3ee' : '#94a3b8';
 
-        {/* Drone marker - zIndexOffset ensures it's on top of all other markers */}
-        {hasPosition && (
-          <Marker position={[lat, lon]} icon={droneIcon} zIndexOffset={1000}>
-            <Popup>
-              <div className="text-xs font-mono space-y-0.5">
-                <div className="font-semibold text-[11px] mb-1" style={{color:'#06b6d4'}}>Vehicle</div>
-                <div><span style={{color:'#94a3b8'}}>ALT</span> <span style={{color:'#e2e8f0'}}>{alt.toFixed(1)}m</span></div>
-                <div><span style={{color:'#94a3b8'}}>GS</span> <span style={{color:'#e2e8f0'}}>{groundspeed.toFixed(1)} m/s</span></div>
-                <div><span style={{color:'#94a3b8'}}>HDG</span> <span style={{color:'#e2e8f0'}}>{Math.round(yawDeg)}&deg;</span></div>
-                <div style={{borderTop:'1px solid rgba(100,116,139,0.3)',marginTop:'4px',paddingTop:'4px',fontSize:'9px',color:'#64748b'}}>{formatCoord(lat, lon, coordFormat, 6)}</div>
-              </div>
-            </Popup>
-          </Marker>
-        )}
+          return (
+            <React.Fragment key={droneId}>
+              {/* Trail */}
+              {drone.trail.length > 1 && (
+                <Polyline
+                  positions={drone.trail}
+                  pathOptions={{ color: trailColor, weight: 2, opacity: isActive ? 0.6 : 0.3 }}
+                />
+              )}
+
+              {/* Drone marker */}
+              {dHasPos && (
+                <>
+                  <Marker
+                    position={[t.lat, t.lon]}
+                    icon={createDroneIcon(dYawDeg, fillColor, strokeColor)}
+                    zIndexOffset={isActive ? 1000 : 500}
+                    eventHandlers={{
+                      click: () => { if (!isActive) setActiveDrone(droneId); },
+                    }}
+                  >
+                    <Popup>
+                      <div className="text-xs font-mono space-y-0.5">
+                        <div className="font-semibold text-[11px] mb-1" style={{color: fillColor}}>{drone.name}</div>
+                        <div><span style={{color:'#94a3b8'}}>ALT</span> <span style={{color:'#e2e8f0'}}>{t.alt.toFixed(1)}m</span></div>
+                        <div><span style={{color:'#94a3b8'}}>GS</span> <span style={{color:'#e2e8f0'}}>{t.groundspeed.toFixed(1)} m/s</span></div>
+                        <div><span style={{color:'#94a3b8'}}>HDG</span> <span style={{color:'#e2e8f0'}}>{Math.round(dYawDeg)}&deg;</span></div>
+                        <div style={{borderTop:'1px solid rgba(100,116,139,0.3)',marginTop:'4px',paddingTop:'4px',fontSize:'9px',color:'#64748b'}}>{formatCoord(t.lat, t.lon, coordFormat, 6)}</div>
+                      </div>
+                    </Popup>
+                  </Marker>
+                  {/* Name label */}
+                  <Marker
+                    position={[t.lat, t.lon]}
+                    icon={createDroneNameIcon(drone.name, isActive)}
+                    interactive={false}
+                  />
+                </>
+              )}
+            </React.Fragment>
+          );
+        })}
 
         {/* Home position marker */}
         {hasHome && (

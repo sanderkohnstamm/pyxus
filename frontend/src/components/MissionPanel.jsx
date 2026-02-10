@@ -41,7 +41,8 @@ import {
   Repeat,
   Grip,
 } from 'lucide-react';
-import useDroneStore from '../store/droneStore';
+import useDroneStore, { INITIAL_TELEMETRY } from '../store/droneStore';
+import { droneApi } from '../utils/api';
 import FenceSubPanel from './FenceSubPanel';
 import ElevationProfile from './ElevationProfile';
 import { haversineDistance } from '../utils/geo';
@@ -377,8 +378,8 @@ const NAV_TYPES = new Set(['waypoint', 'takeoff', 'loiter_unlim', 'loiter_turns'
 function MissionStats() {
   const plannedWaypoints = useDroneStore((s) => s.plannedWaypoints);
   const defaultSpeed = useDroneStore((s) => s.defaultSpeed);
-  const groundspeed = useDroneStore((s) => s.telemetry.groundspeed);
-  const connectionStatus = useDroneStore((s) => s.connectionStatus);
+  const telemetry = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry : INITIAL_TELEMETRY) || INITIAL_TELEMETRY;
+  const activeDroneId = useDroneStore((s) => s.activeDroneId);
 
   const navWaypoints = plannedWaypoints.filter((w) => NAV_TYPES.has(w.type));
   if (navWaypoints.length < 2) return null;
@@ -391,8 +392,8 @@ function MissionStats() {
     );
   }
 
-  const isConnected = connectionStatus === 'connected';
-  const speed = isConnected && groundspeed > 1 ? groundspeed : defaultSpeed;
+  const isConnected = !!activeDroneId;
+  const speed = isConnected && telemetry.groundspeed > 1 ? telemetry.groundspeed : defaultSpeed;
   const timeS = speed > 0 ? totalDist / speed : 0;
   const minutes = Math.floor(timeS / 60);
   const seconds = Math.round(timeS % 60);
@@ -419,7 +420,7 @@ function MissionStats() {
 }
 
 function MissionSubPanel() {
-  const connectionStatus = useDroneStore((s) => s.connectionStatus);
+  const activeDroneId = useDroneStore((s) => s.activeDroneId);
   const plannedWaypoints = useDroneStore((s) => s.plannedWaypoints);
   const missionStatus = useDroneStore((s) => s.missionStatus);
   const removeWaypoint = useDroneStore((s) => s.removeWaypoint);
@@ -451,7 +452,7 @@ function MissionSubPanel() {
   const [editingName, setEditingName] = React.useState(false);
   const [nameValue, setNameValue] = React.useState('');
 
-  const isConnected = connectionStatus === 'connected';
+  const isConnected = !!activeDroneId;
 
   // Get active mission name (needed by callbacks below)
   const activeMission = savedMissions.find(m => m.id === activeMissionId);
@@ -474,7 +475,7 @@ function MissionSubPanel() {
   const apiCall = useCallback(
     async (endpoint, body = {}) => {
       try {
-        const res = await fetch(`/api/mission/${endpoint}`, {
+        const res = await fetch(droneApi(`/api/mission/${endpoint}`), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
@@ -498,7 +499,7 @@ function MissionSubPanel() {
       return;
     }
     try {
-      const res = await fetch('/api/mission/upload', {
+      const res = await fetch(droneApi('/api/mission/upload'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -521,10 +522,11 @@ function MissionSubPanel() {
         addAlert('Mission upload ok', 'success');
         // Auto-download to sync drone mission display
         try {
-          const dlRes = await fetch('/api/mission/download');
+          const droneId = useDroneStore.getState().activeDroneId;
+          const dlRes = await fetch(droneApi('/api/mission/download'));
           const dlData = await dlRes.json();
-          if (dlData.status === 'ok' && dlData.waypoints) {
-            setDroneMission(dlData.waypoints);
+          if (dlData.status === 'ok' && dlData.waypoints && droneId) {
+            setDroneMission(droneId, dlData.waypoints);
           }
         } catch {}
       }
@@ -535,10 +537,11 @@ function MissionSubPanel() {
 
   const handleImport = useCallback(async () => {
     try {
-      const res = await fetch('/api/mission/download');
+      const droneId = useDroneStore.getState().activeDroneId;
+      const res = await fetch(droneApi('/api/mission/download'));
       const data = await res.json();
       if (data.status === 'ok' && data.waypoints && data.waypoints.length > 0) {
-        setDroneMission(data.waypoints);
+        if (droneId) setDroneMission(droneId, data.waypoints);
         const newMissionObj = importDroneAsMission();
         if (newMissionObj) {
           addAlert(`Imported ${data.waypoints.length} waypoints as "${newMissionObj.name}"`, 'success');

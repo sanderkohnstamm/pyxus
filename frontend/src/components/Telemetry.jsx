@@ -1,6 +1,6 @@
 import React from 'react';
 import { MapPin, Gauge, Battery, Satellite, Activity } from 'lucide-react';
-import useDroneStore from '../store/droneStore';
+import useDroneStore, { INITIAL_TELEMETRY } from '../store/droneStore';
 import { formatCoord } from '../utils/formatCoord';
 
 function TelemetryRow({ label, value, unit = '' }) {
@@ -39,11 +39,11 @@ const FIX_TYPES = {
 };
 
 export default function Telemetry() {
-  const t = useDroneStore((s) => s.telemetry);
-  const connectionStatus = useDroneStore((s) => s.connectionStatus);
+  const t = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry : INITIAL_TELEMETRY) || INITIAL_TELEMETRY;
+  const activeDroneId = useDroneStore((s) => s.activeDroneId);
   const coordFormat = useDroneStore((s) => s.coordFormat);
 
-  if (connectionStatus !== 'connected') {
+  if (!activeDroneId) {
     return (
       <div className="p-4">
         <div className="text-xs text-gray-600 italic text-center py-8">

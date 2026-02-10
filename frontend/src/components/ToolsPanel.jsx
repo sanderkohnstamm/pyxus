@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { SlidersHorizontal, Cog, Gamepad2, Compass, Keyboard, Zap, Plus, X, Trash2, ChevronDown, ChevronUp, Radio, Activity, ArrowDownToLine, Gauge, Loader2, Check, Video } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
+import { droneApi } from '../utils/api';
 import ParamsPanel from './ParamsPanel';
 import MavlinkInspector from './MavlinkInspector';
 import GamepadPanel from './GamepadPanel';
@@ -25,9 +26,9 @@ const COMMAND_OPTIONS = [
 
 // Merged Controls Panel with Hotkeys and Servo Groups
 function ControlsPanel({ sendMessage }) {
-  const connectionStatus = useDroneStore((s) => s.connectionStatus);
+  const activeDroneId = useDroneStore((s) => s.activeDroneId);
   const addAlert = useDroneStore((s) => s.addAlert);
-  const isConnected = connectionStatus === 'connected';
+  const isConnected = !!activeDroneId;
 
   // Hotkeys state
   const commandHotkeys = useDroneStore((s) => s.commandHotkeys);
@@ -203,12 +204,12 @@ function ControlsPanel({ sendMessage }) {
 
 // Combined Hardware Panel (Motors + Calibration)
 function HardwarePanel() {
-  const connectionStatus = useDroneStore((s) => s.connectionStatus);
+  const activeDroneId = useDroneStore((s) => s.activeDroneId);
   const addAlert = useDroneStore((s) => s.addAlert);
   const calibrationStatus = useDroneStore((s) => s.calibrationStatus);
   const setCalibrationActive = useDroneStore((s) => s.setCalibrationActive);
   const clearCalibrationStatus = useDroneStore((s) => s.clearCalibrationStatus);
-  const isConnected = connectionStatus === 'connected';
+  const isConnected = !!activeDroneId;
 
   const [motor, setMotor] = useState(1);
   const [throttle, setThrottle] = useState(5);
@@ -230,7 +231,7 @@ function HardwarePanel() {
   const testMotor = useCallback(async () => {
     try {
       setMotorRunning(true);
-      const res = await fetch('/api/motor/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ motor: allMotors ? 1 : motor, throttle, duration, all_motors: allMotors }) });
+      const res = await fetch(droneApi('/api/motor/test'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ motor: allMotors ? 1 : motor, throttle, duration, all_motors: allMotors }) });
       const data = await res.json();
       if (data.status === 'error') addAlert(data.error || 'Motor test failed', 'error');
       else addAlert(allMotors ? `All motors: ${throttle}%` : `Motor ${motor}: ${throttle}%`, 'info');
@@ -240,7 +241,7 @@ function HardwarePanel() {
 
   const testServo = useCallback(async () => {
     try {
-      const res = await fetch('/api/servo/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ servo, pwm }) });
+      const res = await fetch(droneApi('/api/servo/test'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ servo, pwm }) });
       const data = await res.json();
       if (data.status === 'error') addAlert(data.error || 'Servo test failed', 'error');
       else addAlert(`Servo ${servo} → ${pwm}`, 'info');
@@ -251,7 +252,7 @@ function HardwarePanel() {
     setLocalRunning(type);
     setCalibrationActive(true, type);
     try {
-      const res = await fetch('/api/calibrate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type }) });
+      const res = await fetch(droneApi('/api/calibrate'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type }) });
       const data = await res.json();
       if (data.status === 'error') { addAlert(data.error || 'Calibration failed', 'error'); setLocalRunning(null); clearCalibrationStatus(); }
       else { addAlert(`${type} calibration started`, 'info'); setTimeout(() => setLocalRunning((r) => { if (r === type) { clearCalibrationStatus(); return null; } return r; }), type === 'accel' ? 120000 : 30000); }
@@ -259,7 +260,7 @@ function HardwarePanel() {
   }, [addAlert, setCalibrationActive, clearCalibrationStatus]);
 
   const cancelCalibration = useCallback(async () => {
-    try { await fetch('/api/calibrate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'cancel' }) }); addAlert('Calibration cancelled', 'info'); } catch {}
+    try { await fetch(droneApi('/api/calibrate'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'cancel' }) }); addAlert('Calibration cancelled', 'info'); } catch {}
     setLocalRunning(null); clearCalibrationStatus();
   }, [addAlert, clearCalibrationStatus]);
 
@@ -325,7 +326,7 @@ function HardwarePanel() {
                   </div>
                   {isRunning ? (
                     <div className="flex gap-1.5">
-                      {cal.id === 'accel' && <button onClick={async () => { try { await fetch('/api/calibrate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'next_step' }) }); } catch {} }} className="px-2 py-1 rounded text-[9px] font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-300"><Check size={10} /></button>}
+                      {cal.id === 'accel' && <button onClick={async () => { try { await fetch(droneApi('/api/calibrate'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'next_step' }) }); } catch {} }} className="px-2 py-1 rounded text-[9px] font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-300"><Check size={10} /></button>}
                       <button onClick={cancelCalibration} className="px-2 py-1 rounded text-[9px] font-semibold bg-red-500/10 border border-red-500/20 text-red-300"><X size={10} /></button>
                     </div>
                   ) : (

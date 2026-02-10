@@ -10,12 +10,13 @@
   },
   "gamepad": {
     "buttonMappings": {
-      "0": "toggle_arm",
-      "1": "land",
-      "2": "mission_start",
-      "3": "takeoff",
+      "0": "arm",
+      "1": "disarm",
+      "2": "takeoff",
+      "3": "land",
       "4": "mode:ALT_HOLD",
-      "5": "rtl"
+      "5": "rtl",
+      "6": "mode:GUIDED"
     },
     "axisMappings": {
       "0": {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Radio, Trash2, ChevronDown, ChevronRight, RefreshCw, Cpu, Camera, Box, Target } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
+import { droneApi } from '../utils/api';
 
 // Component ID to name mapping (fallback)
 const COMPONENT_NAMES = {
@@ -155,8 +156,8 @@ function MessageRow({ msg, expanded, onToggle }) {
 }
 
 export default function MavlinkInspector() {
-  const connectionStatus = useDroneStore((s) => s.connectionStatus);
-  const isConnected = connectionStatus === 'connected';
+  const activeDroneId = useDroneStore((s) => s.activeDroneId);
+  const isConnected = !!activeDroneId;
 
   const [activeTab, setActiveTab] = useState('components');
   const [components, setComponents] = useState([]);
@@ -173,8 +174,8 @@ export default function MavlinkInspector() {
     try {
       // Fetch both components and messages
       const [compRes, msgRes] = await Promise.all([
-        fetch('/api/mavlink/components'),
-        fetch('/api/mavlink/stats'),
+        fetch(droneApi('/api/mavlink/components')),
+        fetch(droneApi('/api/mavlink/stats')),
       ]);
       const compData = await compRes.json();
       const msgData = await msgRes.json();
@@ -196,7 +197,7 @@ export default function MavlinkInspector() {
     if (!isConnected) return;
     setLoading(true);
     try {
-      await fetch('/api/mavlink/stats/clear', { method: 'POST' });
+      await fetch(droneApi('/api/mavlink/stats/clear'), { method: 'POST' });
       setMessages([]);
     } catch (err) {
       console.error('Failed to clear stats:', err);

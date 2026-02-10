@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import useDroneStore from '../store/droneStore';
 import { wsUrl } from '../utils/api';
 
@@ -20,11 +20,8 @@ function isCalibrationMessage(text) {
 export default function useWebSocket() {
   const wsRef = useRef(null);
   const reconnectTimer = useRef(null);
-  const [droneChangeDetected, setDroneChangeDetected] = useState(null);
-  const updateTelemetry = useDroneStore((s) => s.updateTelemetry);
-  const addMavMessages = useDroneStore((s) => s.addMavMessages);
   const setWsConnected = useDroneStore((s) => s.setWsConnected);
-  const connectionStatus = useDroneStore((s) => s.connectionStatus);
+  const addMavMessages = useDroneStore((s) => s.addMavMessages);
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -39,18 +36,30 @@ export default function useWebSocket() {
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'telemetry') {
-          // Extract statustext before passing to telemetry
+          const droneId = data.drone_id;
+          if (!droneId) return;
+
+          const store = useDroneStore.getState();
+
+          // Auto-register drone if we haven't seen it
+          if (!store.drones[droneId]) {
+            store.registerDrone(droneId, data.drone_name || droneId, '');
+          }
+
+          // Route statustext messages
           if (data.statustext && data.statustext.length > 0) {
-            addMavMessages(data.statustext);
+            // Only show statustext from the active drone in the global log
+            if (droneId === store.activeDroneId) {
+              addMavMessages(data.statustext);
+            }
 
             // Route calibration messages
-            const { calibrationStatus, addCalibrationMessage, setCalibrationStep } = useDroneStore.getState();
-            if (calibrationStatus.active) {
+            const { calibrationStatus, addCalibrationMessage, setCalibrationStep } = store;
+            if (calibrationStatus.active && droneId === store.activeDroneId) {
               data.statustext.forEach(msg => {
                 if (isCalibrationMessage(msg.text)) {
                   addCalibrationMessage(msg);
 
-                  // Detect accel calibration steps
                   if (calibrationStatus.type === 'accel') {
                     const text = msg.text.toLowerCase();
                     if (text.includes('level')) setCalibrationStep(0);
@@ -65,27 +74,8 @@ export default function useWebSocket() {
             }
           }
 
-          // Check for drone identity change
-          const { droneIdentity, checkDroneChange, setDroneIdentity } = useDroneStore.getState();
-          const newIdentity = {
-            sysid: data.system_id || null,
-            autopilot: data.autopilot,
-            platformType: data.platform_type,
-          };
-
-          if (checkDroneChange(newIdentity)) {
-            setDroneChangeDetected({
-              old: droneIdentity,
-              new: newIdentity,
-            });
-          }
-
-          // Update identity if not set
-          if (droneIdentity.sysid === null && newIdentity.autopilot && newIdentity.autopilot !== 'unknown') {
-            setDroneIdentity(newIdentity);
-          }
-
-          updateTelemetry(data);
+          // Update per-drone telemetry
+          store.updateDroneTelemetry(droneId, data);
         }
       } catch {
         // ignore parse errors
@@ -95,7 +85,6 @@ export default function useWebSocket() {
     ws.onclose = () => {
       setWsConnected(false);
       wsRef.current = null;
-      // Auto-reconnect
       reconnectTimer.current = setTimeout(connect, WS_RECONNECT_DELAY);
     };
 
@@ -104,7 +93,7 @@ export default function useWebSocket() {
     };
 
     wsRef.current = ws;
-  }, [updateTelemetry, addMavMessages, setWsConnected]);
+  }, [setWsConnected, addMavMessages]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimer.current) {
@@ -119,6 +108,13 @@ export default function useWebSocket() {
 
   const sendMessage = useCallback((data) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
+      // Inject drone_id for RC override messages
+      if (data.type === 'rc_override') {
+        const { activeDroneId } = useDroneStore.getState();
+        if (activeDroneId) {
+          data.drone_id = activeDroneId;
+        }
+      }
       wsRef.current.send(JSON.stringify(data));
     }
   }, []);
@@ -128,20 +124,5 @@ export default function useWebSocket() {
     return () => disconnect();
   }, [connect, disconnect]);
 
-  const dismissDroneChange = useCallback(() => {
-    setDroneChangeDetected(null);
-  }, []);
-
-  const acceptDroneChange = useCallback(() => {
-    const { setDroneIdentity, resetState, setConnectionStatus } = useDroneStore.getState();
-    if (droneChangeDetected) {
-      // Reset state and accept the new drone
-      resetState();
-      setDroneIdentity(droneChangeDetected.new);
-      setConnectionStatus('connected');
-    }
-    setDroneChangeDetected(null);
-  }, [droneChangeDetected]);
-
-  return { sendMessage, wsRef, droneChangeDetected, dismissDroneChange, acceptDroneChange };
+  return { sendMessage, wsRef };
 }

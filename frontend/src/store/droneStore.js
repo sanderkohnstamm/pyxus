@@ -4,7 +4,11 @@ import { transformMission } from '../utils/geo';
 const MAX_TRAIL_POINTS = 500;
 const MAX_BATTERY_SAMPLES = 300; // ~5 min at 1 sample/sec
 
-const INITIAL_TELEMETRY = {
+// Stable empty references for Zustand selectors (avoid new [] / {} each render)
+export const EMPTY_ARRAY = [];
+export const EMPTY_OBJECT = {};
+
+export const INITIAL_TELEMETRY = {
   roll: 0, pitch: 0, yaw: 0,
   rollspeed: 0, pitchspeed: 0, yawspeed: 0,
   lat: 0, lon: 0, alt: 0, alt_msl: 0,
@@ -16,29 +20,38 @@ const INITIAL_TELEMETRY = {
   mission_seq: -1,
 };
 
+const INITIAL_DRONE_STATE = {
+  name: '',
+  connectionString: '',
+  telemetry: { ...INITIAL_TELEMETRY },
+  trail: [],
+  missionStatus: 'idle',
+  droneMission: [],
+  droneFence: [],
+  batteryHistory: [],
+  _lastBatterySampleTs: 0,
+  cameras: [],
+  gimbals: [],
+  params: {},
+  paramsTotal: 0,
+};
+
 const useDroneStore = create((set, get) => ({
-  // Connection
-  connectionStatus: 'disconnected', // disconnected | connecting | connected
-  connectionString: 'udpin:0.0.0.0:14550',
-  connectionType: 'udp',
+  // --- Multi-drone state ---
+  drones: {},          // { [droneId]: INITIAL_DRONE_STATE }
+  activeDroneId: null, // selected drone for sidebar/commands
 
   // Tabs
   activeTab: 'planning', // planning | flying
 
   // Theme
   theme: localStorage.getItem('pyxus-theme') || 'dark', // dark | light
-  colorScheme: localStorage.getItem('pyxus-color-scheme') || 'cyan', // cyan | emerald | violet | rose | amber | sky
+  colorScheme: localStorage.getItem('pyxus-color-scheme') || 'cyan',
 
   // Coordinate format
-  coordFormat: localStorage.getItem('pyxus-coord-format') || 'latlon', // latlon | mgrs
+  coordFormat: localStorage.getItem('pyxus-coord-format') || 'latlon',
 
-  // Telemetry
-  telemetry: { ...INITIAL_TELEMETRY },
-
-  // Trail
-  trail: [],
-
-  // Planned mission (user-editable)
+  // Planned mission (user-editable, global — not per-drone)
   plannedWaypoints: [],
   missionStatus: 'idle',
   defaultAlt: 50,
@@ -49,12 +62,6 @@ const useDroneStore = create((set, get) => ({
   savedMissions: JSON.parse(localStorage.getItem('pyxus-saved-missions') || '[]'),
   activeMissionId: null,
 
-  // Drone mission (downloaded from vehicle, read-only)
-  droneMission: [],
-
-  // Drone fence (downloaded from vehicle)
-  droneFence: [],
-
   // Add waypoint mode
   addWaypointMode: false,
 
@@ -62,7 +69,7 @@ const useDroneStore = create((set, get) => ({
   selectedWaypointId: null,
 
   // Plan subtab
-  planSubTab: 'mission', // 'mission' | 'fence'
+  planSubTab: 'mission',
 
   // Planned fence (polygon vertices)
   plannedFence: [],
@@ -74,13 +81,10 @@ const useDroneStore = create((set, get) => ({
   videoUrl: '',
   videoActive: false,
 
-  // Parameters
-  params: {},       // name -> {value, type, index}
-  paramsTotal: 0,
-  paramsLoading: false,
-  paramMeta: {},    // name -> {description, range, values, units, etc.}
+  // Parameters metadata (global, cached per autopilot type)
+  paramMeta: {},
   paramMetaLoading: false,
-  paramMetaPlatform: null, // platform we fetched metadata for
+  paramMetaPlatform: null,
 
   // Keyboard control
   keyboardEnabled: false,
@@ -91,10 +95,10 @@ const useDroneStore = create((set, get) => ({
 
   // Manual control state (shared between keyboard/gamepad)
   manualControl: {
-    active: false,        // true when any manual input is being sent
-    source: null,         // 'keyboard' | 'gamepad' | null
-    lastRc: [1500, 1500, 1500, 1500], // [roll, pitch, throttle, yaw]
-    lastUpdate: 0,        // timestamp of last RC send
+    active: false,
+    source: null,
+    lastRc: [1500, 1500, 1500, 1500],
+    lastUpdate: 0,
   },
 
   // Sidebar
@@ -114,21 +118,18 @@ const useDroneStore = create((set, get) => ({
   videoOverlayVisible: false,
 
   // Fly click target
-  flyClickTarget: null, // {lat, lon}
+  flyClickTarget: null,
 
-  // Quick mission mode (fly mode fast waypoint selection)
+  // Quick mission mode
   quickMissionMode: false,
-  quickMissionWaypoints: [], // [{lat, lon, id}]
-
-  // Drone identity (for change detection)
-  droneIdentity: { sysid: null, autopilot: null, platformType: null },
+  quickMissionWaypoints: [],
 
   // Calibration
   calibrationStatus: {
     active: false,
     type: null,
-    step: 0,        // For accel: 0-5 (6 positions)
-    messages: [],   // Recent calibration messages
+    step: 0,
+    messages: [],
   },
 
   // Manual control overlay
@@ -139,62 +140,155 @@ const useDroneStore = create((set, get) => ({
 
   // Pattern generation
   patternConfig: {
-    type: null,        // 'lawnmower' | 'spiral' | 'orbit' | 'perimeter'
-    visible: false,    // Show pattern config modal
-    preview: [],       // Preview waypoints before committing
+    type: null,
+    visible: false,
+    preview: [],
   },
-  patternBounds: [],     // Custom polygon vertices for pattern area [{lat, lon, id}, ...]
-  patternDrawMode: false, // Whether we're drawing pattern bounds
+  patternBounds: [],
+  patternDrawMode: false,
 
   // Mission manipulation
-  missionManipMode: null, // null | 'translate' | 'rotate' | 'scale'
-  manipStartPos: null,    // {lat, lon} - mouse start position
-  contextMenuPos: null,   // {lat, lon, x, y} - context menu position
-
-  // Cameras and gimbals detected via MAVLink
-  cameras: [],   // [{id, vendor, model, capabilities, ...}]
-  gimbals: [],   // [{id, vendor, model, capabilities, ...}]
-  activeCamera: null,
+  missionManipMode: null,
+  manipStartPos: null,
+  contextMenuPos: null,
 
   // Hotkeys for flight commands
   commandHotkeys: JSON.parse(localStorage.getItem('pyxus-command-hotkeys') || '{}'),
 
-  // Servo groups (for quick actuation buttons)
-  // Each group: { id, name, servos: [{servo, openPwm, closePwm}], openHotkey, closeHotkey, state }
+  // Servo groups
   servoGroups: JSON.parse(localStorage.getItem('pyxus-servo-groups') || '[]'),
-
-  // Battery history for strip chart
-  batteryHistory: [], // [{ts, voltage, current}]
-  _lastBatterySampleTs: 0,
 
   // Battery warnings
   batteryWarnings: { low: false, critical: false },
 
   // Measure tool
   measureMode: false,
-  measurePoints: [], // [{lat, lon}] max 2
+  measurePoints: [],
 
   // Home position
-  homePosition: null, // {lat, lon, alt}
+  homePosition: null,
 
   // WebSocket
   wsConnected: false,
 
   // Weather
   weather: {
-    routeAnalysis: null,           // RouteWeather data from backend
-    pointWeather: null,             // Single point weather
-    platforms: {},                  // Available platform profiles
+    routeAnalysis: null,
+    pointWeather: null,
+    platforms: {},
     currentPlatform: 'multirotor_medium',
     loading: false,
     lastUpdate: null,
-    autoRefresh: true,              // Auto-fetch when waypoints change
-    showWindVectors: true,          // Map visualization toggle
-    showRiskOverlay: true,          // Map risk circles toggle
-    forecastTime: null,             // ISO string for future missions
+    autoRefresh: true,
+    showWindVectors: true,
+    showRiskOverlay: true,
+    forecastTime: null,
   },
 
-  // Actions
+  // === Multi-drone actions ===
+
+  registerDrone: (droneId, name, connectionString) => {
+    const { drones, activeDroneId } = get();
+    const newDrones = {
+      ...drones,
+      [droneId]: { ...INITIAL_DRONE_STATE, name, connectionString },
+    };
+    // Auto-select if first drone
+    const newActive = activeDroneId || droneId;
+    set({ drones: newDrones, activeDroneId: newActive });
+  },
+
+  removeDrone: (droneId) => {
+    const { drones, activeDroneId } = get();
+    const { [droneId]: _, ...rest } = drones;
+    let newActive = activeDroneId;
+    if (activeDroneId === droneId) {
+      const ids = Object.keys(rest);
+      newActive = ids.length > 0 ? ids[0] : null;
+    }
+    set({ drones: rest, activeDroneId: newActive });
+  },
+
+  setActiveDrone: (droneId) => set({ activeDroneId: droneId }),
+
+  updateDroneTelemetry: (droneId, data) => {
+    const { drones } = get();
+    const droneState = drones[droneId];
+    if (!droneState) return;
+
+    const newTrail = [...droneState.trail];
+    if (data.lat !== 0 && data.lon !== 0) {
+      const lastPoint = newTrail[newTrail.length - 1];
+      if (!lastPoint || lastPoint[0] !== data.lat || lastPoint[1] !== data.lon) {
+        newTrail.push([data.lat, data.lon]);
+        if (newTrail.length > MAX_TRAIL_POINTS) {
+          newTrail.shift();
+        }
+      }
+    }
+
+    // Battery history sampling
+    const now = Date.now();
+    let newBatteryHistory = droneState.batteryHistory;
+    let newLastTs = droneState._lastBatterySampleTs;
+    if (data.voltage > 0 && now - droneState._lastBatterySampleTs >= 1000) {
+      newBatteryHistory = [...droneState.batteryHistory, { ts: now, voltage: data.voltage, current: data.current }];
+      if (newBatteryHistory.length > MAX_BATTERY_SAMPLES) newBatteryHistory.shift();
+      newLastTs = now;
+    }
+
+    set({
+      drones: {
+        ...drones,
+        [droneId]: {
+          ...droneState,
+          telemetry: { ...droneState.telemetry, ...data },
+          trail: newTrail,
+          missionStatus: data.mission_status || 'idle',
+          batteryHistory: newBatteryHistory,
+          _lastBatterySampleTs: newLastTs,
+        },
+      },
+    });
+  },
+
+  setDroneMission: (droneId, waypoints) => {
+    const { drones } = get();
+    const droneState = drones[droneId];
+    if (!droneState) return;
+    set({
+      drones: { ...drones, [droneId]: { ...droneState, droneMission: waypoints } },
+    });
+  },
+
+  setDroneFence: (droneId, items) => {
+    const { drones } = get();
+    const droneState = drones[droneId];
+    if (!droneState) return;
+    set({
+      drones: { ...drones, [droneId]: { ...droneState, droneFence: items } },
+    });
+  },
+
+  setDroneCameras: (droneId, cameras, gimbals) => {
+    const { drones } = get();
+    const droneState = drones[droneId];
+    if (!droneState) return;
+    set({
+      drones: { ...drones, [droneId]: { ...droneState, cameras: cameras || [], gimbals: gimbals || [] } },
+    });
+  },
+
+  setDroneParams: (droneId, params, total) => {
+    const { drones } = get();
+    const droneState = drones[droneId];
+    if (!droneState) return;
+    set({
+      drones: { ...drones, [droneId]: { ...droneState, params, paramsTotal: total } },
+    });
+  },
+
+  // === Actions ===
   setActiveTab: (tab) => set({ activeTab: tab, addWaypointMode: false }),
 
   setTheme: (theme) => {
@@ -214,50 +308,6 @@ const useDroneStore = create((set, get) => ({
     const next = get().coordFormat === 'latlon' ? 'mgrs' : 'latlon';
     localStorage.setItem('pyxus-coord-format', next);
     set({ coordFormat: next });
-  },
-
-  setConnectionStatus: (status) => set({ connectionStatus: status }),
-  setConnectionString: (str) => set({ connectionString: str }),
-  setConnectionType: (type) => {
-    const presets = {
-      udp: 'udpin:0.0.0.0:14550',
-      tcp: 'tcp:127.0.0.1:5760',
-      serial: '/dev/ttyUSB0',
-    };
-    set({ connectionType: type, connectionString: presets[type] || '' });
-  },
-
-  updateTelemetry: (data) => {
-    const { trail } = get();
-    const newTrail = [...trail];
-
-    // Add to trail if we have valid coordinates
-    if (data.lat !== 0 && data.lon !== 0) {
-      const lastPoint = newTrail[newTrail.length - 1];
-      if (!lastPoint || lastPoint[0] !== data.lat || lastPoint[1] !== data.lon) {
-        newTrail.push([data.lat, data.lon]);
-        if (newTrail.length > MAX_TRAIL_POINTS) {
-          newTrail.shift();
-        }
-      }
-    }
-
-    // Sample battery history (throttled to 1/sec)
-    const now = Date.now();
-    const { batteryHistory, _lastBatterySampleTs } = get();
-    let newBatteryHistory = batteryHistory;
-    if (data.voltage > 0 && now - _lastBatterySampleTs >= 1000) {
-      newBatteryHistory = [...batteryHistory, { ts: now, voltage: data.voltage, current: data.current }];
-      if (newBatteryHistory.length > MAX_BATTERY_SAMPLES) newBatteryHistory.shift();
-    }
-
-    set({
-      telemetry: { ...data },
-      trail: newTrail,
-      missionStatus: data.mission_status || 'idle',
-      batteryHistory: newBatteryHistory,
-      _lastBatterySampleTs: newBatteryHistory !== batteryHistory ? now : _lastBatterySampleTs,
-    });
   },
 
   setWsConnected: (connected) => set({ wsConnected: connected }),
@@ -310,8 +360,8 @@ const useDroneStore = create((set, get) => ({
           lat: 0, lon: 0, alt: 0,
           id: Date.now(),
           type: 'do_jump',
-          param1: targetIndex, // 1-based target item
-          param2: repeat,      // -1 = infinite
+          param1: targetIndex,
+          param2: repeat,
           param3: 0,
           param4: 0,
         },
@@ -344,13 +394,12 @@ const useDroneStore = create((set, get) => ({
   // Selected waypoint
   setSelectedWaypointId: (id) => set({ selectedWaypointId: id }),
 
-  // Drone mission (downloaded)
-  setDroneMission: (waypoints) => set({ droneMission: waypoints }),
-  clearDroneMission: () => set({ droneMission: [] }),
-
+  // Drone mission helpers (use active drone)
   importDroneMission: () => {
-    const { droneMission } = get();
-    const imported = droneMission.map((wp) => ({
+    const { drones, activeDroneId } = get();
+    const droneState = activeDroneId && drones[activeDroneId];
+    if (!droneState) return;
+    const imported = droneState.droneMission.map((wp) => ({
       lat: wp.lat,
       lon: wp.lon,
       alt: wp.alt,
@@ -370,7 +419,6 @@ const useDroneStore = create((set, get) => ({
     const now = Date.now();
 
     if (activeMissionId) {
-      // Update existing mission
       const updated = savedMissions.map(m => m.id === activeMissionId ? {
         ...m,
         name: name || m.name,
@@ -381,7 +429,6 @@ const useDroneStore = create((set, get) => ({
       localStorage.setItem('pyxus-saved-missions', JSON.stringify(updated));
       set({ savedMissions: updated });
     } else {
-      // Create new mission
       const newMission = {
         id: now,
         name: name || `Mission ${savedMissions.length + 1}`,
@@ -450,11 +497,12 @@ const useDroneStore = create((set, get) => ({
   },
 
   importDroneAsMission: (name) => {
-    const { droneMission, savedMissions } = get();
-    if (!droneMission.length) return null;
+    const { drones, activeDroneId, savedMissions } = get();
+    const droneState = activeDroneId && drones[activeDroneId];
+    if (!droneState || !droneState.droneMission.length) return null;
 
     const now = Date.now();
-    const waypoints = droneMission.map((wp) => ({
+    const waypoints = droneState.droneMission.map((wp) => ({
       lat: wp.lat,
       lon: wp.lon,
       alt: wp.alt,
@@ -506,9 +554,6 @@ const useDroneStore = create((set, get) => ({
   },
   clearPlannedFence: () => set({ plannedFence: [] }),
 
-  // Drone fence (downloaded)
-  setDroneFence: (items) => set({ droneFence: items }),
-
   // Geofence (circular)
   setGeofence: (updates) => {
     const { geofence } = get();
@@ -556,24 +601,18 @@ const useDroneStore = create((set, get) => ({
   setVideoUrl: (url) => set({ videoUrl: url }),
   setVideoActive: (active) => set({ videoActive: active }),
 
-  // Parameters
-  setParams: (params, total) => set({ params, paramsTotal: total }),
-  setParamsLoading: (loading) => set({ paramsLoading: loading }),
+  // Parameters metadata
   setParamMeta: (meta, platform) => set({ paramMeta: meta, paramMetaPlatform: platform }),
   fetchParamMeta: async (platformType, autopilot) => {
     const { paramMetaPlatform } = get();
-    // Create a cache key combining autopilot and platform
     const cacheKey = `${autopilot}:${platformType}`;
-    // Don't refetch if already loaded for this autopilot/platform
     if (paramMetaPlatform === cacheKey) return;
 
     let vehicle;
 
     if (autopilot === 'px4') {
-      // PX4 uses a single metadata file for all vehicle types
       vehicle = 'px4';
     } else if (autopilot === 'ardupilot') {
-      // Map platform type to ArduPilot vehicle type
       const vehicleMap = {
         'Quadrotor': 'ArduCopter',
         'Hexarotor': 'ArduCopter',
@@ -589,13 +628,10 @@ const useDroneStore = create((set, get) => ({
       };
       vehicle = vehicleMap[platformType] || 'ArduCopter';
     } else {
-      // Unknown autopilot, skip metadata fetch
       return;
     }
 
-    // Use backend proxy to avoid CORS issues
     const url = `/api/params/metadata/${vehicle}`;
-
     set({ paramMetaLoading: true });
 
     try {
@@ -607,8 +643,6 @@ const useDroneStore = create((set, get) => ({
         throw new Error(data.error || 'No metadata');
       }
 
-      // Parse the ArduPilot pdef format
-      // It's a dict of param names -> {Description, Range, Values, Units, ...}
       const meta = {};
       for (const [name, info] of Object.entries(data.metadata)) {
         if (typeof info === 'object' && info.Description) {
@@ -669,7 +703,7 @@ const useDroneStore = create((set, get) => ({
   toggleMavLog: () => set((s) => ({ mavLogVisible: !s.mavLogVisible })),
   clearMavMessages: () => set({ mavMessages: [] }),
 
-  // GCS action log (merged into mavMessages)
+  // GCS action log
   addGcsLog: (text, level = 'info') => {
     const severityMap = { info: 6, warn: 4, error: 3, success: 5 };
     const { mavMessages } = get();
@@ -717,27 +751,13 @@ const useDroneStore = create((set, get) => ({
       quickMissionWaypoints: [...quickMissionWaypoints, {
         id: Date.now(),
         type: 'do_jump',
-        jumpTarget: targetIndex, // 1-based
+        jumpTarget: targetIndex,
         repeat,
       }],
     });
   },
   cancelQuickMission: () => {
     set({ quickMissionMode: false, quickMissionWaypoints: [] });
-  },
-
-  // Drone identity
-  setDroneIdentity: (identity) => set({ droneIdentity: identity }),
-  checkDroneChange: (newIdentity) => {
-    const { droneIdentity } = get();
-    // If we had a previous identity and it changed
-    if (droneIdentity.sysid !== null &&
-        (droneIdentity.sysid !== newIdentity.sysid ||
-         droneIdentity.autopilot !== newIdentity.autopilot ||
-         droneIdentity.platformType !== newIdentity.platformType)) {
-      return true; // Drone changed
-    }
-    return false;
   },
 
   // Calibration
@@ -763,11 +783,6 @@ const useDroneStore = create((set, get) => ({
   // Zoom on connect
   triggerZoomToDrone: () => set({ zoomToDrone: true }),
   clearZoomToDrone: () => set({ zoomToDrone: false }),
-
-  // Cameras and gimbals
-  setCameras: (cameras) => set({ cameras }),
-  setGimbals: (gimbals) => set({ gimbals }),
-  setActiveCamera: (id) => set({ activeCamera: id }),
 
   // Command hotkeys
   setCommandHotkey: (key, command) => {
@@ -919,27 +934,6 @@ const useDroneStore = create((set, get) => ({
       set({ alerts: current.filter((a) => a.id !== id) });
     }, 5000);
   },
-
-  // Reset on disconnect
-  resetState: () =>
-    set({
-      connectionStatus: 'disconnected',
-      telemetry: { ...INITIAL_TELEMETRY },
-      trail: [],
-      missionStatus: 'idle',
-      wsConnected: false,
-      droneMission: [],
-      droneFence: [],
-      addWaypointMode: false,
-      mavMessages: [],
-      droneIdentity: { sysid: null, autopilot: null, platformType: null },
-      calibrationStatus: { active: false, type: null, step: 0, messages: [] },
-      batteryHistory: [],
-      _lastBatterySampleTs: 0,
-      batteryWarnings: { low: false, critical: false },
-      quickMissionMode: false,
-      quickMissionWaypoints: [],
-    }),
 }));
 
 export default useDroneStore;

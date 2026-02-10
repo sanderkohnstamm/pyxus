@@ -12,7 +12,7 @@ const isDev = process.argv.includes('--dev');
 function waitForBackend(retries = 30) {
   return new Promise((resolve, reject) => {
     const check = (attempt) => {
-      http.get(`http://localhost:${BACKEND_PORT}/api/status`, (res) => {
+      http.get(`http://127.0.0.1:${BACKEND_PORT}/api/drones`, (res) => {
         resolve();
       }).on('error', () => {
         if (attempt >= retries) {

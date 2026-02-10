@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Gamepad2, Keyboard, Radio, ChevronDown, ChevronUp } from 'lucide-react';
-import useDroneStore from '../store/droneStore';
+import useDroneStore, { INITIAL_TELEMETRY } from '../store/droneStore';
 
 const RC_CENTER = 1500;
 const RC_MIN = 1000;
@@ -80,13 +80,11 @@ export default function ManualControlOverlay() {
   const keyboardEnabled = useDroneStore((s) => s.keyboardEnabled);
   const gamepadEnabled = useDroneStore((s) => s.gamepadEnabled);
   const manualControl = useDroneStore((s) => s.manualControl);
-  const telemetry = useDroneStore((s) => s.telemetry);
+  const telemetry = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry : null) || INITIAL_TELEMETRY;
   const keysPressed = useDroneStore((s) => s.keysPressed);
-  const connectionStatus = useDroneStore((s) => s.connectionStatus);
+  const isConnected = !!useDroneStore((s) => s.activeDroneId);
   const collapsed = useDroneStore((s) => s.manualOverlayCollapsed);
   const toggleCollapsed = useDroneStore((s) => s.toggleManualOverlay);
-
-  const isConnected = connectionStatus === 'connected';
   const isManualMode = MANUAL_MODES.includes(telemetry.mode);
   const isActive = keyboardEnabled || gamepadEnabled;
   const isSending = manualControl.active && (Date.now() - manualControl.lastUpdate < 200);

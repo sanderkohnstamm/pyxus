@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Gamepad2, Radio } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
+import { droneApi } from '../utils/api';
 
 const BUTTON_NAMES = [
   'A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT',
@@ -98,11 +99,11 @@ function saveConfig(config) {
 }
 
 export default function GamepadPanel() {
-  const connectionStatus = useDroneStore((s) => s.connectionStatus);
+  const activeDroneId = useDroneStore((s) => s.activeDroneId);
   const gamepadEnabled = useDroneStore((s) => s.gamepadEnabled);
   const setGamepadEnabled = useDroneStore((s) => s.setGamepadEnabled);
   const addAlert = useDroneStore((s) => s.addAlert);
-  const isConnected = connectionStatus === 'connected';
+  const isConnected = !!activeDroneId;
 
   const [gamepads, setGamepads] = useState([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -174,7 +175,7 @@ export default function GamepadPanel() {
     if (action.startsWith('mode:')) {
       const mode = action.slice(5);
       try {
-        await fetch('/api/mode', {
+        await fetch(droneApi('/api/mode'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mode }),
@@ -194,10 +195,12 @@ export default function GamepadPanel() {
     };
 
     if (action === 'toggle_arm') {
-      const armed = useDroneStore.getState().telemetry.armed;
+      const state = useDroneStore.getState();
+      const droneId = state.activeDroneId;
+      const armed = droneId ? state.drones[droneId]?.telemetry?.armed : false;
       const ep = armed ? 'disarm' : 'arm';
       try {
-        await fetch(`/api/${ep}`, {
+        await fetch(droneApi(`/api/${ep}`), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(action === 'takeoff' ? { alt: 10 } : {}),
@@ -209,7 +212,7 @@ export default function GamepadPanel() {
     const ep = endpoints[action];
     if (ep) {
       try {
-        await fetch(`/api/${ep}`, {
+        await fetch(droneApi(`/api/${ep}`), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(action === 'takeoff' ? { alt: 10 } : {}),

@@ -6,7 +6,8 @@ import {
   Download,
   Radio,
 } from 'lucide-react';
-import useDroneStore from '../store/droneStore';
+import useDroneStore, { INITIAL_TELEMETRY, EMPTY_ARRAY } from '../store/droneStore';
+import { droneApi } from '../utils/api';
 import { formatCoord } from '../utils/formatCoord';
 
 const RC_CENTER = 1500;
@@ -32,13 +33,13 @@ const TYPE_LABELS = {
 };
 
 export default function Controls({ sendMessage }) {
-  const connectionStatus = useDroneStore((s) => s.connectionStatus);
-  const telemetry = useDroneStore((s) => s.telemetry);
+  const activeDroneId = useDroneStore((s) => s.activeDroneId);
+  const telemetry = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry : INITIAL_TELEMETRY) || INITIAL_TELEMETRY;
   const keyboardEnabled = useDroneStore((s) => s.keyboardEnabled);
   const setKeyboardEnabled = useDroneStore((s) => s.setKeyboardEnabled);
   const setKeyPressed = useDroneStore((s) => s.setKeyPressed);
   const addAlert = useDroneStore((s) => s.addAlert);
-  const droneMission = useDroneStore((s) => s.droneMission);
+  const droneMission = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.droneMission ?? EMPTY_ARRAY : EMPTY_ARRAY);
   const setDroneMission = useDroneStore((s) => s.setDroneMission);
   const coordFormat = useDroneStore((s) => s.coordFormat);
   const missionSeq = telemetry.mission_seq;
@@ -54,12 +55,12 @@ export default function Controls({ sendMessage }) {
   const gamepadEnabled = useDroneStore((s) => s.gamepadEnabled);
 
   const rcIntervalRef = useRef(null);
-  const isConnected = connectionStatus === 'connected';
+  const isConnected = !!activeDroneId;
 
   const apiCall = useCallback(
     async (endpoint, body = {}) => {
       try {
-        const res = await fetch(`/api/${endpoint}`, {
+        const res = await fetch(droneApi(`/api/${endpoint}`), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
@@ -77,10 +78,11 @@ export default function Controls({ sendMessage }) {
 
   const handleDownload = useCallback(async () => {
     try {
-      const res = await fetch('/api/mission/download');
+      const res = await fetch(droneApi('/api/mission/download'));
       const data = await res.json();
       if (data.status === 'ok' && data.waypoints) {
-        setDroneMission(data.waypoints);
+        const droneId = useDroneStore.getState().activeDroneId;
+        if (droneId) setDroneMission(droneId, data.waypoints);
         addAlert(`Downloaded ${data.waypoints.length} mission items`, 'success');
       } else {
         addAlert('No mission on drone', 'info');
