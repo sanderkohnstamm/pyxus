@@ -75,10 +75,10 @@ function createDroneIcon(yawDeg, fill = '#06b6d4', stroke = '#22d3ee') {
 function createDroneNameIcon(name, isActive) {
   const bg = isActive ? 'rgba(6,182,212,0.85)' : 'rgba(100,116,139,0.75)';
   return L.divIcon({
-    html: `<div style="white-space:nowrap;background:${bg};color:white;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600;font-family:monospace;text-align:center">${name}</div>`,
-    className: '',
-    iconSize: [0, 0],
-    iconAnchor: [0, -22],
+    html: `<div style="white-space:nowrap;background:${bg};color:white;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:600;font-family:monospace;text-align:center;pointer-events:none">${name}</div>`,
+    className: 'drone-name-label',
+    iconSize: null,
+    iconAnchor: [-12, -10],
   });
 }
 

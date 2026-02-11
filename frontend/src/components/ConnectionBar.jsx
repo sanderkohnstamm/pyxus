@@ -173,7 +173,7 @@ export default function ConnectionBar() {
   const hasDrones = Object.keys(drones).length > 0;
 
   return (
-    <div className="flex items-center gap-2.5 px-3 py-1.5 bg-gray-950/70 border-b border-gray-800/20 backdrop-blur-xl shrink-0">
+    <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-950/70 border-b border-gray-800/20 backdrop-blur-xl shrink-0">
       {/* Logo */}
       <span className="text-[13px] font-bold text-cyan-400/90 tracking-[0.15em] mr-0.5">PYXUS</span>
 
@@ -238,7 +238,7 @@ export default function ConnectionBar() {
           <div className="flex items-center gap-1">
             {Object.entries(drones).map(([id, drone]) => {
               const isActive = id === activeDroneId;
-              const droneConnected = drone.telemetry.heartbeat_age >= 0 && drone.telemetry.heartbeat_age <= 5;
+              const droneConnected = drone.telemetry?.heartbeat_age >= 0 && drone.telemetry?.heartbeat_age <= 5;
               return (
                 <div key={id} className="flex items-center">
                   <button
@@ -251,7 +251,7 @@ export default function ConnectionBar() {
                   >
                     <span className={`w-1.5 h-1.5 rounded-full ${
                       droneConnected
-                        ? (drone.telemetry.armed ? 'bg-red-500 animate-pulse' : 'bg-emerald-500')
+                        ? (drone.telemetry?.armed ? 'bg-red-500 animate-pulse' : 'bg-emerald-500')
                         : 'bg-gray-600'
                     }`} />
                     {drone.name}
@@ -277,7 +277,7 @@ export default function ConnectionBar() {
       )}
 
       {/* Status indicators */}
-      <div className="flex items-center gap-2 ml-auto">
+      <div className="flex items-center gap-1.5 ml-auto">
         {/* WebSocket */}
         <div className="flex items-center gap-1">
           {wsConnected ? (
@@ -319,14 +319,14 @@ export default function ConnectionBar() {
 
             <div className="w-px h-3.5 bg-gray-800/40" />
 
-            {/* Platform + Autopilot combined */}
+            {/* Platform + Autopilot */}
             <span className="text-[10px] text-gray-500/70 font-medium">
               {telemetry.platform_type} <span className="text-gray-600/50">/ {telemetry.autopilot}</span>
             </span>
           </>
         )}
 
-        <div className="w-px h-3.5 bg-gray-800/40" />
+        <div className="w-px h-3.5 bg-gray-800/30" />
 
         {/* Coord format toggle */}
         <button

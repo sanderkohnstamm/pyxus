@@ -279,6 +279,13 @@ html, body, #root {
   will-change: transform;
   cursor: pointer !important;
 }
+.drone-name-label {
+  background: transparent !important;
+  border: none !important;
+  width: auto !important;
+  height: auto !important;
+  pointer-events: none !important;
+}
 .leaflet-dragging .leaflet-marker-icon,
 .leaflet-marker-draggable {
   transition: none !important;
