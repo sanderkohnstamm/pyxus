@@ -3,6 +3,7 @@ import { Wifi, WifiOff, Heart, Sun, Moon, Grid3X3, Plus, X } from 'lucide-react'
 import useDroneStore from '../store/droneStore';
 import { INITIAL_TELEMETRY } from '../store/droneStore';
 import { droneApi } from '../utils/api';
+import ConnectionModal from './ConnectionModal';
 
 function HeartbeatIndicator({ age }) {
   if (age < 0) return null;
@@ -44,11 +45,10 @@ export default function ConnectionBar() {
   const setTakeoffAlt = useDroneStore((s) => s.setTakeoffAlt);
   const setVideoUrl = useDroneStore((s) => s.setVideoUrl);
   const triggerZoomToDrone = useDroneStore((s) => s.triggerZoomToDrone);
+  const setHomePosition = useDroneStore((s) => s.setHomePosition);
+  const addToConnectionHistory = useDroneStore((s) => s.addToConnectionHistory);
 
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [connType, setConnType] = useState('udp');
-  const [connString, setConnString] = useState('udpin:0.0.0.0:14550');
-  const [droneName, setDroneName] = useState('');
+  const [showModal, setShowModal] = useState(false);
   const [connecting, setConnecting] = useState(false);
 
   // Active drone telemetry
@@ -65,10 +65,6 @@ export default function ConnectionBar() {
         const settingsData = await settingsRes.json();
         if (!cancelled && settingsData.status === 'ok') {
           const s = settingsData.settings;
-          if (s.connection) {
-            if (s.connection.type) setConnType(s.connection.type);
-            if (s.connection.string) setConnString(s.connection.string);
-          }
           if (s.flight) {
             if (s.flight.default_alt) setDefaultAlt(s.flight.default_alt);
             if (s.flight.default_speed) setDefaultSpeed(s.flight.default_speed);
@@ -92,7 +88,18 @@ export default function ConnectionBar() {
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleConnect = useCallback(async () => {
+  const handleConnect = useCallback(async (connString, droneName, connType) => {
+    // Check for duplicate connection string or name
+    const existing = Object.values(drones);
+    if (existing.some((d) => d.connectionString === connString)) {
+      addAlert('Already connected with this connection string', 'warning');
+      return;
+    }
+    if (droneName && existing.some((d) => d.name === droneName)) {
+      addAlert(`Name "${droneName}" is already in use`, 'warning');
+      return;
+    }
+
     setConnecting(true);
     try {
       const res = await fetch('/api/drones', {
@@ -106,9 +113,9 @@ export default function ConnectionBar() {
       const data = await res.json();
       if (data.status === 'ok') {
         registerDrone(data.drone_id, data.name, connString);
+        addToConnectionHistory(data.name, connString, connType);
         addAlert(`Connected: ${data.name} (${data.autopilot})`, 'success');
-        setShowAddForm(false);
-        setDroneName('');
+        setShowModal(false);
         setTimeout(() => triggerZoomToDrone(), 500);
 
         // Auto-download mission, fence, cameras for the new drone
@@ -150,7 +157,7 @@ export default function ConnectionBar() {
       addAlert('Connection failed: ' + err.message, 'error');
     }
     setConnecting(false);
-  }, [connString, droneName, registerDrone, addAlert, triggerZoomToDrone]);
+  }, [drones, registerDrone, addAlert, triggerZoomToDrone, addToConnectionHistory]);
 
   const handleDisconnect = useCallback(async (droneId) => {
     try {
@@ -159,16 +166,6 @@ export default function ConnectionBar() {
     removeDrone(droneId);
     addAlert('Disconnected drone', 'info');
   }, [removeDrone, addAlert]);
-
-  const handleTypeChange = (type) => {
-    const presets = {
-      udp: 'udpin:0.0.0.0:14550',
-      tcp: 'tcp:127.0.0.1:5760',
-      serial: '/dev/ttyUSB0',
-    };
-    setConnType(type);
-    setConnString(presets[type] || '');
-  };
 
   const hasDrones = Object.keys(drones).length > 0;
 
@@ -181,9 +178,9 @@ export default function ConnectionBar() {
 
       {/* Add connection button */}
       <button
-        onClick={() => setShowAddForm(!showAddForm)}
+        onClick={() => setShowModal(!showModal)}
         className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold transition-all border ${
-          showAddForm
+          showModal
             ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
             : 'bg-gray-900/60 text-gray-400 hover:text-gray-200 border-gray-800/40 hover:border-gray-700/40'
         }`}
@@ -192,44 +189,13 @@ export default function ConnectionBar() {
         Add
       </button>
 
-      {/* Add connection form (inline) */}
-      {showAddForm && (
-        <>
-          <select
-            value={connType}
-            onChange={(e) => handleTypeChange(e.target.value)}
-            className="bg-gray-900/60 text-gray-400 border border-gray-800/40 rounded px-2 py-1 text-[11px] font-mono focus:outline-none focus:border-cyan-500/30 transition-colors"
-          >
-            <option value="udp">UDP</option>
-            <option value="tcp">TCP</option>
-            <option value="serial">Serial</option>
-          </select>
-
-          <input
-            type="text"
-            value={connString}
-            onChange={(e) => setConnString(e.target.value)}
-            placeholder="Connection string..."
-            className="max-w-[200px] bg-gray-900/60 text-gray-300 border border-gray-800/40 rounded px-2.5 py-1 text-[11px] font-mono focus:outline-none focus:border-cyan-500/30 transition-colors placeholder:text-gray-700"
-          />
-
-          <input
-            type="text"
-            value={droneName}
-            onChange={(e) => setDroneName(e.target.value)}
-            placeholder="Name..."
-            className="max-w-[100px] bg-gray-900/60 text-gray-300 border border-gray-800/40 rounded px-2.5 py-1 text-[11px] font-mono focus:outline-none focus:border-cyan-500/30 transition-colors placeholder:text-gray-700"
-          />
-
-          <button
-            onClick={handleConnect}
-            disabled={connecting}
-            className="px-3 py-1 rounded text-[11px] font-semibold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-400/80 border border-cyan-500/20 transition-all disabled:opacity-50"
-          >
-            {connecting ? 'Connecting...' : 'Connect'}
-          </button>
-        </>
-      )}
+      {/* Connection modal */}
+      <ConnectionModal
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        onConnect={handleConnect}
+        connecting={connecting}
+      />
 
       {/* Drone selector pills */}
       {hasDrones && (
@@ -240,39 +206,39 @@ export default function ConnectionBar() {
               const isActive = id === activeDroneId;
               const droneConnected = drone.telemetry?.heartbeat_age >= 0 && drone.telemetry?.heartbeat_age <= 5;
               return (
-                <div key={id} className="flex items-center">
-                  <button
-                    onClick={() => setActiveDrone(id)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-l text-[11px] font-semibold transition-all border-y border-l ${
-                      isActive
-                        ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
-                        : 'bg-gray-900/40 text-gray-500 hover:text-gray-300 border-gray-800/30 hover:bg-gray-800/30'
-                    }`}
-                  >
-                    <span className={`w-1.5 h-1.5 rounded-full ${
-                      droneConnected
-                        ? (drone.telemetry?.armed ? 'bg-red-500 animate-pulse' : 'bg-emerald-500')
-                        : 'bg-gray-600'
-                    }`} />
-                    {drone.name}
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDisconnect(id);
-                    }}
-                    className={`px-1 py-1 rounded-r text-[11px] transition-all border-y border-r ${
-                      isActive
-                        ? 'bg-cyan-500/10 text-cyan-500/60 hover:text-red-400 hover:bg-red-500/10 border-cyan-500/30'
-                        : 'bg-gray-900/40 text-gray-700 hover:text-red-400 hover:bg-red-500/10 border-gray-800/30'
-                    }`}
-                  >
-                    <X size={10} />
-                  </button>
-                </div>
+                <button
+                  key={id}
+                  onClick={() => {
+                    if (!isActive) {
+                      setActiveDrone(id);
+                      setHomePosition(null);
+                      triggerZoomToDrone();
+                    }
+                  }}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-semibold transition-all border ${
+                    isActive
+                      ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+                      : 'bg-gray-900/40 text-gray-500 hover:text-gray-300 border-gray-800/30 hover:bg-gray-800/30'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    droneConnected
+                      ? (drone.telemetry?.armed ? 'bg-red-500 animate-pulse' : 'bg-emerald-500')
+                      : 'bg-gray-600'
+                  }`} />
+                  {drone.name}
+                </button>
               );
             })}
           </div>
+          <button
+            onClick={() => handleDisconnect(activeDroneId)}
+            className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-gray-500 hover:text-red-400 hover:bg-red-500/10 border border-gray-800/30 hover:border-red-800/30 transition-all"
+            title="Disconnect active drone"
+          >
+            <X size={11} />
+            <span>Disconnect</span>
+          </button>
         </>
       )}
 

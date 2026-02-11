@@ -171,6 +171,9 @@ const useDroneStore = create((set, get) => ({
   // WebSocket
   wsConnected: false,
 
+  // Connection history (persisted in localStorage)
+  connectionHistory: JSON.parse(localStorage.getItem('pyxus-connection-history') || '[]'),
+
   // Weather
   weather: {
     routeAnalysis: null,
@@ -210,6 +213,21 @@ const useDroneStore = create((set, get) => ({
   },
 
   setActiveDrone: (droneId) => set({ activeDroneId: droneId }),
+
+  addToConnectionHistory: (name, connectionString, type) => {
+    const { connectionHistory } = get();
+    const filtered = connectionHistory.filter((e) => e.connectionString !== connectionString);
+    const updated = [{ name, connectionString, type, lastUsed: Date.now() }, ...filtered];
+    localStorage.setItem('pyxus-connection-history', JSON.stringify(updated));
+    set({ connectionHistory: updated });
+  },
+
+  removeFromConnectionHistory: (connectionString) => {
+    const { connectionHistory } = get();
+    const updated = connectionHistory.filter((e) => e.connectionString !== connectionString);
+    localStorage.setItem('pyxus-connection-history', JSON.stringify(updated));
+    set({ connectionHistory: updated });
+  },
 
   updateDroneTelemetry: (droneId, data) => {
     const { drones } = get();
