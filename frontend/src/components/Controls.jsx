@@ -356,6 +356,7 @@ function ChannelBar({ value, label, color = 'cyan' }) {
 function ManualControlSection({ keyboardEnabled, setKeyboardEnabled, gamepadEnabled, isConnected, telemetry }) {
   const manualControl = useDroneStore((s) => s.manualControl);
   const keysPressed = useDroneStore((s) => s.keysPressed);
+  const setGamepadEnabled = useDroneStore((s) => s.setGamepadEnabled);
 
   const [roll, pitch, throttle, yaw] = manualControl.lastRc;
   const normalize = (v) => (v - RC_CENTER) / 500;
@@ -388,19 +389,22 @@ function ManualControlSection({ keyboardEnabled, setKeyboardEnabled, gamepadEnab
 
   return (
     <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-800/50">
-      <div className="flex items-center gap-1.5 mb-3">
+      <div className="flex items-center gap-1.5 mb-1.5">
         <Gamepad2 size={11} className="text-gray-600" />
         <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Manual Control</span>
         {isActive && hasInput && (
           <Radio size={10} className="text-cyan-400 animate-pulse ml-auto" />
         )}
       </div>
+      <div className="text-[9px] text-gray-600 mb-3">Only one input source can be active at a time</div>
 
       {/* Keyboard toggle */}
-      <div className="flex items-center justify-between mb-2 px-2 py-1.5 bg-gray-900/40 rounded-md border border-gray-800/30">
+      <div className={`flex items-center justify-between mb-2 px-2 py-1.5 rounded-md border transition-colors ${
+        keyboardEnabled ? 'bg-cyan-950/30 border-cyan-800/30' : 'bg-gray-900/40 border-gray-800/30'
+      }`}>
         <div className="flex items-center gap-2">
           <Keyboard size={12} className={keyboardEnabled ? 'text-cyan-400' : 'text-gray-600'} />
-          <span className="text-[11px] text-gray-400">Keyboard</span>
+          <span className={`text-[11px] ${keyboardEnabled ? 'text-gray-300' : 'text-gray-400'}`}>Keyboard</span>
         </div>
         <button
           onClick={() => setKeyboardEnabled(!keyboardEnabled)}
@@ -416,15 +420,26 @@ function ManualControlSection({ keyboardEnabled, setKeyboardEnabled, gamepadEnab
         </button>
       </div>
 
-      {/* Gamepad status */}
-      <div className="flex items-center justify-between px-2 py-1.5 bg-gray-900/40 rounded-md border border-gray-800/30">
+      {/* Controller toggle */}
+      <div className={`flex items-center justify-between px-2 py-1.5 rounded-md border transition-colors ${
+        gamepadEnabled ? 'bg-cyan-950/30 border-cyan-800/30' : 'bg-gray-900/40 border-gray-800/30'
+      }`}>
         <div className="flex items-center gap-2">
           <Gamepad2 size={12} className={gamepadEnabled ? 'text-cyan-400' : 'text-gray-600'} />
-          <span className="text-[11px] text-gray-400">Controller</span>
+          <span className={`text-[11px] ${gamepadEnabled ? 'text-gray-300' : 'text-gray-400'}`}>Controller</span>
         </div>
-        <span className={`text-[10px] ${gamepadEnabled ? 'text-cyan-400' : 'text-gray-600'}`}>
-          {gamepadEnabled ? 'Active' : 'Off'} (Tools tab)
-        </span>
+        <button
+          onClick={() => setGamepadEnabled(!gamepadEnabled)}
+          className={`relative w-9 h-5 rounded-full transition-colors ${
+            gamepadEnabled ? 'bg-cyan-600' : 'bg-gray-700'
+          }`}
+        >
+          <span
+            className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
+              gamepadEnabled ? 'translate-x-4' : ''
+            }`}
+          />
+        </button>
       </div>
 
       {/* Mode warning - only when connected */}

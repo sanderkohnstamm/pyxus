@@ -52,14 +52,34 @@ const BUTTON_ACTIONS = [
   { value: 'rtl', label: 'RTL' },
   { value: 'mission_start', label: 'Mission Start' },
   { value: 'mission_pause', label: 'Mission Pause' },
-  { value: 'mode:STABILIZE', label: 'Stabilize' },
-  { value: 'mode:ALT_HOLD', label: 'Alt Hold' },
-  { value: 'mode:LOITER', label: 'Loiter' },
-  { value: 'mode:GUIDED', label: 'Guided' },
-  { value: 'mode:AUTO', label: 'Auto' },
-  { value: 'mode:RTL', label: 'RTL Mode' },
-  { value: 'mode:LAND', label: 'Land Mode' },
-  { value: 'mode:POSHOLD', label: 'PosHold' },
+  // ArduPilot modes
+  { value: 'mode:STABILIZE', label: 'AP: Stabilize' },
+  { value: 'mode:ALT_HOLD', label: 'AP: Alt Hold' },
+  { value: 'mode:LOITER', label: 'AP: Loiter' },
+  { value: 'mode:POSHOLD', label: 'AP: PosHold' },
+  { value: 'mode:GUIDED', label: 'AP: Guided' },
+  { value: 'mode:AUTO', label: 'AP: Auto' },
+  { value: 'mode:RTL', label: 'AP: RTL' },
+  { value: 'mode:SMART_RTL', label: 'AP: Smart RTL' },
+  { value: 'mode:LAND', label: 'AP: Land' },
+  { value: 'mode:BRAKE', label: 'AP: Brake' },
+  { value: 'mode:ACRO', label: 'AP: Acro' },
+  { value: 'mode:SPORT', label: 'AP: Sport' },
+  { value: 'mode:CIRCLE', label: 'AP: Circle' },
+  { value: 'mode:AUTOTUNE', label: 'AP: Autotune' },
+  { value: 'mode:DRIFT', label: 'AP: Drift' },
+  // PX4 modes
+  { value: 'mode:MANUAL', label: 'PX4: Manual' },
+  { value: 'mode:STABILIZED', label: 'PX4: Stabilized' },
+  { value: 'mode:ALTCTL', label: 'PX4: Altitude' },
+  { value: 'mode:POSCTL', label: 'PX4: Position' },
+  { value: 'mode:OFFBOARD', label: 'PX4: Offboard' },
+  { value: 'mode:AUTO_MISSION', label: 'PX4: Mission' },
+  { value: 'mode:AUTO_RTL', label: 'PX4: RTL' },
+  { value: 'mode:AUTO_LAND', label: 'PX4: Land' },
+  { value: 'mode:AUTO_LOITER', label: 'PX4: Loiter' },
+  { value: 'mode:AUTO_TAKEOFF', label: 'PX4: Takeoff' },
+  { value: 'mode:ACRO', label: 'PX4: Acro' },
 ];
 
 const AXIS_CHANNELS = [
@@ -270,7 +290,7 @@ export default function GamepadPanel() {
     <div className="p-4 space-y-3">
       {/* Gamepad detection */}
       <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-800/50">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-1.5">
             <Gamepad2 size={11} className="text-gray-600" />
             <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Controller</span>
@@ -288,6 +308,7 @@ export default function GamepadPanel() {
             />
           </button>
         </div>
+        <div className="text-[9px] text-gray-600 mb-2">Enabling controller will disable keyboard input</div>
 
         {gamepads.length === 0 ? (
           <div className="text-[10px] text-gray-600 italic text-center py-2">

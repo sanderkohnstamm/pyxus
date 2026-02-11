@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import {
   Shield,
   ShieldOff,
@@ -13,8 +13,19 @@ import {
 import useDroneStore, { INITIAL_TELEMETRY } from '../store/droneStore';
 import { droneApi } from '../utils/api';
 
-const ARDUPILOT_MODES = ['STABILIZE', 'ALT_HOLD', 'LOITER', 'GUIDED', 'AUTO', 'RTL', 'LAND', 'POSHOLD', 'ACRO'];
-const PX4_MODES = ['MANUAL', 'ALTCTL', 'POSCTL', 'OFFBOARD', 'STABILIZED', 'AUTO_MISSION', 'AUTO_RTL', 'AUTO_LAND', 'AUTO_LOITER'];
+const ARDUPILOT_MODES = [
+  'STABILIZE', 'ALT_HOLD', 'LOITER', 'POSHOLD', 'GUIDED', 'AUTO',
+  'RTL', 'SMART_RTL', 'LAND', 'BRAKE',
+  'ACRO', 'SPORT', 'DRIFT',
+  'CIRCLE', 'AUTOTUNE', 'FLIP', 'THROW',
+  'GUIDED_NOGPS', 'AVOID_ADSB',
+];
+const PX4_MODES = [
+  'MANUAL', 'STABILIZED', 'ALTCTL', 'POSCTL', 'ACRO', 'RATTITUDE',
+  'OFFBOARD',
+  'AUTO_MISSION', 'AUTO_LOITER', 'AUTO_RTL', 'AUTO_LAND',
+  'AUTO_TAKEOFF', 'AUTO_FOLLOW',
+];
 
 const STATUS_COLORS = {
   idle: 'bg-gray-800/60 text-gray-500 border-gray-700/30',
@@ -29,10 +40,58 @@ export default function FlyOverlay() {
   const activeDroneId = useDroneStore((s) => s.activeDroneId);
   const telemetry = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry : INITIAL_TELEMETRY) || INITIAL_TELEMETRY;
   const missionStatus = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.missionStatus : 'idle') || 'idle';
+  const availableModes = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.availableModes : []) || [];
+  const backendStaticModes = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.staticModes : []) || [];
+  const setDroneAvailableModes = useDroneStore((s) => s.setDroneAvailableModes);
   const addAlert = useDroneStore((s) => s.addAlert);
   const addGcsLog = useDroneStore((s) => s.addGcsLog);
   const takeoffAlt = useDroneStore((s) => s.takeoffAlt);
   const setDroneMission = useDroneStore((s) => s.setDroneMission);
+
+  // Fetch available modes when drone changes, with delay and retry
+  // The vehicle needs time to respond to AVAILABLE_MODES requests after connection
+  useEffect(() => {
+    if (!activeDroneId) return;
+    let cancelled = false;
+
+    const fetchModes = async () => {
+      try {
+        const res = await fetch(droneApi(`/api/modes?drone_id=${activeDroneId}`));
+        const data = await res.json();
+        if (cancelled) return null;
+        if (data.status === 'ok') {
+          setDroneAvailableModes(
+            activeDroneId,
+            data.modes || [],
+            data.static_modes || [],
+          );
+          return data;
+        }
+        return data;
+      } catch {
+        return null;
+      }
+    };
+
+    // Initial fetch after 2s delay (let the vehicle respond to mode request)
+    const t1 = setTimeout(async () => {
+      const result = await fetchModes();
+      if (cancelled) return;
+      // Retry after 3 more seconds if standard modes incomplete
+      const got = result?.modes?.length || 0;
+      const total = result?.total_modes || 0;
+      if (total > 0 && got < total) {
+        const t2 = setTimeout(() => { if (!cancelled) fetchModes(); }, 3000);
+        cleanupTimers.push(t2);
+      }
+    }, 2000);
+
+    const cleanupTimers = [t1];
+    return () => {
+      cancelled = true;
+      cleanupTimers.forEach(clearTimeout);
+    };
+  }, [activeDroneId, setDroneAvailableModes]);
 
   const isConnected = !!activeDroneId;
 
@@ -89,8 +148,30 @@ export default function FlyOverlay() {
 
   if (!isConnected) return null;
 
-  const modes = telemetry.autopilot === 'ardupilot' ? ARDUPILOT_MODES : PX4_MODES;
+  const useStandardModes = availableModes.length > 0;
+  // Use backend-provided static modes (vehicle-type-aware), fallback to hardcoded
+  const baseModes = backendStaticModes.length > 0
+    ? backendStaticModes
+    : (telemetry.autopilot === 'ardupilot' ? ARDUPILOT_MODES : PX4_MODES);
+  // Ensure current mode is always in the list so the dropdown shows it correctly
+  const staticModes = telemetry.mode && !baseModes.includes(telemetry.mode)
+    ? [telemetry.mode, ...baseModes]
+    : baseModes;
   const btn = 'px-3 py-1.5 rounded text-[11px] font-medium transition-all border';
+
+  const handleModeChange = useCallback((e) => {
+    const val = e.target.value;
+    if (useStandardModes) {
+      const entry = availableModes.find((m) => String(m.standard_mode) === val);
+      if (entry && entry.standard_mode > 0) {
+        apiCall('mode', { standard_mode: entry.standard_mode }, `Mode → ${entry.mode_name}`);
+      } else if (entry) {
+        apiCall('mode', { mode: entry.mode_name }, `Mode → ${entry.mode_name}`);
+      }
+    } else {
+      apiCall('mode', { mode: val }, `Mode → ${val}`);
+    }
+  }, [useStandardModes, availableModes, apiCall]);
 
   return (
     <div className="absolute bottom-4 right-4 z-[1000] flex flex-col gap-1.5 items-end">
@@ -175,13 +256,24 @@ export default function FlyOverlay() {
         <div className="w-px h-4 bg-gray-700/30 mx-0.5" />
 
         <select
-          value={telemetry.mode}
-          onChange={(e) => apiCall('mode', { mode: e.target.value }, `Mode \u2192 ${e.target.value}`)}
+          value={useStandardModes
+            ? (availableModes.find((m) => m.mode_name === telemetry.mode)?.standard_mode ?? '')
+            : telemetry.mode
+          }
+          onChange={handleModeChange}
           className="bg-gray-800/60 text-gray-300 border border-gray-700/30 rounded px-2 py-1 text-[11px] font-medium focus:outline-none focus:border-gray-600/40 transition-colors"
         >
-          {modes.map((m) => (
-            <option key={m} value={m}>{m}</option>
-          ))}
+          {useStandardModes ? (
+            availableModes.map((m) => (
+              <option key={m.mode_index} value={m.standard_mode}>
+                {m.mode_name}{m.advanced ? ' ★' : ''}
+              </option>
+            ))
+          ) : (
+            staticModes.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))
+          )}
         </select>
       </div>
     </div>

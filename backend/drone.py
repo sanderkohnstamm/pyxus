@@ -1,3 +1,7 @@
+import os
+os.environ['MAVLINK20'] = '1'
+os.environ['MAVLINK_DIALECT'] = 'all'
+
 import threading
 import time
 import queue
@@ -146,14 +150,55 @@ class TelemetryState:
         }
 
 
-# ArduPilot mode mappings (copter)
-ARDUPILOT_MODES = {
+# ArduPilot mode mappings per vehicle type (custom_mode -> name)
+ARDUPILOT_COPTER_MODES = {
     0: "STABILIZE", 1: "ACRO", 2: "ALT_HOLD", 3: "AUTO",
     4: "GUIDED", 5: "LOITER", 6: "RTL", 7: "CIRCLE",
     9: "LAND", 11: "DRIFT", 13: "SPORT", 14: "FLIP",
     15: "AUTOTUNE", 16: "POSHOLD", 17: "BRAKE", 18: "THROW",
     19: "AVOID_ADSB", 20: "GUIDED_NOGPS", 21: "SMART_RTL",
 }
+ARDUPILOT_PLANE_MODES = {
+    0: "MANUAL", 1: "CIRCLE", 2: "STABILIZE", 3: "TRAINING",
+    4: "ACRO", 5: "FBWA", 6: "FBWB", 7: "CRUISE",
+    8: "AUTOTUNE", 10: "AUTO", 11: "RTL", 12: "LOITER",
+    13: "TAKEOFF", 14: "AVOID_ADSB", 15: "GUIDED",
+    17: "QSTABILIZE", 18: "QHOVER", 19: "QLOITER",
+    20: "QLAND", 21: "QRTL", 22: "QAUTOTUNE", 23: "QACRO",
+    24: "THERMAL",
+}
+ARDUPILOT_ROVER_MODES = {
+    0: "MANUAL", 1: "ACRO", 2: "STEERING", 3: "HOLD",
+    4: "LOITER", 5: "FOLLOW", 6: "SIMPLE",
+    10: "AUTO", 11: "RTL", 12: "SMART_RTL",
+    15: "GUIDED",
+}
+ARDUPILOT_SUB_MODES = {
+    0: "STABILIZE", 1: "ACRO", 2: "ALT_HOLD",
+    3: "AUTO", 4: "GUIDED", 7: "CIRCLE",
+    9: "SURFACE", 16: "POSHOLD", 19: "MANUAL",
+}
+# Backwards compat alias (used externally)
+ARDUPILOT_MODES = ARDUPILOT_COPTER_MODES
+
+# MAV_TYPE -> ArduPilot mode dict
+_ARDUPILOT_MODE_MAP_BY_TYPE = {
+    1: ARDUPILOT_PLANE_MODES,    # Fixed Wing
+    10: ARDUPILOT_ROVER_MODES,   # Ground Rover
+    11: ARDUPILOT_ROVER_MODES,   # Surface Boat
+    12: ARDUPILOT_SUB_MODES,     # Submarine
+}
+# All multirotor types map to copter modes
+for _t in (2, 3, 4, 13, 14, 15, 29, 35):
+    _ARDUPILOT_MODE_MAP_BY_TYPE[_t] = ARDUPILOT_COPTER_MODES
+# VTOL types use plane modes
+for _t in (19, 20, 21, 22, 23, 24, 25):
+    _ARDUPILOT_MODE_MAP_BY_TYPE[_t] = ARDUPILOT_PLANE_MODES
+
+
+def ardupilot_modes_for_type(mav_type: int) -> dict:
+    """Return the ArduPilot custom_mode->name mapping for a given MAV_TYPE."""
+    return _ARDUPILOT_MODE_MAP_BY_TYPE.get(mav_type, ARDUPILOT_COPTER_MODES)
 
 # Vehicle MAV_TYPEs - these are actual aircraft/vehicles we should connect to
 VEHICLE_TYPES = {
@@ -235,6 +280,7 @@ class DroneConnection:
         self._cmd_queue: queue.Queue = queue.Queue()
         self._mission_msg_queue: queue.Queue = queue.Queue()
         self._is_ardupilot = True
+        self._mav_type = 0  # MAV_TYPE from heartbeat (for mode mapping)
         self._target_system = 1
         self._target_component = 1
         self._connected = False
@@ -261,6 +307,12 @@ class DroneConnection:
         self._components: dict = {}  # "sys:comp" -> {type, name, last_seen, ...}
         self._components_lock = threading.Lock()
 
+        # Available modes (MAVLink standard modes protocol)
+        self._available_modes: list = []
+        self._available_modes_count: int = 0
+        self._available_modes_lock = threading.Lock()
+        self._modes_requested: bool = False
+
     @property
     def connected(self) -> bool:
         return self._connected
@@ -286,8 +338,23 @@ class DroneConnection:
             # Track other components we see along the way
             start_time = time.time()
             vehicle_msg = None
+            last_hb_sent = 0
 
             while time.time() - start_time < 10:
+                # Send GCS heartbeats during handshake so the remote
+                # side knows where to send data (critical for udpout)
+                now = time.time()
+                if now - last_hb_sent >= 1.0:
+                    try:
+                        self._mav.mav.heartbeat_send(
+                            mavutil.mavlink.MAV_TYPE_GCS,
+                            mavutil.mavlink.MAV_AUTOPILOT_INVALID,
+                            0, 0, 0
+                        )
+                    except Exception:
+                        pass
+                    last_hb_sent = now
+
                 msg = self._mav.recv_match(type='HEARTBEAT', blocking=True, timeout=1)
                 if msg is None:
                     continue
@@ -319,8 +386,9 @@ class DroneConnection:
             # Mark this component as the target
             self._mark_target_component()
 
-            # Detect autopilot type
+            # Detect autopilot type and vehicle type
             self._is_ardupilot = vehicle_msg.autopilot == mavutil.mavlink.MAV_AUTOPILOT_ARDUPILOTMEGA
+            self._mav_type = vehicle_msg.type
             with self._lock:
                 self._telemetry.autopilot = "ardupilot" if self._is_ardupilot else "px4"
                 self._telemetry.platform_type = MAV_TYPES.get(vehicle_msg.type, f"Type {vehicle_msg.type}")
@@ -334,6 +402,12 @@ class DroneConnection:
 
             # Request data streams
             self._request_data_streams()
+
+            # Request all parameters from vehicle
+            self._enqueue_cmd("request_param_list")
+
+            # Request available modes (standard modes protocol)
+            self.request_available_modes()
             return True
 
         except Exception as e:
@@ -468,11 +542,34 @@ class DroneConnection:
             elif cmd_type == "set_mode":
                 mode_name = kwargs["mode"]
                 if self._is_ardupilot:
-                    mode_id = self._mav.mode_mapping().get(mode_name)
+                    # Use our own vehicle-type-specific mapping (the 'all' dialect
+                    # doesn't include ArduPilot mode tables)
+                    mode_map = ardupilot_modes_for_type(self._mav_type)
+                    name_to_id = {v: k for k, v in mode_map.items()}
+                    mode_id = name_to_id.get(mode_name)
                     if mode_id is not None:
                         self._mav.set_mode(mode_id)
+                    else:
+                        print(f"Unknown ArduPilot mode: {mode_name}")
                 else:
                     self._mav.set_mode_apm(mode_name)
+            elif cmd_type == "set_standard_mode":
+                self._mav.mav.command_long_send(
+                    self._target_system, self._target_component,
+                    262,  # MAV_CMD_DO_SET_STANDARD_MODE
+                    0,
+                    kwargs["standard_mode"],  # param1: standard mode enum
+                    0, 0, 0, 0, 0, 0
+                )
+            elif cmd_type == "request_message":
+                self._mav.mav.command_long_send(
+                    self._target_system, self._target_component,
+                    mavutil.mavlink.MAV_CMD_REQUEST_MESSAGE,
+                    0,
+                    kwargs["msg_id"],
+                    kwargs.get("param2", 0),
+                    0, 0, 0, 0, 0
+                )
             elif cmd_type == "rc_override":
                 channels = kwargs["channels"]
                 # Pad to 8 channels, 0 = no override
@@ -815,6 +912,34 @@ class DroneConnection:
                     })
             return
 
+        # Handle AVAILABLE_MODES (standard modes protocol, msg ID 435)
+        if msg_type == "AVAILABLE_MODES":
+            with self._available_modes_lock:
+                self._available_modes_count = msg.number_modes
+                mode_name = msg.mode_name.rstrip('\x00') if isinstance(msg.mode_name, str) else msg.mode_name.decode('utf-8', errors='replace').rstrip('\x00')
+                properties = msg.properties
+                # Filter out non-user-selectable modes (MAV_MODE_PROPERTY_NOT_USER_SELECTABLE = 0x2)
+                if properties & 0x2:
+                    return
+                entry = {
+                    'mode_index': msg.mode_index,
+                    'standard_mode': msg.standard_mode,
+                    'custom_mode': msg.custom_mode,
+                    'properties': properties,
+                    'mode_name': mode_name,
+                    'advanced': bool(properties & 0x1),  # MAV_MODE_PROPERTY_ADVANCED
+                }
+                # Replace if same mode_index already stored, else append
+                existing_indices = {m['mode_index'] for m in self._available_modes}
+                if msg.mode_index in existing_indices:
+                    self._available_modes = [
+                        entry if m['mode_index'] == msg.mode_index else m
+                        for m in self._available_modes
+                    ]
+                else:
+                    self._available_modes.append(entry)
+            return
+
         with self._lock:
             if msg_type == "HEARTBEAT":
                 src_system = msg.get_srcSystem()
@@ -840,7 +965,8 @@ class DroneConnection:
                 # Decode mode
                 if self._is_ardupilot:
                     custom = msg.custom_mode
-                    self._telemetry.mode = ARDUPILOT_MODES.get(custom, f"MODE_{custom}")
+                    mode_map = ardupilot_modes_for_type(self._mav_type)
+                    self._telemetry.mode = mode_map.get(custom, f"MODE_{custom}")
                 else:
                     # PX4 mode decoding - fixed bit positions
                     main_mode = (msg.custom_mode >> 16) & 0xFF
@@ -954,6 +1080,36 @@ class DroneConnection:
         params = cal_map.get(cal_type, {})
         if params:
             self._enqueue_cmd("preflight_calibration", **params)
+
+    def request_available_modes(self):
+        """Request AVAILABLE_MODES from the vehicle (standard modes protocol)."""
+        self._modes_requested = True
+        # MAV_CMD_REQUEST_MESSAGE with param1=435 (AVAILABLE_MODES), param2=0 (all modes)
+        self._enqueue_cmd("request_message", msg_id=435, param2=0)
+
+    def get_available_modes(self) -> list:
+        """Return list of available modes, sorted by mode_index."""
+        with self._available_modes_lock:
+            return sorted(self._available_modes, key=lambda m: m['mode_index'])
+
+    def set_standard_mode(self, standard_mode_id: int):
+        """Set flight mode using MAV_CMD_DO_SET_STANDARD_MODE."""
+        self._enqueue_cmd("set_standard_mode", standard_mode=standard_mode_id)
+
+    def get_static_modes(self) -> list[str]:
+        """Return the static mode name list appropriate for this vehicle type."""
+        if self._is_ardupilot:
+            mode_map = ardupilot_modes_for_type(self._mav_type)
+            return [name for _, name in sorted(mode_map.items())]
+        else:
+            # PX4: return unique mode names (skip duplicates from sub-mode variants)
+            seen = set()
+            modes = []
+            for _, name in sorted(PX4_MODES.items()):
+                if name not in seen:
+                    seen.add(name)
+                    modes.append(name)
+            return modes
 
     def get_cameras(self) -> list:
         """Return list of discovered cameras."""

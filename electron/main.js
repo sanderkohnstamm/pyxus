@@ -1,6 +1,7 @@
-const { app, BrowserWindow, shell } = require('electron');
-const { spawn } = require('child_process');
+const { app, BrowserWindow, shell, session } = require('electron');
+const { spawn, execSync } = require('child_process');
 const path = require('path');
+const fs = require('fs');
 const http = require('http');
 
 let mainWindow;
@@ -97,7 +98,41 @@ function createWindow() {
   });
 }
 
+// In dev mode on macOS, patch the Electron framework Info.plist to include
+// NSLocationWhenInUseUsageDescription so CoreLocation works (otherwise macOS
+// silently denies geolocation and we get no permission prompt).
+if (isDev && process.platform === 'darwin') {
+  try {
+    const plistPath = path.join(
+      path.dirname(require.resolve('electron/index.js')),
+      'dist', 'Electron.app', 'Contents', 'Info.plist'
+    );
+    if (fs.existsSync(plistPath)) {
+      const content = fs.readFileSync(plistPath, 'utf8');
+      if (!content.includes('NSLocationWhenInUseUsageDescription')) {
+        // Insert location keys before closing </dict>
+        const patch = `\t<key>NSLocationWhenInUseUsageDescription</key>\n\t<string>Pyxus uses your location to show the GCS position on the map.</string>\n\t<key>NSLocationUsageDescription</key>\n\t<string>Pyxus uses your location to show the GCS position on the map.</string>\n`;
+        const patched = content.replace('</dict>', patch + '</dict>');
+        fs.writeFileSync(plistPath, patched);
+        console.log('Patched Electron Info.plist with location permission keys');
+      }
+    }
+  } catch (err) {
+    console.warn('Could not patch Electron Info.plist for location:', err.message);
+  }
+}
+
 app.whenReady().then(async () => {
+  // Grant geolocation (and media) permissions so navigator.geolocation works
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    const allowed = ['geolocation', 'media', 'mediaKeySystem'];
+    callback(allowed.includes(permission));
+  });
+  session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
+    const allowed = ['geolocation', 'media', 'mediaKeySystem'];
+    return allowed.includes(permission);
+  });
+
   // Start backend
   startBackend();
 

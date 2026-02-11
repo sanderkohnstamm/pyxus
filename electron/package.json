@@ -48,7 +48,11 @@
       "target": [
         "dmg",
         "zip"
-      ]
+      ],
+      "extendInfo": {
+        "NSLocationWhenInUseUsageDescription": "Pyxus uses your location to show the GCS position on the map.",
+        "NSLocationUsageDescription": "Pyxus uses your location to show the GCS position on the map."
+      }
     },
     "win": {
       "icon": "icons/icon.ico",

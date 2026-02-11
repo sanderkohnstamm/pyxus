@@ -34,6 +34,8 @@ const INITIAL_DRONE_STATE = {
   gimbals: [],
   params: {},
   paramsTotal: 0,
+  availableModes: [],
+  staticModes: [],
 };
 
 const useDroneStore = create((set, get) => ({
@@ -167,6 +169,10 @@ const useDroneStore = create((set, get) => ({
 
   // Home position
   homePosition: null,
+
+  // GCS position (from browser geolocation)
+  gcsPosition: null,
+  _gcsZoomed: false,
 
   // WebSocket
   wsConnected: false,
@@ -303,6 +309,17 @@ const useDroneStore = create((set, get) => ({
     if (!droneState) return;
     set({
       drones: { ...drones, [droneId]: { ...droneState, params, paramsTotal: total } },
+    });
+  },
+
+  setDroneAvailableModes: (droneId, modes, staticModes) => {
+    const { drones } = get();
+    const droneState = drones[droneId];
+    if (!droneState) return;
+    const updates = { availableModes: modes };
+    if (staticModes) updates.staticModes = staticModes;
+    set({
+      drones: { ...drones, [droneId]: { ...droneState, ...updates } },
     });
   },
 
@@ -684,11 +701,17 @@ const useDroneStore = create((set, get) => ({
     }
   },
 
-  // Keyboard
-  setKeyboardEnabled: (enabled) => set({ keyboardEnabled: enabled }),
+  // Keyboard (exclusive with gamepad)
+  setKeyboardEnabled: (enabled) => set({
+    keyboardEnabled: enabled,
+    ...(enabled ? { gamepadEnabled: false } : {}),
+  }),
 
-  // Gamepad
-  setGamepadEnabled: (enabled) => set({ gamepadEnabled: enabled }),
+  // Gamepad (exclusive with keyboard)
+  setGamepadEnabled: (enabled) => set({
+    gamepadEnabled: enabled,
+    ...(enabled ? { keyboardEnabled: false, keysPressed: {} } : {}),
+  }),
   setKeyPressed: (key, pressed) => {
     const { keysPressed } = get();
     set({ keysPressed: { ...keysPressed, [key.toLowerCase()]: pressed } });
@@ -866,6 +889,10 @@ const useDroneStore = create((set, get) => ({
 
   // Home position
   setHomePosition: (pos) => set({ homePosition: pos }),
+
+  // GCS position
+  setGcsPosition: (pos) => set({ gcsPosition: pos }),
+  markGcsZoomed: () => set({ _gcsZoomed: true }),
 
   // Pattern generation
   setPatternConfig: (config) => set((s) => ({

@@ -50,7 +50,8 @@ class TakeoffRequest(BaseModel):
 
 
 class ModeRequest(BaseModel):
-    mode: str
+    mode: str = ""
+    standard_mode: Optional[int] = None
 
 
 class WaypointModel(BaseModel):
@@ -382,8 +383,29 @@ async def api_mode(req: ModeRequest, drone_id: str = Query(...)):
     drone, _ = get_drone(drone_id)
     if not drone.connected:
         return {"status": "error", "error": "Not connected"}
+    if req.standard_mode is not None:
+        drone.set_standard_mode(req.standard_mode)
+        return {"status": "ok", "command": "mode", "standard_mode": req.standard_mode}
     drone.set_mode(req.mode)
     return {"status": "ok", "command": "mode", "mode": req.mode}
+
+
+@app.get("/api/modes")
+async def api_modes(drone_id: str = Query(...)):
+    drone, _ = get_drone(drone_id)
+    if not drone.connected:
+        return {"status": "error", "error": "Not connected"}
+    modes = drone.get_available_modes()
+    static_modes = drone.get_static_modes()
+    with drone._available_modes_lock:
+        total = drone._available_modes_count
+    return {
+        "status": "ok",
+        "modes": modes,
+        "static_modes": static_modes,
+        "total_modes": total,
+        "supports_standard_modes": len(modes) > 0,
+    }
 
 
 @app.post("/api/goto")
@@ -656,7 +678,7 @@ async def api_params_metadata(vehicle: str):
     if vehicle_lower == "px4":
         url = "https://raw.githubusercontent.com/mavlink/qgroundcontrol/master/src/FirmwarePlugin/PX4/PX4ParameterFactMetaData.xml"
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
                 resp = await client.get(url)
                 if resp.status_code == 200:
                     import xml.etree.ElementTree as ET
@@ -702,10 +724,19 @@ async def api_params_metadata(vehicle: str):
     url = f"https://autotest.ardupilot.org/Parameters/{vehicle_name}/apm.pdef.json"
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             resp = await client.get(url)
             if resp.status_code == 200:
-                return {"status": "ok", "metadata": resp.json()}
+                raw = resp.json()
+                # ArduPilot pdef.json is grouped by prefix: {"GRP_": {"GRP_PARAM": {...}}}
+                # Flatten into a single dict keyed by full parameter name
+                metadata = {}
+                for group_params in raw.values():
+                    if isinstance(group_params, dict):
+                        for param_name, param_info in group_params.items():
+                            if isinstance(param_info, dict):
+                                metadata[param_name] = param_info
+                return {"status": "ok", "metadata": metadata}
             return {"status": "error", "error": f"Failed to fetch: {resp.status_code}"}
     except Exception as e:
         return {"status": "error", "error": str(e)}

@@ -142,7 +142,10 @@ export default function ManualControlOverlay() {
           <span className={`text-[10px] font-semibold uppercase tracking-wide ${
             isSending ? 'text-cyan-300' : 'text-gray-400'
           }`}>
-            {isSending ? 'Sending RC' : 'Manual Control'}
+            {isSending ? 'Sending RC' : 'Manual Control'}{' '}
+            <span className="font-normal normal-case text-[9px] text-gray-500">
+              ({keyboardEnabled ? 'Keyboard' : 'Controller'})
+            </span>
           </span>
           <span className={`text-[9px] ${isManualMode ? 'text-emerald-400/80' : 'text-amber-400/80'}`}>
             {isManualMode ? `Mode: ${telemetry.mode}` : `${telemetry.mode} - Switch to manual mode`}

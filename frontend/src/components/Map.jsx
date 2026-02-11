@@ -136,6 +136,55 @@ const homeIcon = L.divIcon({
   iconAnchor: [14, 14],
 });
 
+// GCS location icon
+const gcsIcon = L.divIcon({
+  html: `<div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:#6366f1;border:2px solid #818cf8;border-radius:50%;box-shadow:0 2px 8px rgba(99,102,241,0.4)">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+      <line x1="8" y1="21" x2="16" y2="21"></line>
+      <line x1="12" y1="17" x2="12" y2="21"></line>
+    </svg>
+  </div>`,
+  className: '',
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+});
+
+// GCS location tracker — uses browser geolocation (CoreLocation on macOS)
+function GcsLocator() {
+  const map = useMap();
+  const gcsPosition = useDroneStore((s) => s.gcsPosition);
+  const setGcsPosition = useDroneStore((s) => s.setGcsPosition);
+  const gcsZoomed = useDroneStore((s) => s._gcsZoomed);
+  const markGcsZoomed = useDroneStore((s) => s.markGcsZoomed);
+  const activeDroneId = useDroneStore((s) => s.activeDroneId);
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    let cancelled = false;
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        if (!cancelled) {
+          setGcsPosition({ lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: pos.coords.accuracy });
+        }
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 },
+    );
+    return () => { cancelled = true; navigator.geolocation.clearWatch(watchId); };
+  }, [setGcsPosition]);
+
+  // Zoom to GCS on first fix — only if no drone is connected yet
+  useEffect(() => {
+    if (gcsZoomed || !gcsPosition || activeDroneId) return;
+    markGcsZoomed();
+    map.setView([gcsPosition.lat, gcsPosition.lon], 15, { animate: true });
+  }, [gcsPosition, gcsZoomed, activeDroneId, markGcsZoomed, map]);
+
+  return null;
+}
+
 // Invalidate map size when sidebar collapses/expands
 function MapResizer() {
   const map = useMap();
@@ -1375,6 +1424,7 @@ export default function MapView() {
   const toggleAddWaypointMode = useDroneStore((s) => s.toggleAddWaypointMode);
   const planSubTab = useDroneStore((s) => s.planSubTab);
   const homePosition = useDroneStore((s) => s.homePosition);
+  const gcsPosition = useDroneStore((s) => s.gcsPosition);
   const setPatternConfig = useDroneStore((s) => s.setPatternConfig);
   const reverseWaypoints = useDroneStore((s) => s.reverseWaypoints);
   const measureMode = useDroneStore((s) => s.measureMode);
@@ -1391,6 +1441,7 @@ export default function MapView() {
   const activeTelemetry = activeDrone?.telemetry || INITIAL_TELEMETRY;
   const hasPosition = activeTelemetry.lat !== 0 && activeTelemetry.lon !== 0;
   const hasHome = homePosition && homePosition.lat !== 0 && homePosition.lon !== 0;
+  const hasGcs = gcsPosition && gcsPosition.lat !== 0 && gcsPosition.lon !== 0;
 
   const isPlanning = activeTab === 'planning';
   const isConnected = !!activeDroneId;
@@ -1436,6 +1487,7 @@ export default function MapView() {
 
         <MapResizer />
         <DroneFollower />
+        <GcsLocator />
         <MapClickHandler />
         <AddModeCursor />
 
@@ -1502,6 +1554,26 @@ export default function MapView() {
               </div>
             </Popup>
           </Marker>
+        )}
+
+        {/* GCS location marker */}
+        {hasGcs && (
+          <>
+            <Circle
+              center={[gcsPosition.lat, gcsPosition.lon]}
+              radius={gcsPosition.accuracy || 0}
+              pathOptions={{ color: '#6366f1', weight: 1, opacity: 0.3, fillColor: '#6366f1', fillOpacity: 0.08 }}
+            />
+            <Marker position={[gcsPosition.lat, gcsPosition.lon]} icon={gcsIcon}>
+              <Popup>
+                <div className="text-xs font-mono space-y-0.5">
+                  <div className="font-semibold text-[11px] mb-1" style={{color:'#6366f1'}}>GCS Location</div>
+                  <div style={{fontSize:'9px',color:'#64748b'}}>{formatCoord(gcsPosition.lat, gcsPosition.lon, coordFormat, 6)}</div>
+                  {gcsPosition.accuracy && <div style={{fontSize:'9px',color:'#64748b'}}>Accuracy: {Math.round(gcsPosition.accuracy)}m</div>}
+                </div>
+              </Popup>
+            </Marker>
+          </>
         )}
 
         {/* Planned waypoint markers + polyline (isolated from telemetry re-renders) */}
