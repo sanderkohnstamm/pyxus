@@ -45,7 +45,7 @@ import useDroneStore, { INITIAL_TELEMETRY } from '../store/droneStore';
 import { droneApi } from '../utils/api';
 import FenceSubPanel from './FenceSubPanel';
 import ElevationProfile from './ElevationProfile';
-import { haversineDistance } from '../utils/geo';
+import { haversineDistance, validateMissionAgainstFence } from '../utils/geo';
 import { formatCoord } from '../utils/formatCoord';
 
 const ITEM_TYPES = {
@@ -83,12 +83,14 @@ function WaypointItem({ wp, index, onUpdate, onRemove }) {
   const coordFormat = useDroneStore((s) => s.coordFormat);
   const selectedWaypointId = useDroneStore((s) => s.selectedWaypointId);
   const setSelectedWaypointId = useDroneStore((s) => s.setSelectedWaypointId);
+  const missionViolations = useDroneStore((s) => s.missionViolations);
   const itemType = ITEM_TYPES[wp.type] || ITEM_TYPES.waypoint;
   const colorClass = TYPE_COLORS[itemType.color];
   const expanded = selectedWaypointId === wp.id;
   const Icon = itemType.icon;
   const itemRef = React.useRef(null);
   const prevExpanded = React.useRef(false);
+  const hasViolation = missionViolations.some((v) => v.waypointIndex === index);
 
   // Scroll into view when this item becomes expanded (e.g. from map click)
   React.useEffect(() => {
@@ -101,7 +103,7 @@ function WaypointItem({ wp, index, onUpdate, onRemove }) {
   }, [expanded]);
 
   return (
-    <div ref={itemRef} className={`rounded-lg border ${colorClass} overflow-hidden`}>
+    <div ref={itemRef} className={`rounded-lg border ${hasViolation ? 'border-red-500/60 bg-red-500/10 text-red-300' : colorClass} overflow-hidden`}>
       {/* Header row */}
       <div className="flex items-center gap-2 px-2.5 py-2">
         <Icon size={13} className="shrink-0" />
@@ -419,6 +421,46 @@ function MissionStats() {
   );
 }
 
+function FenceWarningDialog({ violations, onUploadAnyway, onCancel }) {
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-gray-900 border border-red-500/30 rounded-lg shadow-2xl p-5 max-w-sm w-full mx-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Shield size={16} className="text-red-400" />
+          <span className="text-sm font-semibold text-red-300">Fence Violation</span>
+        </div>
+        <p className="text-xs text-gray-400 mb-3">
+          The following waypoints are outside the fence boundary:
+        </p>
+        <div className="max-h-32 overflow-y-auto space-y-1 mb-4">
+          {violations.map((v) => (
+            <div key={v.waypointIndex} className="flex items-center gap-2 px-2 py-1 rounded bg-red-500/10 border border-red-500/20">
+              <span className="text-[10px] font-bold text-red-400 w-6 text-center">WP {v.waypointIndex + 1}</span>
+              <span className="text-[10px] text-gray-400">
+                {v.type === 'outside_circle' ? 'Outside circular fence' : 'Outside polygon fence'}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={onCancel}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-700/40 hover:bg-gray-700/60 border border-gray-600/30 rounded-md text-xs font-semibold text-gray-300 transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onUploadAnyway}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 rounded-md text-xs font-semibold text-amber-300 transition-all"
+          >
+            Upload Anyway
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MissionSubPanel() {
   const activeDroneId = useDroneStore((s) => s.activeDroneId);
   const plannedWaypoints = useDroneStore((s) => s.plannedWaypoints);
@@ -435,6 +477,9 @@ function MissionSubPanel() {
   const addAlert = useDroneStore((s) => s.addAlert);
   const setDroneMission = useDroneStore((s) => s.setDroneMission);
   const importDroneMission = useDroneStore((s) => s.importDroneMission);
+  const geofence = useDroneStore((s) => s.geofence);
+  const plannedFence = useDroneStore((s) => s.plannedFence);
+  const setMissionViolations = useDroneStore((s) => s.setMissionViolations);
 
   // Multi-mission state
   const savedMissions = useDroneStore((s) => s.savedMissions);
@@ -451,6 +496,9 @@ function MissionSubPanel() {
   // Rename editing state
   const [editingName, setEditingName] = React.useState(false);
   const [nameValue, setNameValue] = React.useState('');
+
+  // Fence validation warning dialog
+  const [fenceWarning, setFenceWarning] = React.useState(null);
 
   const isConnected = !!activeDroneId;
 
@@ -493,11 +541,7 @@ function MissionSubPanel() {
     [addAlert]
   );
 
-  const handleUpload = useCallback(async () => {
-    if (plannedWaypoints.length === 0) {
-      addAlert('No waypoints to upload', 'warning');
-      return;
-    }
+  const doUpload = useCallback(async () => {
     try {
       const res = await fetch(droneApi('/api/mission/upload'), {
         method: 'POST',
@@ -520,6 +564,7 @@ function MissionSubPanel() {
         addAlert(data.error || 'Mission upload failed', 'error');
       } else {
         addAlert('Mission upload ok', 'success');
+        setMissionViolations([]);
         // Auto-download to sync drone mission display
         try {
           const droneId = useDroneStore.getState().activeDroneId;
@@ -533,7 +578,23 @@ function MissionSubPanel() {
     } catch (err) {
       addAlert(`Mission upload failed: ${err.message}`, 'error');
     }
-  }, [plannedWaypoints, addAlert, setDroneMission]);
+  }, [plannedWaypoints, addAlert, setDroneMission, setMissionViolations]);
+
+  const handleUpload = useCallback(async () => {
+    if (plannedWaypoints.length === 0) {
+      addAlert('No waypoints to upload', 'warning');
+      return;
+    }
+    // Validate against fences
+    const result = validateMissionAgainstFence(plannedWaypoints, geofence, plannedFence);
+    if (!result.valid) {
+      setMissionViolations(result.violations);
+      setFenceWarning(result.violations);
+      return;
+    }
+    setMissionViolations([]);
+    await doUpload();
+  }, [plannedWaypoints, geofence, plannedFence, addAlert, setMissionViolations, doUpload]);
 
   const handleImport = useCallback(async () => {
     try {
@@ -707,6 +768,20 @@ function MissionSubPanel() {
 
   return (
     <>
+      {/* Fence violation warning dialog */}
+      {fenceWarning && (
+        <FenceWarningDialog
+          violations={fenceWarning}
+          onUploadAnyway={() => {
+            setFenceWarning(null);
+            doUpload();
+          }}
+          onCancel={() => {
+            setFenceWarning(null);
+          }}
+        />
+      )}
+
       {/* Mission selector */}
       <div className="bg-gray-800/40 rounded-lg p-2.5 border border-gray-800/50 mb-3">
         <div className="flex items-center gap-2 mb-2">

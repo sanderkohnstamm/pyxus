@@ -3,6 +3,7 @@ import { Upload, Trash2, X, Shield, Pentagon, Download, FolderOpen } from 'lucid
 import useDroneStore, { INITIAL_TELEMETRY } from '../store/droneStore';
 import { droneApi } from '../utils/api';
 import { formatCoord } from '../utils/formatCoord';
+import { polygonSelfIntersects } from '../utils/geo';
 
 // Parse KML polygon coordinates
 function parseKmlPolygon(kmlText) {
@@ -144,6 +145,10 @@ export default function FenceSubPanel() {
   const handlePolygonFenceUpload = useCallback(async () => {
     if (plannedFence.length < 3) {
       addAlert('Need at least 3 vertices for polygon fence', 'warning');
+      return;
+    }
+    if (polygonSelfIntersects(plannedFence)) {
+      addAlert('Polygon fence has self-intersecting edges. Fix the shape before uploading.', 'error');
       return;
     }
     await fenceApiCall('upload_polygon', {

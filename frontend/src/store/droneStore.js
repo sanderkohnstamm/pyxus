@@ -63,6 +63,9 @@ const useDroneStore = create((set, get) => ({
   defaultSpeed: 5,
   takeoffAlt: 10,
 
+  // Terrain elevation data for mission waypoints (from backend proxy)
+  terrainElevations: [],  // [{lat, lon, elevation}] parallel to sampled path points
+
   // Saved missions (multi-mission planning)
   savedMissions: JSON.parse(localStorage.getItem('pyxus-saved-missions') || '[]'),
   activeMissionId: null,
@@ -152,6 +155,9 @@ const useDroneStore = create((set, get) => ({
   patternBounds: [],
   patternDrawMode: false,
 
+  // Mission fence violations (from validation)
+  missionViolations: [],
+
   // Mission manipulation
   missionManipMode: null,
   manipStartPos: null,
@@ -186,6 +192,10 @@ const useDroneStore = create((set, get) => ({
 
   // Pre-flight checklist
   showPreFlightChecklist: false,
+
+  // Batch (multi-drone) operations
+  selectedDroneIds: [],       // drone IDs selected for batch ops (empty = single-drone mode)
+  batchCommandStatus: {},     // { [droneId]: 'pending'|'success'|'error' }
 
   // WebSocket
   wsConnected: false,
@@ -245,6 +255,25 @@ const useDroneStore = create((set, get) => ({
   },
 
   setActiveDrone: (droneId) => set({ activeDroneId: droneId }),
+
+  // Batch selection actions
+  toggleDroneSelection: (droneId) => {
+    const { selectedDroneIds } = get();
+    if (selectedDroneIds.includes(droneId)) {
+      set({ selectedDroneIds: selectedDroneIds.filter((id) => id !== droneId) });
+    } else {
+      set({ selectedDroneIds: [...selectedDroneIds, droneId] });
+    }
+  },
+  selectAllDrones: () => {
+    const { drones } = get();
+    set({ selectedDroneIds: Object.keys(drones) });
+  },
+  clearDroneSelection: () => set({ selectedDroneIds: [], batchCommandStatus: {} }),
+  setBatchCommandStatus: (status) => set({ batchCommandStatus: status }),
+  updateBatchCommandStatus: (droneId, status) => set((s) => ({
+    batchCommandStatus: { ...s.batchCommandStatus, [droneId]: status },
+  })),
 
   toggleDroneVisibility: (droneId, field) => {
     const { droneVisibility } = get();
@@ -464,6 +493,9 @@ const useDroneStore = create((set, get) => ({
   setDefaultAlt: (alt) => set({ defaultAlt: parseFloat(alt) || 50 }),
   setDefaultSpeed: (speed) => set({ defaultSpeed: parseFloat(speed) || 5 }),
   setTakeoffAlt: (alt) => set({ takeoffAlt: parseFloat(alt) || 10 }),
+
+  // Terrain elevations
+  setTerrainElevations: (elevations) => set({ terrainElevations: elevations }),
 
   setMissionStatus: (status) => set({ missionStatus: status }),
 
@@ -1021,6 +1053,9 @@ const useDroneStore = create((set, get) => ({
     });
   },
   clearPatternBounds: () => set({ patternBounds: [], patternDrawMode: false }),
+
+  // Mission fence violations
+  setMissionViolations: (violations) => set({ missionViolations: violations }),
 
   // Mission manipulation
   setMissionManipMode: (mode) => set({ missionManipMode: mode }),

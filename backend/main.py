@@ -13,6 +13,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
+# --- Terrain elevation cache ---
+# Keyed by (round(lat, 4), round(lon, 4)) -> elevation in meters
+_terrain_cache: dict[tuple[float, float], float] = {}
+
 from drone import DroneConnection
 from mission import MissionManager, Waypoint
 from weather import (
@@ -915,6 +919,97 @@ async def api_calibrate(req: CalibrationRequest, drone_id: str = Query(...)):
         return {"status": "error", "error": "Not connected"}
     drone.calibrate(req.type)
     return {"status": "ok", "command": "calibrate", "type": req.type}
+
+
+# --- Terrain Elevation Proxy ---
+
+@app.get("/api/terrain/elevation")
+async def api_terrain_elevation(locations: str = Query(...)):
+    """Proxy terrain elevation lookups with in-memory caching.
+
+    Query format: locations=lat1,lon1|lat2,lon2|...
+    Returns: { elevations: [{ lat, lon, elevation }] }
+    Caches results keyed by coordinates rounded to 4 decimal places (~11m).
+    Limit: 100 points per request.
+    """
+    import httpx
+
+    # Parse locations
+    pairs = locations.strip().split("|")
+    if len(pairs) > 100:
+        pairs = pairs[:100]
+
+    parsed = []
+    for pair in pairs:
+        parts = pair.strip().split(",")
+        if len(parts) != 2:
+            continue
+        try:
+            lat = float(parts[0])
+            lon = float(parts[1])
+            parsed.append((lat, lon))
+        except ValueError:
+            continue
+
+    if not parsed:
+        return {"elevations": []}
+
+    # Check cache, collect misses
+    results = {}  # index -> elevation
+    cache_misses = []  # (index, lat, lon)
+
+    for i, (lat, lon) in enumerate(parsed):
+        cache_key = (round(lat, 4), round(lon, 4))
+        if cache_key in _terrain_cache:
+            results[i] = _terrain_cache[cache_key]
+        else:
+            cache_misses.append((i, lat, lon))
+
+    # Fetch uncached points from Open-Elevation API
+    if cache_misses:
+        # Build location string for the API
+        batch_size = 100
+        for batch_start in range(0, len(cache_misses), batch_size):
+            batch = cache_misses[batch_start:batch_start + batch_size]
+            loc_str = "|".join(f"{lat},{lon}" for _, lat, lon in batch)
+            api_url = f"https://api.open-elevation.com/api/v1/lookup?locations={loc_str}"
+
+            try:
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    resp = await client.get(api_url)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        api_results = data.get("results", [])
+                        for j, entry in enumerate(api_results):
+                            if j < len(batch):
+                                idx, lat, lon = batch[j]
+                                elev = entry.get("elevation")
+                                if elev is not None:
+                                    results[idx] = float(elev)
+                                    # Cache it
+                                    cache_key = (round(lat, 4), round(lon, 4))
+                                    _terrain_cache[cache_key] = float(elev)
+                                else:
+                                    results[idx] = None
+                    else:
+                        # API error -- fill with None
+                        for idx, _, _ in batch:
+                            results.setdefault(idx, None)
+            except Exception:
+                # Network/timeout error -- fill with None
+                for idx, _, _ in batch:
+                    results.setdefault(idx, None)
+
+    # Build response preserving input order
+    elevations = []
+    for i, (lat, lon) in enumerate(parsed):
+        elevations.append({
+            "lat": lat,
+            "lon": lon,
+            "elevation": results.get(i),
+        })
+
+    return {"elevations": elevations}
 
 
 # --- Weather ---

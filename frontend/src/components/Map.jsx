@@ -564,6 +564,16 @@ function JumpArrows({ waypoints, opacity = 1 }) {
   );
 }
 
+// Red violation ring icon for waypoints outside fence
+function createViolationRingIcon() {
+  return L.divIcon({
+    html: `<div style="width:36px;height:36px;border:3px solid #ef4444;border-radius:50%;box-shadow:0 0 8px rgba(239,68,68,0.6),inset 0 0 4px rgba(239,68,68,0.3);pointer-events:none"></div>`,
+    className: '',
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+  });
+}
+
 // Isolated component for planned waypoint markers - prevents telemetry re-renders from
 // recreating marker DOM (which kills in-progress drags)
 function PlannedWaypointMarkers({ onContextMenu }) {
@@ -577,6 +587,7 @@ function PlannedWaypointMarkers({ onContextMenu }) {
   const setPlanSubTab = useDroneStore((s) => s.setPlanSubTab);
   const setSidebarCollapsed = useDroneStore((s) => s.setSidebarCollapsed);
   const addWaypointMode = useDroneStore((s) => s.addWaypointMode);
+  const missionViolations = useDroneStore((s) => s.missionViolations);
 
   const isPlanning = activeTab === 'planning';
   const plannedOpacity = isPlanning ? 1 : 0.3;
@@ -590,69 +601,93 @@ function PlannedWaypointMarkers({ onContextMenu }) {
     .filter((w) => w.type !== 'roi')
     .map((w) => [w.lat, w.lon]);
 
+  // Build a set of violating waypoint indices for fast lookup
+  const violatingIndices = useMemo(
+    () => new Set(missionViolations.map((v) => v.waypointIndex)),
+    [missionViolations]
+  );
+
   // Memoize icons so they only change when waypoints change
   const icons = useMemo(
     () => plannedWaypoints.map((wp, i) => createWaypointIcon(i, wp.type)),
     [plannedWaypoints]
   );
 
+  const violationIcon = useMemo(() => createViolationRingIcon(), []);
+
   return (
     <>
       {plannedWaypoints.map((wp, i) => {
         // Skip non-positioned waypoints (do_jump, do_set_servo)
         if (!MARKER_COLORS[wp.type]) return null;
+        const hasViolation = violatingIndices.has(i);
         return (
-          <Marker
-            key={wp.id}
-            position={[wp.lat, wp.lon]}
-            icon={icons[i]}
-            draggable={isPlanning}
-            autoPan={false}
-            opacity={plannedOpacity}
-            eventHandlers={{
-              dragend: (e) => {
-                const pos = e.target.getLatLng();
-                updateWaypoint(wp.id, { lat: pos.lat, lon: pos.lng });
-              },
-              click: () => {
-                if (isPlanning) {
-                  setPlanSubTab('mission');
-                  setSidebarCollapsed(false);
-                  setSelectedWaypointId(wp.id);
-                }
-              },
-            }}
-          >
-            <Popup>
-              <div className="text-sm">
-                <div className="font-semibold">{TYPE_LABELS[wp.type] || 'Waypoint'} {i + 1}</div>
-                <div>Alt: {wp.alt}m</div>
-                <div className="text-xs opacity-70">{formatCoord(wp.lat, wp.lon, coordFormat, 6)}</div>
-                {isPlanning && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      addJumpWaypoint(i + 1);
-                    }}
-                    style={{
-                      marginTop: '6px',
-                      padding: '4px 10px',
-                      fontSize: '10px',
-                      fontWeight: 600,
-                      background: '#ec4899',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      width: '100%',
-                    }}
-                  >
-                    Add Jump to WP {i + 1}
-                  </button>
-                )}
-              </div>
-            </Popup>
-          </Marker>
+          <React.Fragment key={wp.id}>
+            <Marker
+              position={[wp.lat, wp.lon]}
+              icon={icons[i]}
+              draggable={isPlanning}
+              autoPan={false}
+              opacity={plannedOpacity}
+              eventHandlers={{
+                dragend: (e) => {
+                  const pos = e.target.getLatLng();
+                  updateWaypoint(wp.id, { lat: pos.lat, lon: pos.lng });
+                },
+                click: () => {
+                  if (isPlanning) {
+                    setPlanSubTab('mission');
+                    setSidebarCollapsed(false);
+                    setSelectedWaypointId(wp.id);
+                  }
+                },
+              }}
+            >
+              <Popup>
+                <div className="text-sm">
+                  <div className="font-semibold">{TYPE_LABELS[wp.type] || 'Waypoint'} {i + 1}</div>
+                  <div>Alt: {wp.alt}m</div>
+                  <div className="text-xs opacity-70">{formatCoord(wp.lat, wp.lon, coordFormat, 6)}</div>
+                  {hasViolation && (
+                    <div style={{ color: '#ef4444', fontSize: '10px', fontWeight: 600, marginTop: '4px' }}>
+                      Outside fence boundary
+                    </div>
+                  )}
+                  {isPlanning && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        addJumpWaypoint(i + 1);
+                      }}
+                      style={{
+                        marginTop: '6px',
+                        padding: '4px 10px',
+                        fontSize: '10px',
+                        fontWeight: 600,
+                        background: '#ec4899',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        width: '100%',
+                      }}
+                    >
+                      Add Jump to WP {i + 1}
+                    </button>
+                  )}
+                </div>
+              </Popup>
+            </Marker>
+            {/* Red violation ring overlay */}
+            {hasViolation && (
+              <Marker
+                position={[wp.lat, wp.lon]}
+                icon={violationIcon}
+                interactive={false}
+                opacity={plannedOpacity}
+              />
+            )}
+          </React.Fragment>
         );
       })}
 

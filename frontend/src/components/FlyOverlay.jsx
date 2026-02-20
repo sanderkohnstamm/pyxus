@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Shield,
   ShieldOff,
@@ -9,9 +9,13 @@ import {
   Square,
   Trash2,
   FastForward,
+  Layers,
+  Check,
+  X,
+  Loader2,
 } from 'lucide-react';
 import useDroneStore, { INITIAL_TELEMETRY } from '../store/droneStore';
-import { droneApi } from '../utils/api';
+import { droneApi, executeBatchCommand } from '../utils/api';
 import PreFlightChecklist from './PreFlightChecklist';
 
 const ARDUPILOT_MODES = [
@@ -318,6 +322,118 @@ export default function FlyOverlay() {
       </div>
 
       <PreFlightChecklist />
+
+      {/* Batch controls overlay */}
+      <BatchControlsBar />
+    </div>
+  );
+}
+
+
+// --- Batch Controls Bar ---
+
+function BatchStatusDot({ status }) {
+  if (status === 'pending') return <Loader2 size={10} className="text-gray-400 animate-spin" />;
+  if (status === 'success') return <Check size={10} className="text-emerald-400" />;
+  if (status === 'error') return <X size={10} className="text-red-400" />;
+  return null;
+}
+
+function BatchControlsBar() {
+  const selectedDroneIds = useDroneStore((s) => s.selectedDroneIds);
+  const drones = useDroneStore((s) => s.drones);
+  const batchCommandStatus = useDroneStore((s) => s.batchCommandStatus);
+  const addAlert = useDroneStore((s) => s.addAlert);
+  const addGcsLog = useDroneStore((s) => s.addGcsLog);
+  const clearDroneSelection = useDroneStore((s) => s.clearDroneSelection);
+  const [running, setRunning] = useState(false);
+
+  if (selectedDroneIds.length < 2) return null;
+
+  const btn = 'px-3 py-1.5 rounded text-[11px] font-medium transition-all border';
+
+  const runBatch = async (endpoint, label) => {
+    if (running) return;
+    setRunning(true);
+    addGcsLog(`Batch ${label}: sending to ${selectedDroneIds.length} drones`, 'info');
+    await executeBatchCommand(selectedDroneIds, endpoint, {}, addAlert);
+    addGcsLog(`Batch ${label}: complete`, 'info');
+    setRunning(false);
+  };
+
+  const hasStatus = Object.keys(batchCommandStatus).length > 0;
+
+  return (
+    <div className="flex flex-col gap-1 items-end">
+      {/* Batch mode indicator + per-drone status */}
+      <div className="flex items-center gap-1.5 bg-gray-900/70 backdrop-blur-md rounded-lg px-2.5 py-1.5 border border-cyan-500/30 shadow-2xl">
+        <Layers size={11} className="text-cyan-400" />
+        <span className="text-[10px] font-bold text-cyan-300 uppercase tracking-wider">
+          Batch Mode
+        </span>
+        <span className="text-[10px] text-gray-400">
+          {selectedDroneIds.length} drones
+        </span>
+        <div className="w-px h-3.5 bg-gray-700/30 mx-0.5" />
+        {/* Per-drone mini status */}
+        {selectedDroneIds.map((id) => {
+          const drone = drones[id];
+          const status = batchCommandStatus[id];
+          return (
+            <div key={id} className="flex items-center gap-0.5" title={drone?.name || id}>
+              <span className="text-[9px] text-gray-500 truncate" style={{ maxWidth: '50px' }}>
+                {drone?.name || id}
+              </span>
+              {hasStatus && <BatchStatusDot status={status} />}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Batch action buttons */}
+      <div className="flex items-center gap-1 bg-gray-900/70 backdrop-blur-md rounded-lg px-2 py-1.5 border border-gray-700/30 shadow-2xl">
+        <button
+          onClick={() => runBatch('arm', 'Arm')}
+          disabled={running}
+          className={`${btn} bg-gray-800/50 hover:bg-red-950/40 border-gray-700/30 hover:border-red-800/30 text-gray-300 hover:text-red-300 disabled:opacity-40 disabled:cursor-not-allowed`}
+        >
+          <Shield size={10} className="inline -mt-0.5 mr-1" />Arm All
+        </button>
+        <button
+          onClick={() => runBatch('disarm', 'Disarm')}
+          disabled={running}
+          className={`${btn} bg-gray-800/50 hover:bg-gray-700/50 border-gray-700/30 hover:border-gray-600/40 text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed`}
+        >
+          <ShieldOff size={10} className="inline -mt-0.5 mr-1" />Disarm All
+        </button>
+
+        <div className="w-px h-4 bg-gray-700/30 mx-0.5" />
+
+        <button
+          onClick={() => runBatch('land', 'Land')}
+          disabled={running}
+          className={`${btn} bg-gray-800/50 hover:bg-gray-700/50 border-gray-700/30 hover:border-gray-600/40 text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed`}
+        >
+          <ArrowDown size={10} className="inline -mt-0.5 mr-1" />Land All
+        </button>
+        <button
+          onClick={() => runBatch('rtl', 'RTL')}
+          disabled={running}
+          className={`${btn} bg-amber-950/40 hover:bg-amber-950/50 border-amber-900/25 hover:border-amber-800/35 text-amber-400 disabled:opacity-40 disabled:cursor-not-allowed`}
+        >
+          <Home size={10} className="inline -mt-0.5 mr-1" />RTL All
+        </button>
+
+        <div className="w-px h-4 bg-gray-700/30 mx-0.5" />
+
+        <button
+          onClick={clearDroneSelection}
+          className={`${btn} bg-gray-800/50 hover:bg-gray-700/50 border-gray-700/30 hover:border-gray-600/40 text-gray-500 hover:text-gray-300`}
+          title="Exit batch mode"
+        >
+          <X size={10} className="inline -mt-0.5 mr-1" />Exit
+        </button>
+      </div>
     </div>
   );
 }

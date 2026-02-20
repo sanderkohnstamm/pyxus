@@ -144,6 +144,136 @@ export function scalePoint(lat, lon, centerLat, centerLon, factor) {
 }
 
 /**
+ * Check if a point is inside a circle (haversine-based)
+ * @param {number} lat - Point latitude
+ * @param {number} lon - Point longitude
+ * @param {number} centerLat - Circle center latitude
+ * @param {number} centerLon - Circle center longitude
+ * @param {number} radiusMeters - Circle radius in meters
+ * @returns {boolean}
+ */
+export function pointInCircle(lat, lon, centerLat, centerLon, radiusMeters) {
+  return haversineDistance(lat, lon, centerLat, centerLon) <= radiusMeters;
+}
+
+/**
+ * Check if a point is inside a polygon (ray casting algorithm)
+ * @param {number} lat - Point latitude
+ * @param {number} lon - Point longitude
+ * @param {Array<{lat, lon}>} polygonVertices - Polygon vertices
+ * @returns {boolean}
+ */
+export function pointInPolygon(lat, lon, polygonVertices) {
+  if (!polygonVertices || polygonVertices.length < 3) return false;
+
+  let inside = false;
+  const n = polygonVertices.length;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const yi = polygonVertices[i].lat;
+    const xi = polygonVertices[i].lon;
+    const yj = polygonVertices[j].lat;
+    const xj = polygonVertices[j].lon;
+
+    if (((yi > lat) !== (yj > lat)) &&
+        (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/**
+ * Check if two line segments (p1-p2 and p3-p4) intersect
+ * @returns {boolean}
+ */
+function segmentsIntersect(p1, p2, p3, p4) {
+  const d1 = direction(p3, p4, p1);
+  const d2 = direction(p3, p4, p2);
+  const d3 = direction(p1, p2, p3);
+  const d4 = direction(p1, p2, p4);
+
+  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+      ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) {
+    return true;
+  }
+
+  if (d1 === 0 && onSegment(p3, p4, p1)) return true;
+  if (d2 === 0 && onSegment(p3, p4, p2)) return true;
+  if (d3 === 0 && onSegment(p1, p2, p3)) return true;
+  if (d4 === 0 && onSegment(p1, p2, p4)) return true;
+
+  return false;
+}
+
+function direction(pi, pj, pk) {
+  return (pk.lon - pi.lon) * (pj.lat - pi.lat) - (pk.lat - pi.lat) * (pj.lon - pi.lon);
+}
+
+function onSegment(pi, pj, pk) {
+  return Math.min(pi.lon, pj.lon) <= pk.lon && pk.lon <= Math.max(pi.lon, pj.lon) &&
+         Math.min(pi.lat, pj.lat) <= pk.lat && pk.lat <= Math.max(pi.lat, pj.lat);
+}
+
+/**
+ * Check if a polygon self-intersects (any non-adjacent edges cross)
+ * @param {Array<{lat, lon}>} vertices - Polygon vertices
+ * @returns {boolean}
+ */
+export function polygonSelfIntersects(vertices) {
+  if (!vertices || vertices.length < 4) return false;
+
+  const n = vertices.length;
+  for (let i = 0; i < n; i++) {
+    const nextI = (i + 1) % n;
+    for (let j = i + 2; j < n; j++) {
+      const nextJ = (j + 1) % n;
+      // Skip adjacent edges (they share a vertex)
+      if (nextJ === i) continue;
+      if (segmentsIntersect(vertices[i], vertices[nextI], vertices[j], vertices[nextJ])) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Validate mission waypoints against geofence (circle) and polygon fence
+ * @param {Array} waypoints - Mission waypoints with lat, lon, type
+ * @param {{lat, lon, radius, enabled}} geofence - Circular geofence
+ * @param {Array<{lat, lon}>} fenceVertices - Polygon fence vertices
+ * @returns {{valid: boolean, violations: Array<{waypointIndex: number, type: string}>}}
+ */
+export function validateMissionAgainstFence(waypoints, geofence, fenceVertices) {
+  const violations = [];
+  const NAV_TYPES = new Set(['waypoint', 'takeoff', 'loiter_unlim', 'loiter_turns', 'loiter_time', 'roi', 'land']);
+
+  for (let i = 0; i < waypoints.length; i++) {
+    const wp = waypoints[i];
+    // Only check waypoints that have a map position
+    if (!NAV_TYPES.has(wp.type)) continue;
+    if (wp.lat === 0 && wp.lon === 0) continue;
+
+    // Check circular geofence
+    if (geofence && geofence.enabled && geofence.lat !== 0 && geofence.lon !== 0) {
+      if (!pointInCircle(wp.lat, wp.lon, geofence.lat, geofence.lon, geofence.radius)) {
+        violations.push({ waypointIndex: i, type: 'outside_circle' });
+        continue; // Only report one violation per waypoint
+      }
+    }
+
+    // Check polygon fence
+    if (fenceVertices && fenceVertices.length >= 3) {
+      if (!pointInPolygon(wp.lat, wp.lon, fenceVertices)) {
+        violations.push({ waypointIndex: i, type: 'outside_polygon' });
+      }
+    }
+  }
+
+  return { valid: violations.length === 0, violations };
+}
+
+/**
  * Get bounding box of waypoints
  * @param {Array<{lat, lon}>} waypoints
  * @returns {{north, south, east, west}}

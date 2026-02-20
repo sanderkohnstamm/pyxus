@@ -57,26 +57,49 @@ export default function DroneListOverlay({ droneColorMap }) {
   const setActiveDrone = useDroneStore((s) => s.setActiveDrone);
   const droneVisibility = useDroneStore((s) => s.droneVisibility);
   const toggleDroneVisibility = useDroneStore((s) => s.toggleDroneVisibility);
+  const selectedDroneIds = useDroneStore((s) => s.selectedDroneIds);
+  const toggleDroneSelection = useDroneStore((s) => s.toggleDroneSelection);
+  const selectAllDrones = useDroneStore((s) => s.selectAllDrones);
+  const clearDroneSelection = useDroneStore((s) => s.clearDroneSelection);
 
   const droneIds = Object.keys(drones);
+  const isMultiSelect = selectedDroneIds.length > 0;
+  const allSelected = droneIds.length > 0 && droneIds.every((id) => selectedDroneIds.includes(id));
 
   // Only show when 2+ drones connected
   if (droneIds.length < 2) return null;
 
   return (
     <div className="absolute top-[80px] left-3 z-[1000] bg-gray-900/80 backdrop-blur-md rounded-lg border border-gray-700/30 shadow-xl overflow-hidden"
-         style={{ maxWidth: '220px' }}
+         style={{ maxWidth: '240px' }}
     >
-      <div className="px-2 py-1 border-b border-gray-700/30">
-        <span className="text-[9px] font-semibold uppercase tracking-wider text-gray-500">
+      <div className="px-2 py-1 border-b border-gray-700/30 flex items-center gap-1.5">
+        <span className="text-[9px] font-semibold uppercase tracking-wider text-gray-500 flex-1">
           Drones ({droneIds.length})
         </span>
+        {isMultiSelect ? (
+          <button
+            onClick={clearDroneSelection}
+            className="text-[9px] font-semibold text-gray-500 hover:text-gray-300 transition-colors px-1"
+          >
+            Clear
+          </button>
+        ) : (
+          <button
+            onClick={selectAllDrones}
+            className="text-[9px] font-semibold text-gray-500 hover:text-cyan-400 transition-colors px-1"
+            title="Select all for batch operations"
+          >
+            Select All
+          </button>
+        )}
       </div>
       <div className="flex flex-col">
         {droneIds.map((droneId) => {
           const drone = drones[droneId];
           const t = drone.telemetry || INITIAL_TELEMETRY;
           const isActive = droneId === activeDroneId;
+          const isSelected = selectedDroneIds.includes(droneId);
           const cIdx = droneColorMap?.[droneId] ?? 0;
           const color = DRONE_COLORS[cIdx];
           const vis = droneVisibility[droneId] || { trail: true, mission: true, fence: true };
@@ -89,9 +112,36 @@ export default function DroneListOverlay({ droneColorMap }) {
                 isActive
                   ? 'bg-gray-800/60'
                   : 'hover:bg-gray-800/40'
-              }`}
-              onClick={() => { if (!isActive) setActiveDrone(droneId); }}
+              } ${isSelected ? 'border-l-2 border-l-cyan-400' : 'border-l-2 border-l-transparent'}`}
+              onClick={(e) => {
+                if (e.shiftKey) {
+                  // Shift-click toggles batch selection
+                  toggleDroneSelection(droneId);
+                } else if (!isActive) {
+                  setActiveDrone(droneId);
+                }
+              }}
             >
+              {/* Selection checkbox */}
+              <div
+                className="flex-shrink-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleDroneSelection(droneId);
+                }}
+              >
+                <div className={`w-3 h-3 rounded-sm border transition-colors flex items-center justify-center ${
+                  isSelected
+                    ? 'bg-cyan-500 border-cyan-400'
+                    : 'border-gray-600 hover:border-gray-400'
+                }`}>
+                  {isSelected && (
+                    <svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="2,6 5,9 10,3" />
+                    </svg>
+                  )}
+                </div>
+              </div>
               {/* Color dot */}
               <div
                 className="w-2 h-2 rounded-full flex-shrink-0"
@@ -125,6 +175,27 @@ export default function DroneListOverlay({ droneColorMap }) {
           );
         })}
       </div>
+      {/* Batch selection hint */}
+      {!isMultiSelect && (
+        <div className="px-2 py-0.5 border-t border-gray-700/30">
+          <span className="text-[8px] text-gray-600 italic">Shift+click or checkbox to multi-select</span>
+        </div>
+      )}
+      {isMultiSelect && (
+        <div className="px-2 py-1 border-t border-gray-700/30 flex items-center gap-1.5">
+          <span className="text-[9px] text-cyan-400 font-semibold">
+            {selectedDroneIds.length} selected
+          </span>
+          {!allSelected && (
+            <button
+              onClick={selectAllDrones}
+              className="text-[9px] text-gray-500 hover:text-cyan-400 transition-colors ml-auto"
+            >
+              All
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
