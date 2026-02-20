@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import useDroneStore, { EMPTY_ARRAY } from '../store/droneStore';
+import useDroneStore, { EMPTY_ARRAY, EMPTY_OBJECT } from '../store/droneStore';
 
 const W = 340;
 const H = 80;
@@ -12,6 +12,7 @@ const chartH = H - padT - padB;
 
 export default function BatteryChart() {
   const batteryHistory = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.batteryHistory ?? EMPTY_ARRAY : EMPTY_ARRAY);
+  const params = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.params ?? EMPTY_OBJECT : EMPTY_OBJECT);
 
   const chartData = useMemo(() => {
     if (batteryHistory.length < 2) return null;
@@ -55,9 +56,13 @@ export default function BatteryChart() {
     return { voltagePath, currentPath, latestV, latestC, elapsed, vTicks, yVolt, vMin, vMax };
   }, [batteryHistory]);
 
+  // Voltage threshold lines from drone params
+  const lowVolt = params.BATT_LOW_VOLT?.value;
+  const crtVolt = params.BATT_CRT_VOLT?.value;
+
   if (!chartData) return null;
 
-  const { voltagePath, currentPath, latestV, latestC, elapsed, vTicks, yVolt } = chartData;
+  const { voltagePath, currentPath, latestV, latestC, elapsed, vTicks, yVolt, vMin, vMax } = chartData;
 
   const elapsedStr = elapsed < 60
     ? `${Math.round(elapsed)}s`
@@ -81,6 +86,30 @@ export default function BatteryChart() {
           </g>
         ))}
 
+        {/* Voltage threshold lines from drone params */}
+        {lowVolt > 0 && lowVolt >= vMin && lowVolt <= vMax && (
+          <g>
+            <line
+              x1={padL} y1={yVolt(lowVolt)} x2={W - padR} y2={yVolt(lowVolt)}
+              stroke="#f59e0b" strokeWidth="0.8" strokeDasharray="4 3" opacity="0.7"
+            />
+            <text x={W - padR} y={yVolt(lowVolt) - 2} textAnchor="end" fill="#f59e0b" fontSize="5.5" fontFamily="monospace" opacity="0.7">
+              WARN {lowVolt.toFixed(1)}V
+            </text>
+          </g>
+        )}
+        {crtVolt > 0 && crtVolt >= vMin && crtVolt <= vMax && (
+          <g>
+            <line
+              x1={padL} y1={yVolt(crtVolt)} x2={W - padR} y2={yVolt(crtVolt)}
+              stroke="#ef4444" strokeWidth="0.8" strokeDasharray="4 3" opacity="0.7"
+            />
+            <text x={W - padR} y={yVolt(crtVolt) - 2} textAnchor="end" fill="#ef4444" fontSize="5.5" fontFamily="monospace" opacity="0.7">
+              CRIT {crtVolt.toFixed(1)}V
+            </text>
+          </g>
+        )}
+
         {/* Current line */}
         <path d={currentPath} fill="none" stroke="#f59e0b" strokeWidth="1" opacity="0.6" />
 
@@ -97,7 +126,7 @@ export default function BatteryChart() {
       </svg>
 
       {/* Legend */}
-      <div className="flex items-center gap-3 mt-1 text-[9px] text-gray-600">
+      <div className="flex items-center gap-3 mt-1 text-[9px] text-gray-600 flex-wrap">
         <span className="flex items-center gap-1">
           <span className="w-2.5 h-0.5 bg-cyan-500 rounded-full inline-block" />
           Voltage
@@ -106,6 +135,18 @@ export default function BatteryChart() {
           <span className="w-2.5 h-0.5 bg-amber-500/60 rounded-full inline-block" />
           Current
         </span>
+        {lowVolt > 0 && (
+          <span className="flex items-center gap-1">
+            <span className="w-2.5 h-0 border-t border-dashed border-amber-500 inline-block" />
+            Warn
+          </span>
+        )}
+        {crtVolt > 0 && (
+          <span className="flex items-center gap-1">
+            <span className="w-2.5 h-0 border-t border-dashed border-red-500 inline-block" />
+            Crit
+          </span>
+        )}
       </div>
     </div>
   );

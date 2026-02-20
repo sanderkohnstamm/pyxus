@@ -3,6 +3,14 @@ import { SlidersHorizontal, RefreshCw, Search, Check, X, Download, Shield, Chevr
 import useDroneStore, { EMPTY_OBJECT } from '../store/droneStore';
 import { droneApi } from '../utils/api';
 
+// Safety-critical parameter prefixes (must match backend CRITICAL_PARAM_PREFIXES)
+const CRITICAL_PREFIXES = ['BATT_', 'FS_', 'ARMING_', 'MOT_', 'INS_'];
+
+function isCriticalParam(name) {
+  const upper = name.toUpperCase();
+  return CRITICAL_PREFIXES.some((p) => upper.startsWith(p));
+}
+
 // Key safety parameters for ArduPilot and PX4
 const SAFETY_PARAMS = {
   ardupilot: [
@@ -38,7 +46,7 @@ const SAFETY_PARAMS = {
   ],
 };
 
-function ParamRow({ name, param, meta, onSet }) {
+function ParamRow({ name, param, meta, onSet, critical }) {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
   const [expanded, setExpanded] = useState(false);
@@ -83,7 +91,7 @@ function ParamRow({ name, param, meta, onSet }) {
   };
 
   return (
-    <div className="hover:bg-gray-800/40 group">
+    <div className={`hover:bg-gray-800/40 group${critical ? ' border-l-2 border-amber-500/40 bg-amber-500/5' : ''}`}>
       <div
         className="flex items-center gap-2 px-3 py-1.5 cursor-pointer"
         onClick={handleRowClick}
@@ -103,6 +111,12 @@ function ParamRow({ name, param, meta, onSet }) {
         </div>
         {editing ? (
           <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+            <span className="text-[9px] font-mono text-gray-600 tabular-nums" title="Current value">
+              {Number.isInteger(param.value) ? param.value : param.value.toFixed(
+                Math.abs(param.value) < 1 ? 6 : Math.abs(param.value) < 100 ? 4 : 2
+              )}
+            </span>
+            <span className="text-gray-600 text-[9px]">&rarr;</span>
             <input
               type="text"
               value={editValue}
@@ -273,17 +287,36 @@ export default function ParamsPanel() {
     }
   }, [isConnected, addAlert]);
 
+  const sendParamSet = useCallback(async (paramId, value, confirm = false) => {
+    const res = await fetch(droneApi('/api/params/set'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ param_id: paramId, value, confirm }),
+    });
+    return res.json();
+  }, []);
+
   const handleSet = useCallback(async (paramId, value) => {
     try {
-      const res = await fetch(droneApi('/api/params/set'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ param_id: paramId, value }),
-      });
-      const data = await res.json();
-      if (data.status === 'ok') {
+      const data = await sendParamSet(paramId, value);
+      if (data.status === 'confirm_required') {
+        // Show native confirmation dialog for safety-critical params
+        const confirmed = window.confirm(
+          `Safety Warning\n\n${data.warning}\n\nAre you sure you want to set ${paramId} = ${value}?`
+        );
+        if (confirmed) {
+          const confirmData = await sendParamSet(paramId, value, true);
+          if (confirmData.status === 'ok') {
+            addAlert(`${paramId} = ${value} (confirmed)`, 'success');
+            setTimeout(fetchParams, 500);
+          } else {
+            addAlert(confirmData.error || 'Failed to set param', 'error');
+          }
+        } else {
+          addAlert(`${paramId} change cancelled`, 'info');
+        }
+      } else if (data.status === 'ok') {
         addAlert(`${paramId} = ${value}`, 'success');
-        // Refresh after a short delay to get updated value
         setTimeout(fetchParams, 500);
       } else {
         addAlert(data.error || 'Failed to set param', 'error');
@@ -291,7 +324,7 @@ export default function ParamsPanel() {
     } catch (err) {
       addAlert('Failed to set param', 'error');
     }
-  }, [addAlert, fetchParams]);
+  }, [addAlert, fetchParams, sendParamSet]);
 
   // Poll params with visibility detection and adaptive interval
   useEffect(() => {
@@ -448,7 +481,7 @@ export default function ParamsPanel() {
         ) : (
           <div className="divide-y divide-gray-800/30">
             {filtered.map(([name, param]) => (
-              <ParamRow key={name} name={name} param={param} meta={paramMeta[name]} onSet={handleSet} />
+              <ParamRow key={name} name={name} param={param} meta={paramMeta[name]} onSet={handleSet} critical={isCriticalParam(name)} />
             ))}
           </div>
         )}

@@ -38,6 +38,58 @@ const FIX_TYPES = {
   6: 'RTK Fixed',
 };
 
+function BatteryGpsRow({ t }) {
+  const batteryWarnThreshold = useDroneStore((s) => s.batteryWarnThreshold);
+  const batteryCritThreshold = useDroneStore((s) => s.batteryCritThreshold);
+
+  const pct = t.remaining;
+  const isCritical = pct >= 0 && pct <= batteryCritThreshold;
+  const isWarn = pct >= 0 && pct <= batteryWarnThreshold && !isCritical;
+
+  // Determine battery card styling
+  let batteryBorder = 'border-gray-800/50';
+  let batteryBg = 'bg-gray-800/40';
+  let batteryIconClass = 'text-gray-600';
+  let batteryPctClass = '';
+
+  if (isCritical) {
+    batteryBorder = 'border-red-800/50';
+    batteryBg = 'bg-red-950/30';
+    batteryIconClass = 'text-red-400 animate-pulse';
+    batteryPctClass = 'text-red-400 font-bold';
+  } else if (isWarn) {
+    batteryBorder = 'border-amber-800/50';
+    batteryBg = 'bg-amber-950/20';
+    batteryIconClass = 'text-amber-400';
+    batteryPctClass = 'text-amber-400 font-bold';
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <div className={`${batteryBg} rounded-lg p-3 border ${batteryBorder} transition-colors`}>
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <Battery size={11} className={batteryIconClass} />
+          <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Battery</span>
+        </div>
+        <TelemetryRow label="V" value={t.voltage.toFixed(1)} unit="V" />
+        <TelemetryRow label="A" value={t.current.toFixed(1)} unit="A" />
+        <div className="flex justify-between items-baseline py-0.5">
+          <span className="text-gray-500 text-[11px]">%</span>
+          <span className={`font-mono text-xs ${batteryPctClass || 'text-gray-200'}`}>
+            {pct >= 0 ? pct : '--'}
+          </span>
+        </div>
+      </div>
+      <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-800/50">
+        <SectionHeader icon={Satellite} label="GPS" />
+        <TelemetryRow label="Fix" value={FIX_TYPES[t.fix_type] || t.fix_type} />
+        <TelemetryRow label="Sats" value={t.satellites} />
+        <TelemetryRow label="HDOP" value={t.hdop.toFixed(2)} />
+      </div>
+    </div>
+  );
+}
+
 export default function Telemetry() {
   const t = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry : INITIAL_TELEMETRY) || INITIAL_TELEMETRY;
   const activeDroneId = useDroneStore((s) => s.activeDroneId);
@@ -76,23 +128,8 @@ export default function Telemetry() {
       </div>
 
       {/* Battery + GPS compact row */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-800/50">
-          <SectionHeader icon={Battery} label="Battery" />
-          <TelemetryRow label="V" value={t.voltage.toFixed(1)} unit="V" />
-          <TelemetryRow label="A" value={t.current.toFixed(1)} unit="A" />
-          <TelemetryRow
-            label="%"
-            value={t.remaining >= 0 ? t.remaining : '--'}
-          />
-        </div>
-        <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-800/50">
-          <SectionHeader icon={Satellite} label="GPS" />
-          <TelemetryRow label="Fix" value={FIX_TYPES[t.fix_type] || t.fix_type} />
-          <TelemetryRow label="Sats" value={t.satellites} />
-          <TelemetryRow label="HDOP" value={t.hdop.toFixed(2)} />
-        </div>
-      </div>
+      <BatteryGpsRow t={t} />
+      {/* (GPS rendered inside BatteryGpsRow) */}
 
       {/* Attitude */}
       <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-800/50">

@@ -118,6 +118,7 @@ class ServoTestRequest(BaseModel):
 class ParamSetRequest(BaseModel):
     param_id: str
     value: float
+    confirm: bool = False
 
 
 class CalibrationRequest(BaseModel):
@@ -355,6 +356,8 @@ async def api_takeoff(req: TakeoffRequest, drone_id: str = Query(...)):
     drone, _ = get_drone(drone_id)
     if not drone.connected:
         return {"status": "error", "error": "Not connected"}
+    if not drone.vehicle_profile.get("supports_takeoff", True):
+        return {"status": "error", "error": "Vehicle type does not support takeoff"}
     if drone.is_ardupilot:
         drone.set_mode("GUIDED")
         await asyncio.sleep(0.5)
@@ -367,6 +370,11 @@ async def api_land(drone_id: str = Query(...)):
     drone, _ = get_drone(drone_id)
     if not drone.connected:
         return {"status": "error", "error": "Not connected"}
+    profile = drone.vehicle_profile
+    if profile.get("category") in ("ground", "surface"):
+        # Ground/surface vehicles: issue HOLD mode instead of land command
+        drone.set_mode("HOLD")
+        return {"status": "ok", "command": "hold"}
     drone.land()
     return {"status": "ok", "command": "land"}
 
@@ -653,12 +661,38 @@ async def api_params_refresh(drone_id: str = Query(...)):
     return {"status": "ok", "command": "param_request_list"}
 
 
+# Safety-critical parameter prefixes that require confirmation
+CRITICAL_PARAM_PREFIXES = {
+    "BATT_": "battery",
+    "FS_": "failsafe",
+    "ARMING_": "arming checks",
+    "MOT_": "motors",
+    "INS_": "inertial sensors",
+}
+
+
 @app.post("/api/params/set")
 async def api_params_set(req: ParamSetRequest, drone_id: str = Query(...)):
     drone, _ = get_drone(drone_id)
     if not drone.connected:
         return {"status": "error", "error": "Not connected"}
-    drone.set_param(req.param_id, req.value)
+
+    # Check if this is a safety-critical parameter
+    param_upper = req.param_id.upper()
+    for prefix, category in CRITICAL_PARAM_PREFIXES.items():
+        if param_upper.startswith(prefix):
+            if not req.confirm:
+                return {
+                    "status": "confirm_required",
+                    "warning": f"'{req.param_id}' is a safety-critical {category} parameter. Incorrect values may cause loss of vehicle. Please confirm.",
+                    "param_id": req.param_id,
+                    "value": req.value,
+                }
+            break
+
+    ok = drone.set_param(req.param_id, req.value)
+    if not ok:
+        return {"status": "error", "error": f"Invalid value for '{req.param_id}': value must be numeric"}
     return {"status": "ok", "command": "param_set", "param_id": req.param_id, "value": req.value}
 
 

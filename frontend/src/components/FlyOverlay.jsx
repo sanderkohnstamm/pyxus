@@ -47,6 +47,7 @@ export default function FlyOverlay() {
   const addGcsLog = useDroneStore((s) => s.addGcsLog);
   const takeoffAlt = useDroneStore((s) => s.takeoffAlt);
   const setDroneMission = useDroneStore((s) => s.setDroneMission);
+  const capabilities = telemetry.capabilities || null;
 
   // Fetch available modes when drone changes, with delay and retry
   // The vehicle needs time to respond to AVAILABLE_MODES requests after connection
@@ -146,6 +147,11 @@ export default function FlyOverlay() {
     [addAlert, addGcsLog, setDroneMission]
   );
 
+  // Battery critical threshold check for RTL banner
+  const batteryRemaining = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry?.remaining : -1) ?? -1;
+  const batteryCritThreshold = useDroneStore((s) => s.batteryCritThreshold);
+  const isBatteryCritical = batteryRemaining >= 0 && batteryRemaining <= batteryCritThreshold;
+
   if (!isConnected) return null;
 
   const useStandardModes = availableModes.length > 0;
@@ -158,6 +164,12 @@ export default function FlyOverlay() {
     ? [telemetry.mode, ...baseModes]
     : baseModes;
   const btn = 'px-3 py-1.5 rounded text-[11px] font-medium transition-all border';
+
+  // Vehicle capability flags
+  const supportsTakeoff = capabilities?.supports_takeoff !== false;
+  const hasAltitude = capabilities?.has_altitude !== false;
+  const isGroundOrSurface = capabilities?.category === 'ground' || capabilities?.category === 'surface';
+  const landLabel = isGroundOrSurface ? 'Stop' : 'Land';
 
   const handleModeChange = useCallback((e) => {
     const val = e.target.value;
@@ -175,6 +187,17 @@ export default function FlyOverlay() {
 
   return (
     <div className="absolute bottom-4 right-4 z-[1000] flex flex-col gap-1.5 items-end">
+      {/* RTL Suggested banner */}
+      {isBatteryCritical && telemetry.armed && (
+        <button
+          onClick={() => apiCall('rtl', {}, 'RTL')}
+          className="flex items-center gap-2 px-4 py-2 bg-red-950/70 backdrop-blur-md rounded-lg border border-red-700/50 shadow-2xl animate-pulse cursor-pointer hover:bg-red-900/70 transition-colors"
+        >
+          <Home size={14} className="text-red-400" />
+          <span className="text-[12px] font-bold text-red-300 tracking-wide uppercase">RTL Suggested -- Battery {batteryRemaining}%</span>
+        </button>
+      )}
+
       {/* Mission controls */}
       <div className="flex items-center gap-1 bg-gray-900/70 backdrop-blur-md rounded-lg px-2 py-1.5 border border-gray-700/30 shadow-2xl">
         <span
@@ -234,21 +257,30 @@ export default function FlyOverlay() {
 
         <div className="w-px h-4 bg-gray-700/30 mx-0.5" />
 
+        {supportsTakeoff && (
+          <button
+            onClick={() => apiCall('takeoff', { alt: takeoffAlt }, `Takeoff ${takeoffAlt}m`)}
+            className={`${btn} bg-gray-800/50 hover:bg-gray-700/50 border-gray-700/30 hover:border-gray-600/40 text-gray-300`}
+          >
+            <ArrowUp size={10} className="inline -mt-0.5 mr-1" />Takeoff
+          </button>
+        )}
         <button
-          onClick={() => apiCall('takeoff', { alt: takeoffAlt }, `Takeoff ${takeoffAlt}m`)}
+          onClick={() => apiCall('land', {}, landLabel)}
           className={`${btn} bg-gray-800/50 hover:bg-gray-700/50 border-gray-700/30 hover:border-gray-600/40 text-gray-300`}
         >
-          <ArrowUp size={10} className="inline -mt-0.5 mr-1" />Takeoff
-        </button>
-        <button
-          onClick={() => apiCall('land', {}, 'Land')}
-          className={`${btn} bg-gray-800/50 hover:bg-gray-700/50 border-gray-700/30 hover:border-gray-600/40 text-gray-300`}
-        >
-          <ArrowDown size={10} className="inline -mt-0.5 mr-1" />Land
+          {isGroundOrSurface
+            ? <Square size={9} className="inline -mt-0.5 mr-1" />
+            : <ArrowDown size={10} className="inline -mt-0.5 mr-1" />
+          }{landLabel}
         </button>
         <button
           onClick={() => apiCall('rtl', {}, 'RTL')}
-          className={`${btn} bg-amber-950/40 hover:bg-amber-950/50 border-amber-900/25 hover:border-amber-800/35 text-amber-400`}
+          className={`${btn} ${
+            isBatteryCritical
+              ? 'bg-red-950/60 hover:bg-red-900/60 border-red-700/50 hover:border-red-600/50 text-red-300 animate-pulse'
+              : 'bg-amber-950/40 hover:bg-amber-950/50 border-amber-900/25 hover:border-amber-800/35 text-amber-400'
+          }`}
         >
           <Home size={10} className="inline -mt-0.5 mr-1" />RTL
         </button>

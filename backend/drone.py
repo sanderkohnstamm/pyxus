@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from pymavlink import mavutil
+from vehicle_profiles import get_profile
 
 
 def sanitize_for_json(value):
@@ -320,7 +321,9 @@ class DroneConnection:
 
     def get_telemetry(self) -> dict:
         with self._lock:
-            return self._telemetry.to_dict()
+            data = self._telemetry.to_dict()
+        data["capabilities"] = get_profile(self._mav_type)
+        return data
 
     def connect(self, connection_string: str) -> bool:
         if self._connected:
@@ -1197,8 +1200,30 @@ class DroneConnection:
     def request_params(self):
         self._enqueue_cmd("request_param_list")
 
-    def set_param(self, param_id: str, value: float, param_type: int = 9):
-        self._enqueue_cmd("set_param", param_id=param_id, value=value, param_type=param_type)
+    def set_param(self, param_id: str, value, param_type: int = 9) -> bool:
+        """Set a parameter value. Returns False if the value is invalid."""
+        # Type validation: reject non-numeric values
+        if isinstance(value, str):
+            try:
+                value = float(value)
+            except (ValueError, TypeError):
+                print(f"[Drone] Rejected set_param '{param_id}': value '{value}' is not numeric")
+                return False
+
+        if not isinstance(value, (int, float)):
+            print(f"[Drone] Rejected set_param '{param_id}': value type '{type(value).__name__}' is not numeric")
+            return False
+
+        # Log old and new values
+        with self._params_lock:
+            old_entry = self._params.get(param_id)
+        if old_entry is not None:
+            print(f"[Drone] PARAM_SET '{param_id}': {old_entry['value']} -> {value}")
+        else:
+            print(f"[Drone] PARAM_SET '{param_id}': (unknown) -> {value}")
+
+        self._enqueue_cmd("set_param", param_id=param_id, value=float(value), param_type=param_type)
+        return True
 
     def _track_message(self, msg, msg_type: str, now: float):
         """Track message for the MAVLink inspector."""
@@ -1379,3 +1404,8 @@ class DroneConnection:
     @property
     def target_component(self) -> int:
         return self._target_component
+
+    @property
+    def vehicle_profile(self) -> dict:
+        """Return the vehicle capability profile for the connected vehicle."""
+        return get_profile(self._mav_type)
