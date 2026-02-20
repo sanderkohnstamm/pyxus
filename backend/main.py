@@ -1,7 +1,9 @@
 import asyncio
 import json
 import os
+import re
 import shutil
+import urllib.parse
 import uuid
 from contextlib import asynccontextmanager
 from typing import Optional
@@ -935,13 +937,27 @@ async def api_weather_platform_set(req: PlatformSelectRequest):
 
 # --- Video stream proxy ---
 
+_SHELL_METACHAR_RE = re.compile(r'[;|&`$(){}]')
+_ALLOWED_SCHEMES = {"rtsp", "http", "https", "udp"}
+_MAX_URL_LENGTH = 2048
+
+
 @app.get("/api/video/stream")
 async def video_stream(url: str = Query(...)):
     if not url:
         return {"status": "error", "error": "No URL provided"}
 
-    if not any(url.startswith(s) for s in ("rtsp://", "http://", "https://", "udp://")):
+    if len(url) > _MAX_URL_LENGTH:
+        return {"status": "error", "error": f"URL exceeds maximum length of {_MAX_URL_LENGTH} characters"}
+
+    if _SHELL_METACHAR_RE.search(url):
+        return {"status": "error", "error": "URL contains disallowed characters"}
+
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in _ALLOWED_SCHEMES:
         return {"status": "error", "error": "Unsupported URL scheme"}
+    if not parsed.hostname:
+        return {"status": "error", "error": "URL must contain a valid hostname"}
 
     if not shutil.which("ffmpeg"):
         return {"status": "error", "error": "ffmpeg not installed on server"}
@@ -1000,9 +1016,23 @@ async def websocket_endpoint(websocket: WebSocket):
                     if drone_id and drone_id in drone_registry:
                         drone = drone_registry[drone_id]["drone"]
                         if drone.connected:
-                            channels = msg.get("channels", [])
-                            if channels:
-                                drone.rc_override(channels)
+                            raw_channels = msg.get("channels", [])
+                            if raw_channels and isinstance(raw_channels, list):
+                                # Validate and sanitize channel values
+                                validated = []
+                                for val in raw_channels[:8]:  # Truncate to max 8
+                                    try:
+                                        v = int(val)
+                                    except (TypeError, ValueError):
+                                        v = 0  # Non-numeric -> release
+                                    # 0 = release, otherwise clamp to 1000-2000
+                                    if v != 0:
+                                        v = max(1000, min(2000, v))
+                                    validated.append(v)
+                                # Pad to 8 channels with 0 (release)
+                                while len(validated) < 8:
+                                    validated.append(0)
+                                drone.rc_override(validated)
             except json.JSONDecodeError:
                 pass
     except WebSocketDisconnect:

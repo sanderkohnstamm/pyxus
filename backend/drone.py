@@ -2,6 +2,7 @@ import os
 os.environ['MAVLINK20'] = '1'
 os.environ['MAVLINK_DIALECT'] = 'all'
 
+import struct
 import threading
 import time
 import queue
@@ -351,8 +352,8 @@ class DroneConnection:
                             mavutil.mavlink.MAV_AUTOPILOT_INVALID,
                             0, 0, 0
                         )
-                    except Exception:
-                        pass
+                    except (OSError, struct.error) as e:
+                        print(f"[Drone] Error sending handshake heartbeat: {e}")
                     last_hb_sent = now
 
                 msg = self._mav.recv_match(type='HEARTBEAT', blocking=True, timeout=1)
@@ -411,12 +412,12 @@ class DroneConnection:
             return True
 
         except Exception as e:
-            print(f"Connection failed: {e}")
+            print(f"[Drone] Connection failed: {e}")
             if self._mav:
                 try:
                     self._mav.close()
-                except:
-                    pass
+                except OSError as close_err:
+                    print(f"[Drone] Error closing connection during cleanup: {close_err}")
                 self._mav = None
             return False
 
@@ -429,8 +430,8 @@ class DroneConnection:
         if self._mav:
             try:
                 self._mav.close()
-            except:
-                pass
+            except OSError as e:
+                print(f"[Drone] Error closing connection during disconnect: {e}")
             self._mav = None
         with self._lock:
             self._telemetry = TelemetryState()
@@ -479,8 +480,8 @@ class DroneConnection:
                         mavutil.mavlink.MAV_AUTOPILOT_INVALID,
                         0, 0, 0
                     )
-                except:
-                    pass
+                except (OSError, struct.error) as e:
+                    print(f"[Drone] Error sending GCS heartbeat: {e}")
                 last_heartbeat = now
 
             # Drain command queue
@@ -496,9 +497,14 @@ class DroneConnection:
                 msg = self._mav.recv_match(blocking=True, timeout=0.05)
                 if msg is not None:
                     self._handle_message(msg)
-            except Exception:
+            except (OSError, struct.error, ValueError) as e:
                 if self._running:
+                    print(f"[Drone] Error receiving message: {e}")
                     time.sleep(0.01)
+            except Exception as e:
+                if self._running:
+                    print(f"[Drone] Unexpected error in run loop: {e}")
+                    time.sleep(0.1)
 
     def _execute_cmd(self, cmd_type: str, kwargs: dict):
         try:
@@ -552,7 +558,26 @@ class DroneConnection:
                     else:
                         print(f"Unknown ArduPilot mode: {mode_name}")
                 else:
-                    self._mav.set_mode_apm(mode_name)
+                    # PX4: reverse-lookup mode name to (main_mode, sub_mode),
+                    # then encode into custom_mode and send MAV_CMD_DO_SET_MODE
+                    name_to_key = {}
+                    for key, name in PX4_MODES.items():
+                        if name not in name_to_key:
+                            name_to_key[name] = key
+                    mode_key = name_to_key.get(mode_name)
+                    if mode_key is not None:
+                        main_mode, sub_mode = mode_key
+                        custom_mode = (main_mode << 16) | (sub_mode << 24)
+                        self._mav.mav.command_long_send(
+                            self._target_system, self._target_component,
+                            mavutil.mavlink.MAV_CMD_DO_SET_MODE,
+                            0,
+                            mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,  # param1: base_mode
+                            custom_mode,  # param2: custom_mode
+                            0, 0, 0, 0, 0
+                        )
+                    else:
+                        print(f"Unknown PX4 mode: {mode_name}")
             elif cmd_type == "set_standard_mode":
                 self._mav.mav.command_long_send(
                     self._target_system, self._target_component,
@@ -571,10 +596,7 @@ class DroneConnection:
                     0, 0, 0, 0, 0
                 )
             elif cmd_type == "rc_override":
-                channels = kwargs["channels"]
-                # Pad to 8 channels, 0 = no override
-                while len(channels) < 8:
-                    channels.append(0)
+                channels = self._validate_rc_channels(kwargs["channels"])
                 self._mav.mav.rc_channels_override_send(
                     self._target_system, self._target_component,
                     *channels[:8]
@@ -798,7 +820,7 @@ class DroneConnection:
                     0, 0
                 )
         except Exception as e:
-            print(f"Command error ({cmd_type}): {e}")
+            print(f"[Drone] Command error ({cmd_type}): {e}")
 
     def _handle_message(self, msg):
         msg_type = msg.get_type()
@@ -1029,7 +1051,31 @@ class DroneConnection:
     def set_mode(self, mode: str):
         self._enqueue_cmd("set_mode", mode=mode)
 
+    @staticmethod
+    def _validate_rc_channels(channels: list) -> list[int]:
+        """Validate and sanitize RC channel values.
+
+        Returns a list of exactly 8 integers. Each value is either 0 (release)
+        or clamped to the valid PWM range 1000-2000.
+        """
+        validated = []
+        for val in channels[:8]:  # Truncate to max 8
+            try:
+                v = int(val)
+            except (TypeError, ValueError):
+                v = 0
+            # 0 = release, otherwise clamp to 1000-2000
+            if v != 0:
+                v = max(1000, min(2000, v))
+            validated.append(v)
+        # Pad to 8 channels with 0 (release)
+        while len(validated) < 8:
+            validated.append(0)
+        return validated
+
     def rc_override(self, channels: list[int]):
+        # Safety-net validation in case caller skipped it
+        channels = self._validate_rc_channels(channels)
         if self._is_ardupilot:
             self._enqueue_cmd("rc_override", channels=channels)
         else:
@@ -1205,7 +1251,8 @@ class DroneConnection:
                 msg_dict.pop('mavpackettype', None)
                 # Limit size of data stored and sanitize NaN/Inf values
                 stats['last_data'] = sanitize_for_json({k: v for k, v in list(msg_dict.items())[:20]})
-            except Exception:
+            except (AttributeError, ValueError, TypeError) as e:
+                print(f"[Drone] Error extracting message data for {msg_type}: {e}")
                 stats['last_data'] = {}
 
     def get_message_stats(self) -> list:
