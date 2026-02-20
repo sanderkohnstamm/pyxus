@@ -286,6 +286,9 @@ class DroneConnection:
         self._target_system = 1
         self._target_component = 1
         self._connected = False
+        # Telemetry generation counter (incremented on each telemetry update)
+        self._telemetry_generation: int = 0
+
         # Parameters
         self._params: dict = {}  # name -> {value, type, index}
         self._params_total: int = 0
@@ -318,6 +321,11 @@ class DroneConnection:
     @property
     def connected(self) -> bool:
         return self._connected
+
+    @property
+    def telemetry_generation(self) -> int:
+        """Counter that increments each time telemetry state changes."""
+        return self._telemetry_generation
 
     def get_telemetry(self) -> dict:
         with self._lock:
@@ -966,6 +974,8 @@ class DroneConnection:
             return
 
         with self._lock:
+            _updated = False
+
             if msg_type == "HEARTBEAT":
                 src_system = msg.get_srcSystem()
                 src_component = msg.get_srcComponent()
@@ -999,6 +1009,7 @@ class DroneConnection:
                     self._telemetry.mode = PX4_MODES.get(
                         (main_mode, sub_mode), f"PX4_{main_mode}_{sub_mode}"
                     )
+                _updated = True
 
             elif msg_type == "ATTITUDE":
                 self._telemetry.roll = msg.roll
@@ -1007,31 +1018,40 @@ class DroneConnection:
                 self._telemetry.rollspeed = msg.rollspeed
                 self._telemetry.pitchspeed = msg.pitchspeed
                 self._telemetry.yawspeed = msg.yawspeed
+                _updated = True
 
             elif msg_type == "GLOBAL_POSITION_INT":
                 self._telemetry.lat = msg.lat / 1e7
                 self._telemetry.lon = msg.lon / 1e7
                 self._telemetry.alt = msg.relative_alt / 1000.0
                 self._telemetry.alt_msl = msg.alt / 1000.0
+                _updated = True
 
             elif msg_type == "GPS_RAW_INT":
                 self._telemetry.fix_type = msg.fix_type
                 self._telemetry.satellites = msg.satellites_visible
                 self._telemetry.hdop = msg.eph / 100.0 if msg.eph != 65535 else 99.99
+                _updated = True
 
             elif msg_type == "VFR_HUD":
                 self._telemetry.airspeed = msg.airspeed
                 self._telemetry.groundspeed = msg.groundspeed
                 self._telemetry.heading = msg.heading
                 self._telemetry.climb = msg.climb
+                _updated = True
 
             elif msg_type == "SYS_STATUS":
                 self._telemetry.voltage = msg.voltage_battery / 1000.0
                 self._telemetry.current = msg.current_battery / 100.0 if msg.current_battery != -1 else 0.0
                 self._telemetry.remaining = msg.battery_remaining
+                _updated = True
 
             elif msg_type == "MISSION_CURRENT":
                 self._telemetry.mission_seq = msg.seq
+                _updated = True
+
+            if _updated:
+                self._telemetry_generation += 1
 
     def arm(self):
         self._enqueue_cmd("arm")

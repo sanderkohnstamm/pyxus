@@ -185,15 +185,36 @@ ws_manager = ConnectionManager()
 # --- Telemetry broadcast task ---
 
 async def telemetry_broadcast():
-    """Broadcast telemetry for all registered drones at ~10Hz with delta detection."""
-    # Per-drone delta tracking
-    last_data: dict[str, dict] = {}  # drone_id -> last telemetry
-    last_mission_status: dict[str, str] = {}
+    """Broadcast telemetry for all drones with delta compression and adaptive rate.
 
-    volatile_keys = {'lat', 'lon', 'alt', 'alt_msl', 'roll', 'pitch', 'yaw', 'heading',
-                     'groundspeed', 'airspeed', 'climb', 'voltage', 'current', 'heartbeat_age'}
+    Optimizations over the previous fixed-10Hz full-dict approach:
+    - Generation counter: skip drones whose telemetry hasn't changed (cheap int compare)
+    - Delta compression: only send fields that actually changed since last broadcast
+    - Full sync: send complete telemetry every 5s as a reliability fallback
+    - Adaptive rate per drone:
+        * Armed + moving (groundspeed > 0.5): 10 Hz
+        * Armed + stationary: 5 Hz
+        * Disarmed / idle: 1 Hz heartbeat
+    """
+    # Per-drone tracking state
+    last_snapshot: dict[str, dict] = {}          # drone_id -> last sent telemetry dict
+    last_generation: dict[str, int] = {}         # drone_id -> last seen generation counter
+    last_mission_status: dict[str, str] = {}     # drone_id -> last sent mission status
+    last_full_sync: dict[str, float] = {}        # drone_id -> monotonic time of last full send
+    last_send_time: dict[str, float] = {}        # drone_id -> monotonic time of last broadcast
+
+    FULL_SYNC_INTERVAL = 5.0  # seconds between full telemetry snapshots
+    # Adaptive rate intervals (seconds between sends)
+    RATE_ACTIVE = 0.1    # 10 Hz  – armed and moving
+    RATE_ARMED  = 0.2    #  5 Hz  – armed but stationary
+    RATE_IDLE   = 1.0    #  1 Hz  – disarmed / parked
+
+    # Fields that are always included in every message (delta or full)
+    ALWAYS_KEYS = {"type", "drone_id", "drone_name"}
 
     while True:
+        now = asyncio.get_event_loop().time()
+
         if ws_manager.active_connections and drone_registry:
             for drone_id, entry in list(drone_registry.items()):
                 drone = entry["drone"]
@@ -201,33 +222,82 @@ async def telemetry_broadcast():
                 if not drone.connected:
                     continue
 
-                telemetry = drone.get_telemetry()
-                mission_status = mission_mgr.status
-                status_msgs = drone.drain_statustext()
+                # --- Adaptive rate: decide if this drone is due for a send ---
+                prev_snap = last_snapshot.get(drone_id, {})
+                armed = prev_snap.get("armed", False)
+                groundspeed = prev_snap.get("groundspeed", 0)
 
-                prev = last_data.get(drone_id, {})
+                if armed and groundspeed > 0.5:
+                    min_interval = RATE_ACTIVE
+                elif armed:
+                    min_interval = RATE_ARMED
+                else:
+                    min_interval = RATE_IDLE
+
+                elapsed = now - last_send_time.get(drone_id, 0)
+                if elapsed < min_interval:
+                    continue
+
+                # --- Generation counter: cheap check if telemetry changed ---
+                gen = drone.telemetry_generation
+                status_msgs = drone.drain_statustext()
+                mission_status = mission_mgr.status
                 prev_mission = last_mission_status.get(drone_id)
 
-                has_changes = (
-                    status_msgs or
-                    mission_status != prev_mission or
-                    any(telemetry.get(k) != prev.get(k) for k in volatile_keys) or
-                    telemetry.get('armed') != prev.get('armed') or
-                    telemetry.get('mode') != prev.get('mode') or
-                    telemetry.get('mission_seq') != prev.get('mission_seq')
-                )
+                gen_changed = gen != last_generation.get(drone_id, -1)
+                mission_changed = mission_status != prev_mission
+                has_statustext = bool(status_msgs)
+                force_full = (now - last_full_sync.get(drone_id, 0)) >= FULL_SYNC_INTERVAL
 
-                if has_changes:
-                    telemetry["type"] = "telemetry"
-                    telemetry["drone_id"] = drone_id
-                    telemetry["drone_name"] = entry["name"]
-                    telemetry["mission_status"] = mission_status
-                    if status_msgs:
-                        telemetry["statustext"] = status_msgs
-                    await ws_manager.broadcast(telemetry)
-                    last_data[drone_id] = telemetry.copy()
-                    last_mission_status[drone_id] = mission_status
+                if not (gen_changed or mission_changed or has_statustext or force_full):
+                    continue
 
+                # --- Build the message ---
+                telemetry = drone.get_telemetry()
+
+                if force_full or not prev_snap:
+                    # Full snapshot: send everything
+                    message = dict(telemetry)
+                    message["_full"] = True
+                    last_full_sync[drone_id] = now
+                else:
+                    # Delta: only include fields that changed
+                    message = {}
+                    for key, val in telemetry.items():
+                        if key in ALWAYS_KEYS:
+                            continue
+                        if prev_snap.get(key) != val:
+                            message[key] = val
+
+                    if mission_changed:
+                        message["mission_status"] = mission_status
+
+                    # If nothing actually changed in values (generation bumped
+                    # but rounding made values identical), skip unless statustext
+                    if not message and not has_statustext:
+                        last_generation[drone_id] = gen
+                        continue
+
+                # Attach envelope fields
+                message["type"] = "telemetry"
+                message["drone_id"] = drone_id
+                message["drone_name"] = entry["name"]
+
+                message["mission_status"] = mission_status
+
+                if has_statustext:
+                    message["statustext"] = status_msgs
+
+                await ws_manager.broadcast(message)
+
+                # Update tracking state
+                last_snapshot[drone_id] = telemetry.copy()
+                last_generation[drone_id] = gen
+                last_mission_status[drone_id] = mission_status
+                last_send_time[drone_id] = now
+
+        # Sleep at the fastest possible rate (10 Hz).
+        # Per-drone rate limiting above prevents over-sending for idle drones.
         await asyncio.sleep(0.1)
 
 

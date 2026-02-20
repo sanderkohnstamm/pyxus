@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import useDroneStore, { INITIAL_TELEMETRY } from '../store/droneStore';
 import { droneApi } from '../utils/api';
+import PreFlightChecklist from './PreFlightChecklist';
 
 const ARDUPILOT_MODES = [
   'STABILIZE', 'ALT_HOLD', 'LOITER', 'POSHOLD', 'GUIDED', 'AUTO',
@@ -46,6 +47,7 @@ export default function FlyOverlay() {
   const addAlert = useDroneStore((s) => s.addAlert);
   const addGcsLog = useDroneStore((s) => s.addGcsLog);
   const takeoffAlt = useDroneStore((s) => s.takeoffAlt);
+  const setShowPreFlightChecklist = useDroneStore((s) => s.setShowPreFlightChecklist);
   const setDroneMission = useDroneStore((s) => s.setDroneMission);
   const capabilities = telemetry.capabilities || null;
 
@@ -239,7 +241,13 @@ export default function FlyOverlay() {
       {/* Flight commands + mode */}
       <div className="flex items-center gap-1 bg-gray-900/70 backdrop-blur-md rounded-lg px-2 py-1.5 border border-gray-700/30 shadow-2xl">
         <button
-          onClick={() => apiCall('arm', {}, 'Arm')}
+          onClick={() => {
+            if (!telemetry.armed) {
+              setShowPreFlightChecklist(true);
+            } else {
+              apiCall('arm', {}, 'Arm');
+            }
+          }}
           className={`${btn} ${
             telemetry.armed
               ? 'bg-red-950/50 border-red-800/30 text-red-400'
@@ -308,6 +316,8 @@ export default function FlyOverlay() {
           )}
         </select>
       </div>
+
+      <PreFlightChecklist />
     </div>
   );
 }

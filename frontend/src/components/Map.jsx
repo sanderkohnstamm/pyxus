@@ -9,12 +9,18 @@ import VideoOverlay from './VideoOverlay';
 import WeatherMapLayer from './WeatherMapLayer';
 import ManualControlOverlay from './ManualControlOverlay';
 import PatternModal from './PatternModal';
+import DroneListOverlay from './DroneListOverlay';
 import { Move, RotateCw, Maximize2, ArrowLeftRight, Grid3X3, Ruler, Zap } from 'lucide-react';
 import { centroid, transformMission, haversineDistance, bearing } from '../utils/geo';
 import { formatCoord } from '../utils/formatCoord';
 
 // Navigation types that have map positions
 const NAV_TYPES = new Set(['waypoint', 'takeoff', 'loiter_unlim', 'loiter_turns', 'loiter_time', 'roi', 'land']);
+
+// Color palette for multi-drone visualization
+const DRONE_COLORS = ['#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+// Lighter stroke variants for drone icons
+const DRONE_STROKES = ['#22d3ee', '#34d399', '#fbbf24', '#f87171', '#a78bfa', '#f472b6', '#2dd4bf', '#fb923c'];
 
 // Generate quadratic bezier arc between two points
 function generateArc(source, target, numPoints = 20) {
@@ -72,14 +78,22 @@ function createDroneIcon(yawDeg, fill = '#06b6d4', stroke = '#22d3ee') {
 }
 
 // Name label icon for drones on the map
-function createDroneNameIcon(name, isActive) {
-  const bg = isActive ? 'rgba(6,182,212,0.85)' : 'rgba(100,116,139,0.75)';
+function createDroneNameIcon(name, isActive, color) {
+  const bg = color ? hexToRgba(color, 0.85) : (isActive ? 'rgba(6,182,212,0.85)' : 'rgba(100,116,139,0.75)');
   return L.divIcon({
     html: `<div style="white-space:nowrap;background:${bg};color:white;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:600;font-family:monospace;text-align:center;pointer-events:none">${name}</div>`,
     className: 'drone-name-label',
     iconSize: null,
     iconAnchor: [-12, -10],
   });
+}
+
+// Utility: hex color to rgba string
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
 }
 
 // Waypoint icon with type-based coloring
@@ -1416,6 +1430,7 @@ export default function MapView() {
   const drones = useDroneStore((s) => s.drones);
   const activeDroneId = useDroneStore((s) => s.activeDroneId);
   const setActiveDrone = useDroneStore((s) => s.setActiveDrone);
+  const droneVisibility = useDroneStore((s) => s.droneVisibility);
   const geofence = useDroneStore((s) => s.geofence);
   const followDrone = useDroneStore((s) => s.followDrone);
   const setFollowDrone = useDroneStore((s) => s.setFollowDrone);
@@ -1435,6 +1450,22 @@ export default function MapView() {
   // Context menu and manipulation state
   const [contextMenu, setContextMenu] = useState(null);
   const [manipMode, setManipMode] = useState(null);
+
+  // Stable color assignment: map droneId -> palette index (active drone always gets cyan = index 0)
+  const droneColorMap = useMemo(() => {
+    const ids = Object.keys(drones);
+    const map = {};
+    let colorIdx = 1; // start at 1 because 0 is reserved for active
+    for (const id of ids) {
+      if (id === activeDroneId) {
+        map[id] = 0; // active always cyan
+      } else {
+        map[id] = colorIdx % DRONE_COLORS.length;
+        colorIdx++;
+      }
+    }
+    return map;
+  }, [drones, activeDroneId]);
 
   // Active drone telemetry
   const activeDrone = activeDroneId ? drones[activeDroneId] : null;
@@ -1491,25 +1522,68 @@ export default function MapView() {
         <MapClickHandler />
         <AddModeCursor />
 
-        {/* All drone trails + markers */}
+        {/* All drone trails + markers + non-active drone missions */}
         {Object.entries(drones).map(([droneId, drone]) => {
           const t = drone.telemetry || INITIAL_TELEMETRY;
           const isActive = droneId === activeDroneId;
           const dHasPos = t.lat !== 0 && t.lon !== 0;
           const dYawDeg = t.heading || (t.yaw * 180) / Math.PI;
-          const trailColor = isActive ? '#06b6d4' : '#64748b';
-          const fillColor = isActive ? '#06b6d4' : '#64748b';
-          const strokeColor = isActive ? '#22d3ee' : '#94a3b8';
+          const cIdx = droneColorMap[droneId] ?? 0;
+          const fillColor = DRONE_COLORS[cIdx];
+          const strokeColor = DRONE_STROKES[cIdx];
+          const vis = droneVisibility[droneId] || { trail: true, mission: true, fence: true };
+
+          // Non-active drone mission polyline
+          const nonActiveMission = !isActive && vis.mission && drone.droneMission?.length > 1;
+          const missionNavPositions = nonActiveMission
+            ? drone.droneMission.filter(w => (w.item_type || 'waypoint') !== 'roi').map(w => [w.lat, w.lon])
+            : [];
+
+          // Non-active drone fence
+          const nonActiveFence = !isActive && vis.fence && drone.droneFence?.length > 0;
 
           return (
             <React.Fragment key={droneId}>
-              {/* Trail */}
-              {drone.trail.length > 1 && (
+              {/* Trail (respect visibility toggle) */}
+              {vis.trail && drone.trail.length > 1 && (
                 <Polyline
                   positions={drone.trail}
-                  pathOptions={{ color: trailColor, weight: 2, opacity: isActive ? 0.6 : 0.3 }}
+                  pathOptions={{ color: fillColor, weight: 2, opacity: isActive ? 0.6 : 0.4 }}
                 />
               )}
+
+              {/* Non-active drone mission (semi-transparent polyline in drone color) */}
+              {nonActiveMission && missionNavPositions.length > 1 && (
+                <Polyline
+                  positions={missionNavPositions}
+                  pathOptions={{ color: fillColor, weight: 2, opacity: 0.35, dashArray: '6 4' }}
+                />
+              )}
+
+              {/* Non-active drone fence */}
+              {nonActiveFence && (() => {
+                const circularFences = drone.droneFence.filter(f => f.command === 5003);
+                const polyVerts = drone.droneFence.filter(f => f.command === 5001);
+                const polyPositions = polyVerts.map(v => [v.lat, v.lon]);
+                return (
+                  <>
+                    {circularFences.map((fence, i) => (
+                      <Circle
+                        key={`naf-circle-${droneId}-${i}`}
+                        center={[fence.lat, fence.lon]}
+                        radius={fence.param1}
+                        pathOptions={{ color: fillColor, weight: 1.5, opacity: 0.3, fillColor: fillColor, fillOpacity: 0.05, dashArray: '8 4' }}
+                      />
+                    ))}
+                    {polyPositions.length >= 3 && (
+                      <Polygon
+                        positions={polyPositions}
+                        pathOptions={{ color: fillColor, weight: 1.5, opacity: 0.3, fillColor: fillColor, fillOpacity: 0.05, dashArray: '8 4' }}
+                      />
+                    )}
+                  </>
+                );
+              })()}
 
               {/* Drone marker */}
               {dHasPos && (
@@ -1535,7 +1609,7 @@ export default function MapView() {
                   {/* Name label */}
                   <Marker
                     position={[t.lat, t.lon]}
-                    icon={createDroneNameIcon(drone.name, isActive)}
+                    icon={createDroneNameIcon(drone.name, isActive, fillColor)}
                     interactive={false}
                   />
                 </>
@@ -1629,6 +1703,9 @@ export default function MapView() {
 
       {/* Manual control overlay */}
       <ManualControlOverlay />
+
+      {/* Multi-drone list overlay (top-left, below zoom controls) */}
+      <DroneListOverlay droneColorMap={droneColorMap} />
 
       {/* Follow button */}
       <button

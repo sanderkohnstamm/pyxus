@@ -43,6 +43,9 @@ const useDroneStore = create((set, get) => ({
   drones: {},          // { [droneId]: INITIAL_DRONE_STATE }
   activeDroneId: null, // selected drone for sidebar/commands
 
+  // Per-drone visibility on map: { [droneId]: { trail: true, mission: true, fence: true } }
+  droneVisibility: {},
+
   // Tabs
   activeTab: 'planning', // planning | flying
 
@@ -181,6 +184,9 @@ const useDroneStore = create((set, get) => ({
   gcsPosition: null,
   _gcsZoomed: false,
 
+  // Pre-flight checklist
+  showPreFlightChecklist: false,
+
   // WebSocket
   wsConnected: false,
 
@@ -211,28 +217,45 @@ const useDroneStore = create((set, get) => ({
   // === Multi-drone actions ===
 
   registerDrone: (droneId, name, connectionString) => {
-    const { drones, activeDroneId } = get();
+    const { drones, activeDroneId, droneVisibility } = get();
     const newDrones = {
       ...drones,
       [droneId]: { ...INITIAL_DRONE_STATE, name, connectionString },
     };
     // Auto-select if first drone
     const newActive = activeDroneId || droneId;
-    set({ drones: newDrones, activeDroneId: newActive });
+    // Initialize visibility defaults (all visible)
+    const newVisibility = {
+      ...droneVisibility,
+      [droneId]: droneVisibility[droneId] || { trail: true, mission: true, fence: true },
+    };
+    set({ drones: newDrones, activeDroneId: newActive, droneVisibility: newVisibility });
   },
 
   removeDrone: (droneId) => {
-    const { drones, activeDroneId } = get();
+    const { drones, activeDroneId, droneVisibility } = get();
     const { [droneId]: _, ...rest } = drones;
+    const { [droneId]: _v, ...restVisibility } = droneVisibility;
     let newActive = activeDroneId;
     if (activeDroneId === droneId) {
       const ids = Object.keys(rest);
       newActive = ids.length > 0 ? ids[0] : null;
     }
-    set({ drones: rest, activeDroneId: newActive });
+    set({ drones: rest, activeDroneId: newActive, droneVisibility: restVisibility });
   },
 
   setActiveDrone: (droneId) => set({ activeDroneId: droneId }),
+
+  toggleDroneVisibility: (droneId, field) => {
+    const { droneVisibility } = get();
+    const current = droneVisibility[droneId] || { trail: true, mission: true, fence: true };
+    set({
+      droneVisibility: {
+        ...droneVisibility,
+        [droneId]: { ...current, [field]: !current[field] },
+      },
+    });
+  },
 
   addToConnectionHistory: (name, connectionString, type) => {
     const { connectionHistory } = get();
@@ -255,22 +278,27 @@ const useDroneStore = create((set, get) => ({
     if (!droneState) return;
 
     const newTrail = [...droneState.trail];
-    if (data.lat !== 0 && data.lon !== 0) {
+    // Use lat/lon from delta if present, otherwise from existing telemetry
+    const lat = data.lat !== undefined ? data.lat : droneState.telemetry.lat;
+    const lon = data.lon !== undefined ? data.lon : droneState.telemetry.lon;
+    if (lat && lat !== 0 && lon && lon !== 0) {
       const lastPoint = newTrail[newTrail.length - 1];
-      if (!lastPoint || lastPoint[0] !== data.lat || lastPoint[1] !== data.lon) {
-        newTrail.push([data.lat, data.lon]);
+      if (!lastPoint || lastPoint[0] !== lat || lastPoint[1] !== lon) {
+        newTrail.push([lat, lon]);
         if (newTrail.length > MAX_TRAIL_POINTS) {
           newTrail.shift();
         }
       }
     }
 
-    // Battery history sampling
+    // Battery history sampling (resolve from delta or existing telemetry)
     const now = Date.now();
     let newBatteryHistory = droneState.batteryHistory;
     let newLastTs = droneState._lastBatterySampleTs;
-    if (data.voltage > 0 && now - droneState._lastBatterySampleTs >= 1000) {
-      newBatteryHistory = [...droneState.batteryHistory, { ts: now, voltage: data.voltage, current: data.current }];
+    const voltage = data.voltage !== undefined ? data.voltage : droneState.telemetry.voltage;
+    const current = data.current !== undefined ? data.current : droneState.telemetry.current;
+    if (voltage > 0 && now - droneState._lastBatterySampleTs >= 1000) {
+      newBatteryHistory = [...droneState.batteryHistory, { ts: now, voltage, current }];
       if (newBatteryHistory.length > MAX_BATTERY_SAMPLES) newBatteryHistory.shift();
       newLastTs = now;
     }
@@ -282,7 +310,7 @@ const useDroneStore = create((set, get) => ({
           ...droneState,
           telemetry: { ...droneState.telemetry, ...data },
           trail: newTrail,
-          missionStatus: data.mission_status || 'idle',
+          missionStatus: data.mission_status !== undefined ? data.mission_status : droneState.missionStatus,
           batteryHistory: newBatteryHistory,
           _lastBatterySampleTs: newLastTs,
         },
@@ -360,6 +388,9 @@ const useDroneStore = create((set, get) => ({
   },
 
   setWsConnected: (connected) => set({ wsConnected: connected }),
+
+  // Pre-flight checklist
+  setShowPreFlightChecklist: (show) => set({ showPreFlightChecklist: show }),
 
   // Planned mission waypoints
   addWaypoint: (lat, lon, alt) => {

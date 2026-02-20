@@ -42,6 +42,7 @@ export default function Controls({ sendMessage }) {
   const droneMission = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.droneMission ?? EMPTY_ARRAY : EMPTY_ARRAY);
   const setDroneMission = useDroneStore((s) => s.setDroneMission);
   const coordFormat = useDroneStore((s) => s.coordFormat);
+  const setShowPreFlightChecklist = useDroneStore((s) => s.setShowPreFlightChecklist);
   const missionSeq = telemetry.mission_seq;
   const autopilot = telemetry.autopilot;
 
@@ -116,7 +117,7 @@ export default function Controls({ sendMessage }) {
           if (telemetry.armed) {
             apiCall('disarm');
           } else {
-            apiCall('arm');
+            setShowPreFlightChecklist(true);
           }
         }
       }
@@ -129,7 +130,7 @@ export default function Controls({ sendMessage }) {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [keyboardEnabled, setKeyPressed, telemetry.armed, apiCall]);
+  }, [keyboardEnabled, setKeyPressed, telemetry.armed, apiCall, setShowPreFlightChecklist]);
 
   // Keyboard RC override send loop at 20Hz
   useEffect(() => {
