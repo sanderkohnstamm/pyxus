@@ -35,6 +35,9 @@ ITEM_TYPE_COMMANDS = {
 # Reverse map: MAVLink command number -> item_type string
 COMMAND_ITEM_TYPES = {v: k for k, v in ITEM_TYPE_COMMANDS.items()}
 
+# Non-navigation command types that must use MAV_FRAME_MISSION with x=y=z=0
+_NON_NAV_TYPES = {"do_jump", "do_set_servo", "roi"}
+
 
 class MissionManager:
     def __init__(self, drone):
@@ -73,10 +76,20 @@ class MissionManager:
                 wp.item_type,
                 mavutil.mavlink.MAV_CMD_NAV_WAYPOINT,
             )
+            # Non-navigation commands (DO_*) use MAV_FRAME_MISSION with
+            # zeroed coordinates; only params carry meaning.
+            if wp.item_type in _NON_NAV_TYPES:
+                frame = mavutil.mavlink.MAV_FRAME_MISSION
+                x, y, z = 0, 0, 0
+            else:
+                frame = mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT
+                x = int(wp.lat * 1e7)
+                y = int(wp.lon * 1e7)
+                z = wp.alt
             self._drone.send_mission_cmd(
                 "mission_item_int",
                 seq=seq,
-                frame=mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
+                frame=frame,
                 command=command,
                 current=0,
                 autocontinue=1,
@@ -84,9 +97,9 @@ class MissionManager:
                 param2=wp.param2,
                 param3=wp.param3,
                 param4=wp.param4,
-                x=int(wp.lat * 1e7),
-                y=int(wp.lon * 1e7),
-                z=wp.alt,
+                x=x,
+                y=y,
+                z=z,
             )
 
     def upload(self, waypoints: list[Waypoint]) -> bool:

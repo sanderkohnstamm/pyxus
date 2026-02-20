@@ -1,7 +1,72 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Video, Play, X, Link, Camera, Crosshair, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
-import useDroneStore, { EMPTY_ARRAY } from '../store/droneStore';
+import { Video, Play, X, Link, Camera, Crosshair, ChevronDown, ChevronUp, RefreshCw, Activity } from 'lucide-react';
+import useDroneStore, { EMPTY_ARRAY, INITIAL_TELEMETRY } from '../store/droneStore';
 import { droneApi } from '../utils/api';
+
+const FIX_TYPES = { 0: 'No GPS', 1: 'No Fix', 2: '2D', 3: '3D', 4: 'DGPS', 5: 'RTK Flt', 6: 'RTK Fix' };
+
+function batteryColor(pct) {
+  if (pct < 0) return 'text-gray-500';
+  if (pct <= 15) return 'text-red-400';
+  if (pct <= 30) return 'text-amber-400';
+  return 'text-emerald-400';
+}
+
+function VideoTelemetryOverlay() {
+  const t = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry : null) || INITIAL_TELEMETRY;
+
+  return (
+    <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-1.5 font-mono transition-opacity duration-200">
+      {/* Top row */}
+      <div className="flex justify-between items-start">
+        {/* Top-left: Mode + Armed */}
+        <div className="bg-gray-900/70 backdrop-blur-sm rounded px-1.5 py-1 border border-gray-700/30">
+          <div className="flex items-center gap-1.5">
+            <span className={`w-1.5 h-1.5 rounded-full ${t.armed ? 'bg-red-400 shadow-red-400/50 shadow-sm' : 'bg-emerald-400'}`} />
+            <span className="text-[9px] text-gray-400">{t.armed ? 'ARMED' : 'SAFE'}</span>
+          </div>
+          <div className="text-[10px] font-bold text-gray-200 mt-0.5 leading-tight">
+            {t.mode || '---'}
+          </div>
+        </div>
+
+        {/* Top-right: Battery + Voltage (offset right to avoid toggle button) */}
+        <div className="bg-gray-900/70 backdrop-blur-sm rounded px-1.5 py-1 border border-gray-700/30 mr-6">
+          <div className={`text-[10px] font-bold tabular-nums leading-tight ${batteryColor(t.remaining)}`}>
+            {t.remaining >= 0 ? `${t.remaining}%` : '--'}
+          </div>
+          <div className="text-[9px] text-gray-400 tabular-nums">
+            {t.voltage.toFixed(1)}V
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom row */}
+      <div className="flex justify-between items-end">
+        {/* Bottom-left: Speed + Altitude */}
+        <div className="bg-gray-900/70 backdrop-blur-sm rounded px-1.5 py-1 border border-gray-700/30">
+          <div className="text-[9px] text-gray-400 tabular-nums">
+            GS <span className="text-gray-200">{t.groundspeed.toFixed(1)}</span> m/s
+          </div>
+          <div className="text-[9px] text-gray-400 tabular-nums">
+            ALT <span className="text-gray-200">{t.alt.toFixed(1)}</span> m
+          </div>
+        </div>
+
+        {/* Bottom-right: GPS + Sats + Heading */}
+        <div className="bg-gray-900/70 backdrop-blur-sm rounded px-1.5 py-1 border border-gray-700/30">
+          <div className="text-[9px] text-gray-400 tabular-nums">
+            <span className={t.fix_type >= 3 ? 'text-emerald-400' : 'text-amber-400'}>{FIX_TYPES[t.fix_type] || t.fix_type}</span>
+            {' '}<span className="text-gray-200">{t.satellites}</span> sat
+          </div>
+          <div className="text-[9px] text-gray-400 tabular-nums">
+            HDG <span className="text-gray-200">{Math.round(t.heading)}</span>&deg;
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const EXAMPLE_URLS = [
   { label: 'RTSP', value: 'rtsp://192.168.1.1:8554/stream' },
@@ -212,6 +277,7 @@ export default function VideoFeed() {
   const setVideoUrl = useDroneStore((s) => s.setVideoUrl);
   const setVideoActive = useDroneStore((s) => s.setVideoActive);
   const addAlert = useDroneStore((s) => s.addAlert);
+  const [showTelemetry, setShowTelemetry] = useState(false);
 
   const streamUrl = videoActive && videoUrl
     ? droneApi(`/api/video/stream?url=${encodeURIComponent(videoUrl)}`)
@@ -284,7 +350,7 @@ export default function VideoFeed() {
       </div>
 
       {/* Video display */}
-      <div className="flex-1 bg-gray-900/60 rounded-lg border border-gray-800/50 overflow-hidden flex items-center justify-center min-h-[200px]">
+      <div className="relative flex-1 bg-gray-900/60 rounded-lg border border-gray-800/50 overflow-hidden flex items-center justify-center min-h-[200px]">
         {streamUrl ? (
           <img
             src={streamUrl}
@@ -302,6 +368,28 @@ export default function VideoFeed() {
             <span className="text-[10px] opacity-60">Enter a URL and click Start</span>
           </div>
         )}
+
+        {/* Telemetry overlay toggle */}
+        <button
+          onClick={() => setShowTelemetry(!showTelemetry)}
+          className={`absolute top-1.5 right-1.5 z-10 p-1 rounded transition-all pointer-events-auto ${
+            showTelemetry
+              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+              : 'bg-gray-900/60 text-gray-500 border border-gray-700/30 hover:text-gray-300 hover:bg-gray-800/60'
+          }`}
+          title={showTelemetry ? 'Hide telemetry overlay' : 'Show telemetry overlay'}
+        >
+          <Activity size={11} />
+        </button>
+
+        {/* Telemetry overlay */}
+        <div
+          className={`absolute inset-0 transition-opacity duration-200 ${
+            showTelemetry ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
+        >
+          {showTelemetry && <VideoTelemetryOverlay />}
+        </div>
       </div>
 
       {/* Info */}

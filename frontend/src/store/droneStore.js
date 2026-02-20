@@ -56,6 +56,9 @@ const useDroneStore = create((set, get) => ({
   // Coordinate format
   coordFormat: localStorage.getItem('pyxus-coord-format') || 'latlon',
 
+  // Sound
+  soundEnabled: localStorage.getItem('pyxus-sound-enabled') !== 'false', // default true
+
   // Planned mission (user-editable, global — not per-drone)
   plannedWaypoints: [],
   missionStatus: 'idle',
@@ -414,6 +417,11 @@ const useDroneStore = create((set, get) => ({
     const next = get().coordFormat === 'latlon' ? 'mgrs' : 'latlon';
     localStorage.setItem('pyxus-coord-format', next);
     set({ coordFormat: next });
+  },
+  toggleSound: () => {
+    const next = !get().soundEnabled;
+    localStorage.setItem('pyxus-sound-enabled', String(next));
+    set({ soundEnabled: next });
   },
 
   setWsConnected: (connected) => set({ wsConnected: connected }),

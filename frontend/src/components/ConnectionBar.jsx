@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Wifi, WifiOff, Heart, Sun, Moon, Grid3X3, Plus, X } from 'lucide-react';
+import { Wifi, WifiOff, Heart, Sun, Moon, Grid3X3, Plus, X, Volume2, VolumeX } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
 import { INITIAL_TELEMETRY } from '../store/droneStore';
 import { droneApi } from '../utils/api';
@@ -40,6 +40,8 @@ export default function ConnectionBar() {
   const toggleTheme = useDroneStore((s) => s.toggleTheme);
   const coordFormat = useDroneStore((s) => s.coordFormat);
   const toggleCoordFormat = useDroneStore((s) => s.toggleCoordFormat);
+  const soundEnabled = useDroneStore((s) => s.soundEnabled);
+  const toggleSound = useDroneStore((s) => s.toggleSound);
   const setDefaultAlt = useDroneStore((s) => s.setDefaultAlt);
   const setDefaultSpeed = useDroneStore((s) => s.setDefaultSpeed);
   const setTakeoffAlt = useDroneStore((s) => s.setTakeoffAlt);
@@ -303,6 +305,15 @@ export default function ConnectionBar() {
           title={coordFormat === 'mgrs' ? 'Switch to Lat/Lon' : 'Switch to MGRS'}
         >
           <Grid3X3 size={12} />
+        </button>
+
+        {/* Sound toggle */}
+        <button
+          onClick={toggleSound}
+          className="p-1 rounded hover:bg-gray-800/30 transition-colors text-gray-500/60 hover:text-gray-400"
+          title={soundEnabled ? 'Mute sounds' : 'Unmute sounds'}
+        >
+          {soundEnabled ? <Volume2 size={12} /> : <VolumeX size={12} />}
         </button>
 
         {/* Theme toggle */}

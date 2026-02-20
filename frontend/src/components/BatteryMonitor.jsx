@@ -18,6 +18,7 @@ function playBeep(frequency = 800, duration = 0.3) {
 }
 
 export default function BatteryMonitor() {
+  const soundEnabled = useDroneStore((s) => s.soundEnabled);
   const drones = useDroneStore((s) => s.drones);
   const activeDroneId = useDroneStore((s) => s.activeDroneId);
   const batteryWarnThreshold = useDroneStore((s) => s.batteryWarnThreshold);
@@ -57,14 +58,16 @@ export default function BatteryMonitor() {
     if (crtVolt && crtVolt > 0 && voltage <= crtVolt && !batteryWarnings.critical) {
       setBatteryWarnings({ critical: true });
       addAlert(`CRITICAL: Battery ${voltage.toFixed(1)}V (threshold: ${crtVolt}V)`, 'error');
-      playBeep(800, 0.3);
-      setTimeout(() => playBeep(800, 0.3), 400);
+      if (soundEnabled) {
+        playBeep(800, 0.3);
+        setTimeout(() => playBeep(800, 0.3), 400);
+      }
     } else if (lowVolt && lowVolt > 0 && voltage <= lowVolt && !batteryWarnings.low) {
       setBatteryWarnings({ low: true });
       addAlert(`Low Battery: ${voltage.toFixed(1)}V (threshold: ${lowVolt}V)`, 'warning');
-      playBeep(600, 0.2);
+      if (soundEnabled) playBeep(600, 0.2);
     }
-  }, [voltage, remaining, activeDroneId, params, batteryWarnings, setBatteryWarnings, addAlert]);
+  }, [voltage, remaining, activeDroneId, params, batteryWarnings, setBatteryWarnings, addAlert, soundEnabled]);
 
   // Percentage-based warnings for ALL connected drones
   useEffect(() => {
@@ -91,14 +94,16 @@ export default function BatteryMonitor() {
       if (pct <= batteryCritThreshold && !state.crit) {
         setBatteryAlertState(droneId, { crit: true });
         addAlert(`CRITICAL: ${name} battery at ${pct}% (threshold: ${batteryCritThreshold}%)`, 'error');
-        playBeep(800, 0.3);
-        setTimeout(() => playBeep(800, 0.3), 400);
+        if (soundEnabled) {
+          playBeep(800, 0.3);
+          setTimeout(() => playBeep(800, 0.3), 400);
+        }
       }
       // Warn check (only if not already critical)
       else if (pct <= batteryWarnThreshold && !state.warn && !state.crit) {
         setBatteryAlertState(droneId, { warn: true });
         addAlert(`Low Battery: ${name} at ${pct}% (threshold: ${batteryWarnThreshold}%)`, 'warning');
-        playBeep(600, 0.2);
+        if (soundEnabled) playBeep(600, 0.2);
       }
     }
 
@@ -108,7 +113,7 @@ export default function BatteryMonitor() {
         clearBatteryAlertState(droneId);
       }
     }
-  }, [drones, batteryWarnThreshold, batteryCritThreshold, alertState, setBatteryAlertState, clearBatteryAlertState, addAlert]);
+  }, [drones, batteryWarnThreshold, batteryCritThreshold, alertState, setBatteryAlertState, clearBatteryAlertState, addAlert, soundEnabled]);
 
   return null;
 }
