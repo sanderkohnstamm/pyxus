@@ -1136,30 +1136,45 @@ async def api_weather_platform_set(req: PlatformSelectRequest):
 
 # --- Video stream proxy ---
 
-_SHELL_METACHAR_RE = re.compile(r'[;|&`$(){}]')
+_UNSAFE_URL_RE = re.compile(r'[;|&`$(){}<>!#\r\n\x00]')
 _ALLOWED_SCHEMES = {"rtsp", "http", "https", "udp"}
 _MAX_URL_LENGTH = 2048
+_BLOCKED_HOSTNAMES = {"localhost", "127.0.0.1", "::1", "0.0.0.0", "[::1]"}
+
+
+def _is_private_ip(hostname: str) -> bool:
+    """Check if hostname resolves to a private/loopback IP (SSRF protection)."""
+    import ipaddress
+    try:
+        addr = ipaddress.ip_address(hostname)
+        return addr.is_private or addr.is_loopback or addr.is_link_local
+    except ValueError:
+        return False
 
 
 @app.get("/api/video/stream")
 async def video_stream(url: str = Query(...)):
-    if not url:
-        return {"status": "error", "error": "No URL provided"}
+    if not url or not url.strip():
+        raise HTTPException(400, "No URL provided")
 
     if len(url) > _MAX_URL_LENGTH:
-        return {"status": "error", "error": f"URL exceeds maximum length of {_MAX_URL_LENGTH} characters"}
+        raise HTTPException(400, f"URL exceeds maximum length of {_MAX_URL_LENGTH} characters")
 
-    if _SHELL_METACHAR_RE.search(url):
-        return {"status": "error", "error": "URL contains disallowed characters"}
+    if _UNSAFE_URL_RE.search(url):
+        raise HTTPException(400, "URL contains disallowed characters")
 
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme not in _ALLOWED_SCHEMES:
-        return {"status": "error", "error": "Unsupported URL scheme"}
+        raise HTTPException(400, f"Unsupported URL scheme. Allowed: {', '.join(sorted(_ALLOWED_SCHEMES))}")
     if not parsed.hostname:
-        return {"status": "error", "error": "URL must contain a valid hostname"}
+        raise HTTPException(400, "URL must contain a valid hostname")
+
+    hostname = parsed.hostname.lower()
+    if hostname in _BLOCKED_HOSTNAMES or _is_private_ip(hostname):
+        raise HTTPException(400, "URLs targeting internal/private addresses are not allowed")
 
     if not shutil.which("ffmpeg"):
-        return {"status": "error", "error": "ffmpeg not installed on server"}
+        raise HTTPException(503, "ffmpeg not installed on server")
 
     args = ["ffmpeg", "-y"]
     if url.startswith("rtsp://"):
