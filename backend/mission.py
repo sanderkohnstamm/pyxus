@@ -1,9 +1,12 @@
+import logging
 import threading
 import time
 from dataclasses import dataclass
 from typing import Optional
 
 from pymavlink import mavutil
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -143,8 +146,8 @@ class MissionManager:
             self._set_status("upload_failed")
             return False
 
-        except Exception as e:
-            print(f"Mission upload error: {e}")
+        except (OSError, TimeoutError, ValueError) as e:
+            logger.error("Mission upload error: %s", e)
             self._set_status("upload_failed")
             return False
 
@@ -166,8 +169,8 @@ class MissionManager:
 
             self._set_status("running")
             return True
-        except Exception as e:
-            print(f"Mission start error: {e}")
+        except (OSError, TimeoutError, ValueError) as e:
+            logger.error("Mission start error: %s", e)
             return False
 
     def pause(self) -> bool:
@@ -183,8 +186,8 @@ class MissionManager:
 
             self._set_status("paused")
             return True
-        except Exception as e:
-            print(f"Mission pause error: {e}")
+        except (OSError, TimeoutError) as e:
+            logger.error("Mission pause error: %s", e)
             return False
 
     def resume(self) -> bool:
@@ -200,8 +203,8 @@ class MissionManager:
 
             self._set_status("running")
             return True
-        except Exception as e:
-            print(f"Mission resume error: {e}")
+        except (OSError, TimeoutError) as e:
+            logger.error("Mission resume error: %s", e)
             return False
 
     def clear(self) -> bool:
@@ -213,8 +216,8 @@ class MissionManager:
             self._send_cmd("mission_clear")
             self._set_status("idle")
             return True
-        except Exception as e:
-            print(f"Mission clear error: {e}")
+        except (OSError, TimeoutError) as e:
+            logger.error("Mission clear error: %s", e)
             return False
 
     def upload_fence(self, lat: float, lon: float, radius: float) -> bool:
@@ -260,8 +263,8 @@ class MissionManager:
 
             return False
 
-        except Exception as e:
-            print(f"Fence upload error: {e}")
+        except (OSError, TimeoutError, ValueError) as e:
+            logger.error("Fence upload error: %s", e)
             return False
 
     def get_mission_seq_for_index(self, index: int) -> int:
@@ -323,8 +326,8 @@ class MissionManager:
             self._send_cmd("mission_ack")
             return items
 
-        except Exception as e:
-            print(f"Mission download error: {e}")
+        except (OSError, TimeoutError, ValueError) as e:
+            logger.error("Mission download error: %s", e)
             return []
 
     def download_fence(self) -> list[dict]:
@@ -371,8 +374,8 @@ class MissionManager:
             self._send_cmd("mission_ack", mission_type=fence_type)
             return items
 
-        except Exception as e:
-            print(f"Fence download error: {e}")
+        except (OSError, TimeoutError, ValueError) as e:
+            logger.error("Fence download error: %s", e)
             return []
 
     def upload_polygon_fence(self, vertices: list[dict]) -> bool:
@@ -421,8 +424,8 @@ class MissionManager:
 
             return False
 
-        except Exception as e:
-            print(f"Polygon fence upload error: {e}")
+        except (OSError, TimeoutError, ValueError) as e:
+            logger.error("Polygon fence upload error: %s", e)
             return False
 
     def clear_fence(self) -> bool:
@@ -438,6 +441,6 @@ class MissionManager:
                 mission_type=mavutil.mavlink.MAV_MISSION_TYPE_FENCE,
             )
             return True
-        except Exception as e:
-            print(f"Fence clear error: {e}")
+        except (OSError, TimeoutError) as e:
+            logger.error("Fence clear error: %s", e)
             return False

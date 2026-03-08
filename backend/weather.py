@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict
@@ -5,6 +6,8 @@ import httpx
 import asyncio
 from functools import lru_cache
 import time
+
+logger = logging.getLogger(__name__)
 
 # ============================================================================
 # PLATFORM PERFORMANCE ENVELOPES
@@ -238,16 +241,15 @@ class OpenMeteoClient:
             response.raise_for_status()
             data = response.json()
 
-            # Debug logging
-            print(f"[Weather] API request successful for {lat:.4f}, {lon:.4f}")
+            logger.debug("Weather API request successful for %.4f, %.4f", lat, lon)
 
             self.cache.set(cache_key, data)
             return self._parse_weather_point(data, lat, lon, forecast_time)
         except httpx.HTTPError as e:
-            print(f"[Weather] HTTP error: {e}")
+            logger.error("Weather HTTP error: %s", e)
             raise ValueError(f"Failed to fetch weather data: {e}")
-        except Exception as e:
-            print(f"[Weather] Unexpected error: {e}")
+        except (ValueError, KeyError) as e:
+            logger.error("Weather data parsing error: %s", e)
             raise
 
     def _parse_weather_point(

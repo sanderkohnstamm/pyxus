@@ -1,12 +1,16 @@
+import logging
 import threading
 import time
 import queue
 import math
+import struct
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Optional
 
 from pymavlink import mavutil
+
+logger = logging.getLogger(__name__)
 
 
 def sanitize_for_json(value):
@@ -295,10 +299,10 @@ class DroneConnection:
                     break
                 else:
                     type_name = PERIPHERAL_TYPES.get(mav_type, MAV_TYPES.get(mav_type, f"Type {mav_type}"))
-                    print(f"Registered {type_name} (sys={src_system}, comp={src_component}), waiting for autopilot...")
+                    logger.info("Registered %s (sys=%d, comp=%d), waiting for autopilot...", type_name, src_system, src_component)
 
             if vehicle_msg is None:
-                print("No autopilot (component 1) heartbeat received within timeout")
+                logger.error("No autopilot (component 1) heartbeat received within timeout")
                 self._mav.close()
                 self._mav = None
                 return False
@@ -310,7 +314,7 @@ class DroneConnection:
                 self._mav = None
                 return False
 
-            print(f"Connected to {first_vehicle.telemetry.platform_type} (sys={first_vehicle.target_system}, comp={first_vehicle.target_component})")
+            logger.info("Connected to %s (sys=%d, comp=%d)", first_vehicle.telemetry.platform_type, first_vehicle.target_system, first_vehicle.target_component)
 
             self._connected = True
             self._running = True
@@ -321,12 +325,12 @@ class DroneConnection:
             self._request_data_streams(first_vehicle)
             return True
 
-        except Exception as e:
-            print(f"Connection failed: {e}")
+        except (OSError, ConnectionError, TimeoutError) as e:
+            logger.error("Connection failed: %s", e)
             if self._mav:
                 try:
                     self._mav.close()
-                except:
+                except OSError:
                     pass
                 self._mav = None
             return False
@@ -377,7 +381,7 @@ class DroneConnection:
         if self._mav:
             try:
                 self._mav.close()
-            except:
+            except OSError:
                 pass
             self._mav = None
         with self._vehicles_lock:
@@ -437,8 +441,8 @@ class DroneConnection:
                         mavutil.mavlink.MAV_AUTOPILOT_INVALID,
                         0, 0, 0
                     )
-                except:
-                    pass
+                except (OSError, struct.error) as e:
+                    logger.warning("Failed to send GCS heartbeat: %s", e)
                 last_heartbeat = now
 
             # Drain command queue
@@ -454,8 +458,9 @@ class DroneConnection:
                 msg = self._mav.recv_match(blocking=True, timeout=0.05)
                 if msg is not None:
                     self._handle_message(msg)
-            except Exception:
+            except (OSError, struct.error, ValueError) as e:
                 if self._running:
+                    logger.warning("Error receiving MAVLink message: %s", e)
                     time.sleep(0.01)
 
     def _execute_cmd(self, cmd_type: str, kwargs: dict):
@@ -718,8 +723,8 @@ class DroneConnection:
                     kwargs.get("yaw_rate", float('nan')),
                     0, 0, 0
                 )
-        except Exception as e:
-            print(f"Command error ({cmd_type}): {e}")
+        except (OSError, struct.error, KeyError, ValueError) as e:
+            logger.error("Command error (%s): %s", cmd_type, e)
 
     def _get_vehicle_for_msg(self, msg):
         """Get the Vehicle for this message's src_system, or None."""
@@ -872,7 +877,7 @@ class DroneConnection:
                 # Request data streams for newly discovered vehicle
                 if vehicle:
                     self._request_data_streams(vehicle)
-                    print(f"Auto-discovered vehicle sysid={src_system} ({vehicle.telemetry.platform_type})")
+                    logger.info("Auto-discovered vehicle sysid=%d (%s)", src_system, vehicle.telemetry.platform_type)
 
             if vehicle is None:
                 return
@@ -1061,7 +1066,7 @@ class DroneConnection:
                 msg_dict = msg.to_dict()
                 msg_dict.pop('mavpackettype', None)
                 stats['last_data'] = sanitize_for_json({k: v for k, v in list(msg_dict.items())[:20]})
-            except Exception:
+            except (TypeError, ValueError, AttributeError):
                 stats['last_data'] = {}
 
     def get_message_stats(self) -> list:

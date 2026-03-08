@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import os
 import shutil
 from contextlib import asynccontextmanager
@@ -18,6 +19,7 @@ from weather import (
 )
 from datetime import datetime
 
+logger = logging.getLogger(__name__)
 
 # --- Settings ---
 
@@ -172,7 +174,7 @@ class ConnectionManager:
             try:
                 await ws.send_text(message)
                 return None
-            except:
+            except (WebSocketDisconnect, RuntimeError, ConnectionError):
                 return ws
         results = await asyncio.gather(*[send_to(ws) for ws in self.active_connections])
         for ws in results:
@@ -242,6 +244,14 @@ async def lifespan(app: FastAPI):
         pass
     registry.disconnect_all()
 
+
+# --- Logging ---
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
 
 # --- FastAPI App ---
 
@@ -700,6 +710,7 @@ async def api_params_metadata(vehicle: str):
                 return {"status": "ok", "metadata": resp.json()}
             return {"status": "error", "error": f"Failed to fetch: {resp.status_code}"}
     except Exception as e:
+        logger.warning("API error: %s", e)
         return {"status": "error", "error": str(e)}
 
 
@@ -816,6 +827,7 @@ async def api_weather_point(lat: float = Query(...), lon: float = Query(...), fo
             }
         }
     except Exception as e:
+        logger.warning("API error: %s", e)
         return {"status": "error", "error": str(e)}
 
 
@@ -858,6 +870,7 @@ async def api_weather_route(req: RouteWeatherRequest):
             }
         }
     except Exception as e:
+        logger.warning("API error: %s", e)
         return {"status": "error", "error": str(e)}
 
 
@@ -894,6 +907,7 @@ async def api_weather_platform_set(req: PlatformSelectRequest):
             "name": current_platform.name
         }
     except Exception as e:
+        logger.warning("API error: %s", e)
         return {"status": "error", "error": str(e)}
 
 
@@ -940,7 +954,7 @@ async def video_stream(url: str = Query(...)):
             try:
                 process.kill()
                 await process.wait()
-            except Exception:
+            except (OSError, ProcessLookupError):
                 pass
 
     return StreamingResponse(
