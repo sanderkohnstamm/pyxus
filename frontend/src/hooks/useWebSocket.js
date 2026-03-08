@@ -23,6 +23,71 @@ export default function useWebSocket() {
   const setWsConnected = useDroneStore((s) => s.setWsConnected);
   const addMavMessages = useDroneStore((s) => s.addMavMessages);
 
+  // Telemetry buffering: only the latest message per drone is kept.
+  // Flushed once per animation frame so that when the tab is backgrounded
+  // and messages queue up, we skip all intermediate positions and jump
+  // straight to the latest state instead of "fast-forwarding" through them.
+  const pendingTelemetry = useRef({});    // droneId -> latest data
+  const pendingStatustext = useRef({});   // droneId -> accumulated statustext arrays
+  const rafId = useRef(null);
+
+  const flushTelemetry = useCallback(() => {
+    const pending = pendingTelemetry.current;
+    const pendingSt = pendingStatustext.current;
+    const droneIds = Object.keys(pending);
+    if (droneIds.length === 0) {
+      rafId.current = null;
+      return;
+    }
+
+    const store = useDroneStore.getState();
+
+    for (const droneId of droneIds) {
+      const data = pending[droneId];
+
+      // Auto-register drone if we haven't seen it
+      if (!store.drones[droneId]) {
+        store.registerDrone(droneId, data.drone_name || droneId, '');
+      }
+
+      // Route accumulated statustext messages
+      const stMsgs = pendingSt[droneId];
+      if (stMsgs && stMsgs.length > 0) {
+        if (droneId === store.activeDroneId) {
+          addMavMessages(stMsgs);
+        }
+
+        // Route calibration messages
+        const { calibrationStatus, addCalibrationMessage, setCalibrationStep } = store;
+        if (calibrationStatus.active && droneId === store.activeDroneId) {
+          stMsgs.forEach(msg => {
+            if (isCalibrationMessage(msg.text)) {
+              addCalibrationMessage(msg);
+
+              if (calibrationStatus.type === 'accel') {
+                const text = msg.text.toLowerCase();
+                if (text.includes('level')) setCalibrationStep(0);
+                else if (text.includes('left')) setCalibrationStep(1);
+                else if (text.includes('right')) setCalibrationStep(2);
+                else if (text.includes('nose down')) setCalibrationStep(3);
+                else if (text.includes('nose up')) setCalibrationStep(4);
+                else if (text.includes('back') || text.includes('belly')) setCalibrationStep(5);
+              }
+            }
+          });
+        }
+      }
+
+      // Update per-drone telemetry (only latest state)
+      store.updateDroneTelemetry(droneId, data);
+    }
+
+    // Clear buffers
+    pendingTelemetry.current = {};
+    pendingStatustext.current = {};
+    rafId.current = null;
+  }, [addMavMessages]);
+
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
@@ -39,43 +104,21 @@ export default function useWebSocket() {
           const droneId = data.drone_id;
           if (!droneId) return;
 
-          const store = useDroneStore.getState();
+          // Buffer: keep only the latest telemetry per drone
+          pendingTelemetry.current[droneId] = data;
 
-          // Auto-register drone if we haven't seen it
-          if (!store.drones[droneId]) {
-            store.registerDrone(droneId, data.drone_name || droneId, '');
-          }
-
-          // Route statustext messages
+          // Accumulate statustext (these should not be dropped)
           if (data.statustext && data.statustext.length > 0) {
-            // Only show statustext from the active drone in the global log
-            if (droneId === store.activeDroneId) {
-              addMavMessages(data.statustext);
+            if (!pendingStatustext.current[droneId]) {
+              pendingStatustext.current[droneId] = [];
             }
-
-            // Route calibration messages
-            const { calibrationStatus, addCalibrationMessage, setCalibrationStep } = store;
-            if (calibrationStatus.active && droneId === store.activeDroneId) {
-              data.statustext.forEach(msg => {
-                if (isCalibrationMessage(msg.text)) {
-                  addCalibrationMessage(msg);
-
-                  if (calibrationStatus.type === 'accel') {
-                    const text = msg.text.toLowerCase();
-                    if (text.includes('level')) setCalibrationStep(0);
-                    else if (text.includes('left')) setCalibrationStep(1);
-                    else if (text.includes('right')) setCalibrationStep(2);
-                    else if (text.includes('nose down')) setCalibrationStep(3);
-                    else if (text.includes('nose up')) setCalibrationStep(4);
-                    else if (text.includes('back') || text.includes('belly')) setCalibrationStep(5);
-                  }
-                }
-              });
-            }
+            pendingStatustext.current[droneId].push(...data.statustext);
           }
 
-          // Update per-drone telemetry
-          store.updateDroneTelemetry(droneId, data);
+          // Schedule flush on next animation frame (coalesces multiple messages)
+          if (rafId.current === null) {
+            rafId.current = requestAnimationFrame(flushTelemetry);
+          }
         }
       } catch {
         // ignore parse errors
@@ -93,12 +136,16 @@ export default function useWebSocket() {
     };
 
     wsRef.current = ws;
-  }, [setWsConnected, addMavMessages]);
+  }, [setWsConnected, flushTelemetry]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimer.current) {
       clearTimeout(reconnectTimer.current);
       reconnectTimer.current = null;
+    }
+    if (rafId.current !== null) {
+      cancelAnimationFrame(rafId.current);
+      rafId.current = null;
     }
     if (wsRef.current) {
       wsRef.current.close();

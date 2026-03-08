@@ -106,12 +106,18 @@ export default function App() {
   const setHomePosition = useDroneStore((s) => s.setHomePosition);
   const isConnected = !!activeDroneId;
 
-  // Set home position from first valid GPS position
+  // Update home position from vehicle's HOME_POSITION message
   useEffect(() => {
-    if (isConnected && !homePosition && telemetry.lat !== 0 && telemetry.lon !== 0) {
-      setHomePosition({ lat: telemetry.lat, lon: telemetry.lon, alt: telemetry.alt_msl });
+    if (isConnected && telemetry.home_lat && telemetry.home_lon &&
+        telemetry.home_lat !== 0 && telemetry.home_lon !== 0) {
+      // Only update if home position actually changed
+      if (!homePosition ||
+          homePosition.lat !== telemetry.home_lat ||
+          homePosition.lon !== telemetry.home_lon) {
+        setHomePosition({ lat: telemetry.home_lat, lon: telemetry.home_lon, alt: telemetry.home_alt || 0 });
+      }
     }
-  }, [isConnected, homePosition, telemetry.lat, telemetry.lon, telemetry.alt_msl, setHomePosition]);
+  }, [isConnected, telemetry.home_lat, telemetry.home_lon, telemetry.home_alt, homePosition, setHomePosition]);
 
   // Execute command helper
   const executeCommand = useCallback(async (command) => {
