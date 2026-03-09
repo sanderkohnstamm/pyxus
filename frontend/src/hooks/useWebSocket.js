@@ -76,6 +76,18 @@ export default function useWebSocket() {
 
           // Update per-drone telemetry
           store.updateDroneTelemetry(droneId, data);
+        } else if (data.type === 'link_event') {
+          const store = useDroneStore.getState();
+          const lost = data.event === 'link_lost';
+          store.setDroneLinkStatus(data.drone_id, lost, data.last_telemetry);
+          const name = data.drone_name || data.drone_id;
+          if (lost) {
+            store.addAlert(`LINK LOST: ${name}`, 'error');
+            store.addGcsLog(`Link lost: ${name}`, 'error');
+          } else {
+            store.addAlert(`Link recovered: ${name}`, 'success');
+            store.addGcsLog(`Link recovered: ${name}`, 'success');
+          }
         }
       } catch {
         // ignore parse errors

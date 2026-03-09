@@ -17,6 +17,8 @@ from vehicle_profiles import get_profile
 
 logger = logging.getLogger(__name__)
 
+HEARTBEAT_TIMEOUT = 3.0  # seconds before declaring link lost
+
 
 def sanitize_for_json(value):
     """Convert NaN/Inf floats to None for JSON compatibility."""
@@ -122,6 +124,9 @@ class TelemetryState:
     platform_type: str = "Unknown"
     last_heartbeat: float = 0.0
 
+    # Link status
+    link_lost: bool = False
+
     def to_dict(self) -> dict:
         heartbeat_age = round(time.time() - self.last_heartbeat, 1) if self.last_heartbeat > 0 else -1
         return {
@@ -152,6 +157,7 @@ class TelemetryState:
             "mission_seq": self.mission_seq,
             "platform_type": self.platform_type,
             "heartbeat_age": heartbeat_age,
+            "link_lost": self.link_lost,
         }
 
 
@@ -291,6 +297,9 @@ class DroneConnection:
         self._connected = False
         # Telemetry generation counter (incremented on each telemetry update)
         self._telemetry_generation: int = 0
+        # Link loss tracking
+        self._link_lost: bool = False
+        self._link_lost_time: float = 0
 
         # Parameters
         self._params: dict = {}  # name -> {value, type, index}
@@ -324,6 +333,10 @@ class DroneConnection:
     @property
     def connected(self) -> bool:
         return self._connected
+
+    @property
+    def link_lost(self) -> bool:
+        return self._link_lost
 
     @property
     def telemetry_generation(self) -> int:
@@ -515,6 +528,24 @@ class DroneConnection:
                 if self._running:
                     logger.warning("Error receiving MAVLink message: %s", e)
                     time.sleep(0.01)
+
+            # Link loss detection
+            with self._lock:
+                hb_time = self._telemetry.last_heartbeat
+            if hb_time > 0 and (time.time() - hb_time) > HEARTBEAT_TIMEOUT:
+                if not self._link_lost:
+                    self._link_lost = True
+                    self._link_lost_time = time.time()
+                    with self._lock:
+                        self._telemetry.link_lost = True
+                        self._telemetry_generation += 1
+                    logger.warning("Link lost — no heartbeat for %.1fs", HEARTBEAT_TIMEOUT)
+                # Drain command queue while link is lost to prevent stale commands
+                while not self._cmd_queue.empty():
+                    try:
+                        self._cmd_queue.get_nowait()
+                    except queue.Empty:
+                        break
 
     def _execute_cmd(self, cmd_type: str, kwargs: dict):
         try:
@@ -995,6 +1026,14 @@ class DroneConnection:
                 self._telemetry.system_status = msg.system_status
                 self._telemetry.last_heartbeat = time.time()
                 self._telemetry.platform_type = MAV_TYPES.get(msg.type, f"Type {msg.type}")
+
+                # Link recovery detection
+                if self._link_lost:
+                    self._link_lost = False
+                    self._telemetry.link_lost = False
+                    logger.info("Link recovered after %.1fs", time.time() - self._link_lost_time)
+                    # Re-request data streams to re-sync telemetry
+                    self._request_data_streams()
 
                 # Decode mode
                 if self._is_ardupilot:
