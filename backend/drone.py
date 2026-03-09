@@ -2,6 +2,7 @@ import os
 os.environ['MAVLINK20'] = '1'
 os.environ['MAVLINK_DIALECT'] = 'all'
 
+import logging
 import struct
 import threading
 import time
@@ -13,6 +14,10 @@ from typing import Optional
 
 from pymavlink import mavutil
 from vehicle_profiles import get_profile
+
+logger = logging.getLogger(__name__)
+
+HEARTBEAT_TIMEOUT = 3.0  # seconds before declaring link lost
 
 
 def sanitize_for_json(value):
@@ -124,6 +129,9 @@ class TelemetryState:
     platform_type: str = "Unknown"
     last_heartbeat: float = 0.0
 
+    # Link status
+    link_lost: bool = False
+
     def to_dict(self) -> dict:
         heartbeat_age = round(time.time() - self.last_heartbeat, 1) if self.last_heartbeat > 0 else -1
         return {
@@ -157,6 +165,7 @@ class TelemetryState:
             "home_alt": round(self.home_alt, 2),
             "platform_type": self.platform_type,
             "heartbeat_age": heartbeat_age,
+            "link_lost": self.link_lost,
         }
 
 
@@ -296,6 +305,9 @@ class DroneConnection:
         self._connected = False
         # Telemetry generation counter (incremented on each telemetry update)
         self._telemetry_generation: int = 0
+        # Link loss tracking
+        self._link_lost: bool = False
+        self._link_lost_time: float = 0
 
         # Parameters
         self._params: dict = {}  # name -> {value, type, index}
@@ -329,6 +341,10 @@ class DroneConnection:
     @property
     def connected(self) -> bool:
         return self._connected
+
+    @property
+    def link_lost(self) -> bool:
+        return self._link_lost
 
     @property
     def telemetry_generation(self) -> int:
@@ -372,7 +388,7 @@ class DroneConnection:
                             0, 0, 0
                         )
                     except (OSError, struct.error) as e:
-                        print(f"[Drone] Error sending handshake heartbeat: {e}")
+                        logger.warning("Error sending handshake heartbeat: %s", e)
                     last_hb_sent = now
 
                 msg = self._mav.recv_match(type='HEARTBEAT', blocking=True, timeout=1)
@@ -392,10 +408,10 @@ class DroneConnection:
                     break
                 else:
                     type_name = PERIPHERAL_TYPES.get(mav_type, MAV_TYPES.get(mav_type, f"Type {mav_type}"))
-                    print(f"Registered {type_name} (sys={src_system}, comp={src_component}), waiting for autopilot...")
+                    logger.info("Registered %s (sys=%d, comp=%d), waiting for autopilot...", type_name, src_system, src_component)
 
             if vehicle_msg is None:
-                print("No autopilot (component 1) heartbeat received within timeout")
+                logger.error("No autopilot (component 1) heartbeat received within timeout")
                 self._mav.close()
                 self._mav = None
                 return False
@@ -413,7 +429,7 @@ class DroneConnection:
                 self._telemetry.autopilot = "ardupilot" if self._is_ardupilot else "px4"
                 self._telemetry.platform_type = MAV_TYPES.get(vehicle_msg.type, f"Type {vehicle_msg.type}")
 
-            print(f"Connected to {self._telemetry.platform_type} (sys={self._target_system}, comp={self._target_component})")
+            logger.info("Connected to %s (sys=%d, comp=%d)", self._telemetry.platform_type, self._target_system, self._target_component)
 
             self._connected = True
             self._running = True
@@ -430,13 +446,13 @@ class DroneConnection:
             self.request_available_modes()
             return True
 
-        except Exception as e:
-            print(f"[Drone] Connection failed: {e}")
+        except (OSError, ConnectionError, TimeoutError) as e:
+            logger.error("Connection failed: %s", e)
             if self._mav:
                 try:
                     self._mav.close()
                 except OSError as close_err:
-                    print(f"[Drone] Error closing connection during cleanup: {close_err}")
+                    logger.warning("Error closing connection during cleanup: %s", close_err)
                 self._mav = None
             return False
 
@@ -450,7 +466,7 @@ class DroneConnection:
             try:
                 self._mav.close()
             except OSError as e:
-                print(f"[Drone] Error closing connection during disconnect: {e}")
+                logger.warning("Error closing connection during disconnect: %s", e)
             self._mav = None
         with self._lock:
             self._telemetry = TelemetryState()
@@ -501,7 +517,7 @@ class DroneConnection:
                         0, 0, 0
                     )
                 except (OSError, struct.error) as e:
-                    print(f"[Drone] Error sending GCS heartbeat: {e}")
+                    logger.warning("Error sending GCS heartbeat: %s", e)
                 last_heartbeat = now
 
             # Drain command queue
@@ -519,12 +535,26 @@ class DroneConnection:
                     self._handle_message(msg)
             except (OSError, struct.error, ValueError) as e:
                 if self._running:
-                    print(f"[Drone] Error receiving message: {e}")
+                    logger.warning("Error receiving MAVLink message: %s", e)
                     time.sleep(0.01)
-            except Exception as e:
-                if self._running:
-                    print(f"[Drone] Unexpected error in run loop: {e}")
-                    time.sleep(0.1)
+
+            # Link loss detection
+            with self._lock:
+                hb_time = self._telemetry.last_heartbeat
+            if hb_time > 0 and (time.time() - hb_time) > HEARTBEAT_TIMEOUT:
+                if not self._link_lost:
+                    self._link_lost = True
+                    self._link_lost_time = time.time()
+                    with self._lock:
+                        self._telemetry.link_lost = True
+                        self._telemetry_generation += 1
+                    logger.warning("Link lost — no heartbeat for %.1fs", HEARTBEAT_TIMEOUT)
+                # Drain command queue while link is lost to prevent stale commands
+                while not self._cmd_queue.empty():
+                    try:
+                        self._cmd_queue.get_nowait()
+                    except queue.Empty:
+                        break
 
     def _execute_cmd(self, cmd_type: str, kwargs: dict):
         try:
@@ -576,7 +606,7 @@ class DroneConnection:
                     if mode_id is not None:
                         self._mav.set_mode(mode_id)
                     else:
-                        print(f"Unknown ArduPilot mode: {mode_name}")
+                        logger.warning("Unknown ArduPilot mode: %s", mode_name)
                 else:
                     # PX4: reverse-lookup mode name to (main_mode, sub_mode),
                     # then encode into custom_mode and send MAV_CMD_DO_SET_MODE
@@ -597,7 +627,7 @@ class DroneConnection:
                             0, 0, 0, 0, 0
                         )
                     else:
-                        print(f"Unknown PX4 mode: {mode_name}")
+                        logger.warning("Unknown PX4 mode: %s", mode_name)
             elif cmd_type == "set_standard_mode":
                 self._mav.mav.command_long_send(
                     self._target_system, self._target_component,
@@ -839,8 +869,8 @@ class DroneConnection:
                     0,              # param5: gimbal manager flags
                     0, 0
                 )
-        except Exception as e:
-            print(f"[Drone] Command error ({cmd_type}): {e}")
+        except (OSError, struct.error, KeyError, ValueError) as e:
+            logger.error("Command error (%s): %s", cmd_type, e)
 
     def _handle_message(self, msg):
         msg_type = msg.get_type()
@@ -1005,6 +1035,14 @@ class DroneConnection:
                 self._telemetry.system_status = msg.system_status
                 self._telemetry.last_heartbeat = time.time()
                 self._telemetry.platform_type = MAV_TYPES.get(msg.type, f"Type {msg.type}")
+
+                # Link recovery detection
+                if self._link_lost:
+                    self._link_lost = False
+                    self._telemetry.link_lost = False
+                    logger.info("Link recovered after %.1fs", time.time() - self._link_lost_time)
+                    # Re-request data streams to re-sync telemetry
+                    self._request_data_streams()
 
                 # Decode mode
                 if self._is_ardupilot:
@@ -1245,20 +1283,20 @@ class DroneConnection:
             try:
                 value = float(value)
             except (ValueError, TypeError):
-                print(f"[Drone] Rejected set_param '{param_id}': value '{value}' is not numeric")
+                logger.warning("Rejected set_param '%s': value '%s' is not numeric", param_id, value)
                 return False
 
         if not isinstance(value, (int, float)):
-            print(f"[Drone] Rejected set_param '{param_id}': value type '{type(value).__name__}' is not numeric")
+            logger.warning("Rejected set_param '%s': value type '%s' is not numeric", param_id, type(value).__name__)
             return False
 
         # Log old and new values
         with self._params_lock:
             old_entry = self._params.get(param_id)
         if old_entry is not None:
-            print(f"[Drone] PARAM_SET '{param_id}': {old_entry['value']} -> {value}")
+            logger.info("PARAM_SET '%s': %s -> %s", param_id, old_entry['value'], value)
         else:
-            print(f"[Drone] PARAM_SET '{param_id}': (unknown) -> {value}")
+            logger.info("PARAM_SET '%s': (unknown) -> %s", param_id, value)
 
         self._enqueue_cmd("set_param", param_id=param_id, value=float(value), param_type=param_type)
         return True
@@ -1315,7 +1353,7 @@ class DroneConnection:
                 # Limit size of data stored and sanitize NaN/Inf values
                 stats['last_data'] = sanitize_for_json({k: v for k, v in list(msg_dict.items())[:20]})
             except (AttributeError, ValueError, TypeError) as e:
-                print(f"[Drone] Error extracting message data for {msg_type}: {e}")
+                logger.debug("Error extracting message data for %s: %s", msg_type, e)
                 stats['last_data'] = {}
 
     def get_message_stats(self) -> list:

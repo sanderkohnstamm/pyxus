@@ -92,6 +92,7 @@ import ToolsPanel from './components/ToolsPanel';
 import FlyOverlay from './components/FlyOverlay';
 import AttitudeIndicator from './components/AttitudeIndicator';
 import BatteryMonitor from './components/BatteryMonitor';
+import ConnectionMonitor from './components/ConnectionMonitor';
 import BatteryChart from './components/BatteryChart';
 
 export default function App() {
@@ -402,8 +403,9 @@ export default function App() {
         ))}
       </div>
 
-      {/* Battery monitor (headless) */}
+      {/* Headless monitors */}
       <BatteryMonitor />
+      <ConnectionMonitor />
 
     </div>
   );

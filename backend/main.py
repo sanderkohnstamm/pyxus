@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import os
 import re
 import shutil
@@ -25,6 +26,7 @@ from weather import (
 )
 from datetime import datetime
 
+logger = logging.getLogger(__name__)
 
 # --- Settings ---
 
@@ -152,6 +154,15 @@ def get_drone(drone_id: str) -> tuple:
     return entry["drone"], entry["mission"]
 
 
+def check_drone_link(drone) -> dict | None:
+    """Return error dict if drone is not connected or link is lost, else None."""
+    if not drone.connected:
+        return {"status": "error", "error": "Not connected"}
+    if drone.link_lost:
+        return {"status": "error", "error": "Link lost — command not sent"}
+    return None
+
+
 # --- WebSocket Manager ---
 
 class ConnectionManager:
@@ -175,7 +186,7 @@ class ConnectionManager:
             try:
                 await ws.send_text(message)
                 return None
-            except:
+            except (WebSocketDisconnect, RuntimeError, ConnectionError):
                 return ws
         results = await asyncio.gather(*[send_to(ws) for ws in self.active_connections])
         for ws in results:
@@ -206,6 +217,7 @@ async def telemetry_broadcast():
     last_mission_status: dict[str, str] = {}     # drone_id -> last sent mission status
     last_full_sync: dict[str, float] = {}        # drone_id -> monotonic time of last full send
     last_send_time: dict[str, float] = {}        # drone_id -> monotonic time of last broadcast
+    last_link_lost: dict[str, bool] = {}         # drone_id -> last known link_lost state
 
     FULL_SYNC_INTERVAL = 5.0  # seconds between full telemetry snapshots
     # Adaptive rate intervals (seconds between sends)
@@ -225,6 +237,21 @@ async def telemetry_broadcast():
                 mission_mgr = entry["mission"]
                 if not drone.connected:
                     continue
+
+                # --- Link state events (sent immediately, bypass rate limiting) ---
+                current_link_lost = drone.link_lost
+                prev_link_lost = last_link_lost.get(drone_id, False)
+                if current_link_lost != prev_link_lost:
+                    event = "link_lost" if current_link_lost else "link_recovered"
+                    link_event = {
+                        "type": "link_event",
+                        "drone_id": drone_id,
+                        "drone_name": entry["name"],
+                        "event": event,
+                        "last_telemetry": drone.get_telemetry(),
+                    }
+                    await ws_manager.broadcast(link_event)
+                    last_link_lost[drone_id] = current_link_lost
 
                 # --- Adaptive rate: decide if this drone is due for a send ---
                 prev_snap = last_snapshot.get(drone_id, {})
@@ -320,10 +347,18 @@ async def lifespan(app: FastAPI):
     for entry in drone_registry.values():
         try:
             entry["drone"].disconnect()
-        except Exception:
+        except OSError:
             pass
     drone_registry.clear()
 
+
+# --- Logging ---
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
 
 # --- FastAPI App ---
 
@@ -388,7 +423,7 @@ async def api_drones_remove(drone_id: str):
         raise HTTPException(404, f"Drone '{drone_id}' not found")
     try:
         entry["drone"].disconnect()
-    except Exception:
+    except OSError:
         pass
     return {"status": "ok", "drone_id": drone_id}
 
@@ -410,8 +445,8 @@ async def api_status(drone_id: str = Query(...)):
 @app.post("/api/arm")
 async def api_arm(drone_id: str = Query(...)):
     drone, _ = get_drone(drone_id)
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+    if err := check_drone_link(drone):
+        return err
     drone.arm()
     return {"status": "ok", "command": "arm"}
 
@@ -419,8 +454,8 @@ async def api_arm(drone_id: str = Query(...)):
 @app.post("/api/disarm")
 async def api_disarm(drone_id: str = Query(...)):
     drone, _ = get_drone(drone_id)
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+    if err := check_drone_link(drone):
+        return err
     drone.disarm()
     return {"status": "ok", "command": "disarm"}
 
@@ -428,8 +463,8 @@ async def api_disarm(drone_id: str = Query(...)):
 @app.post("/api/takeoff")
 async def api_takeoff(req: TakeoffRequest, drone_id: str = Query(...)):
     drone, _ = get_drone(drone_id)
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+    if err := check_drone_link(drone):
+        return err
     if not drone.vehicle_profile.get("supports_takeoff", True):
         return {"status": "error", "error": "Vehicle type does not support takeoff"}
     if drone.is_ardupilot:
@@ -442,8 +477,8 @@ async def api_takeoff(req: TakeoffRequest, drone_id: str = Query(...)):
 @app.post("/api/land")
 async def api_land(drone_id: str = Query(...)):
     drone, _ = get_drone(drone_id)
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+    if err := check_drone_link(drone):
+        return err
     profile = drone.vehicle_profile
     if profile.get("category") in ("ground", "surface"):
         # Ground/surface vehicles: issue HOLD mode instead of land command
@@ -456,8 +491,8 @@ async def api_land(drone_id: str = Query(...)):
 @app.post("/api/rtl")
 async def api_rtl(drone_id: str = Query(...)):
     drone, _ = get_drone(drone_id)
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+    if err := check_drone_link(drone):
+        return err
     drone.rtl()
     return {"status": "ok", "command": "rtl"}
 
@@ -465,8 +500,8 @@ async def api_rtl(drone_id: str = Query(...)):
 @app.post("/api/mode")
 async def api_mode(req: ModeRequest, drone_id: str = Query(...)):
     drone, _ = get_drone(drone_id)
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+    if err := check_drone_link(drone):
+        return err
     if req.standard_mode is not None:
         drone.set_standard_mode(req.standard_mode)
         return {"status": "ok", "command": "mode", "standard_mode": req.standard_mode}
@@ -495,8 +530,8 @@ async def api_modes(drone_id: str = Query(...)):
 @app.post("/api/goto")
 async def api_goto(req: GotoRequest, drone_id: str = Query(...)):
     drone, _ = get_drone(drone_id)
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+    if err := check_drone_link(drone):
+        return err
     if drone.is_ardupilot:
         drone.set_mode("GUIDED")
         await asyncio.sleep(0.3)
@@ -507,8 +542,8 @@ async def api_goto(req: GotoRequest, drone_id: str = Query(...)):
 @app.post("/api/roi")
 async def api_roi(req: RoiRequest, drone_id: str = Query(...)):
     drone, _ = get_drone(drone_id)
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+    if err := check_drone_link(drone):
+        return err
     drone.set_roi(req.lat, req.lon, req.alt)
     return {"status": "ok", "command": "roi", "lat": req.lat, "lon": req.lon}
 
@@ -516,8 +551,8 @@ async def api_roi(req: RoiRequest, drone_id: str = Query(...)):
 @app.post("/api/home/set")
 async def api_set_home(req: SetHomeRequest, drone_id: str = Query(...)):
     drone, _ = get_drone(drone_id)
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+    if err := check_drone_link(drone):
+        return err
     drone.set_home(req.lat, req.lon, req.alt)
     return {"status": "ok", "command": "set_home", "lat": req.lat, "lon": req.lon, "alt": req.alt}
 
@@ -525,8 +560,8 @@ async def api_set_home(req: SetHomeRequest, drone_id: str = Query(...)):
 @app.post("/api/mission/upload")
 async def api_mission_upload(req: MissionUploadRequest, drone_id: str = Query(...)):
     drone, mission_mgr = get_drone(drone_id)
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+    if err := check_drone_link(drone):
+        return err
     waypoints = [
         Waypoint(
             lat=w.lat, lon=w.lon, alt=w.alt,
@@ -545,8 +580,8 @@ async def api_mission_upload(req: MissionUploadRequest, drone_id: str = Query(..
 @app.post("/api/mission/start")
 async def api_mission_start(drone_id: str = Query(...)):
     drone, mission_mgr = get_drone(drone_id)
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+    if err := check_drone_link(drone):
+        return err
     success = mission_mgr.start()
     return {"status": "ok" if success else "error", "command": "mission_start"}
 
@@ -554,8 +589,8 @@ async def api_mission_start(drone_id: str = Query(...)):
 @app.post("/api/mission/pause")
 async def api_mission_pause(drone_id: str = Query(...)):
     drone, mission_mgr = get_drone(drone_id)
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+    if err := check_drone_link(drone):
+        return err
     success = mission_mgr.pause()
     return {"status": "ok" if success else "error", "command": "mission_pause"}
 
@@ -563,8 +598,8 @@ async def api_mission_pause(drone_id: str = Query(...)):
 @app.post("/api/mission/resume")
 async def api_mission_resume(drone_id: str = Query(...)):
     drone, mission_mgr = get_drone(drone_id)
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+    if err := check_drone_link(drone):
+        return err
     success = mission_mgr.resume()
     return {"status": "ok" if success else "error", "command": "mission_resume"}
 
@@ -572,8 +607,8 @@ async def api_mission_resume(drone_id: str = Query(...)):
 @app.post("/api/mission/clear")
 async def api_mission_clear(drone_id: str = Query(...)):
     drone, mission_mgr = get_drone(drone_id)
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+    if err := check_drone_link(drone):
+        return err
     success = mission_mgr.clear()
     return {"status": "ok" if success else "error", "command": "mission_clear"}
 
@@ -581,8 +616,8 @@ async def api_mission_clear(drone_id: str = Query(...)):
 @app.post("/api/mission/set_current")
 async def api_mission_set_current(req: MissionSetCurrentRequest, drone_id: str = Query(...)):
     drone, mission_mgr = get_drone(drone_id)
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+    if err := check_drone_link(drone):
+        return err
     seq = mission_mgr.get_mission_seq_for_index(req.index)
     drone.send_mission_cmd("set_current_mission", seq=seq)
     return {"status": "ok", "command": "mission_set_current", "seq": seq, "index": req.index}
@@ -615,8 +650,8 @@ async def api_fence_download(drone_id: str = Query(...)):
 @app.post("/api/fence/upload_polygon")
 async def api_fence_upload_polygon(req: PolygonFenceRequest, drone_id: str = Query(...)):
     drone, mission_mgr = get_drone(drone_id)
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+    if err := check_drone_link(drone):
+        return err
     if len(req.vertices) < 3:
         return {"status": "error", "error": "Need at least 3 vertices"}
     loop = asyncio.get_event_loop()
@@ -629,8 +664,8 @@ async def api_fence_upload_polygon(req: PolygonFenceRequest, drone_id: str = Que
 @app.post("/api/fence/upload")
 async def api_fence_upload(req: FenceUploadRequest, drone_id: str = Query(...)):
     drone, mission_mgr = get_drone(drone_id)
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+    if err := check_drone_link(drone):
+        return err
     loop = asyncio.get_event_loop()
     success = await loop.run_in_executor(
         None, mission_mgr.upload_fence, req.lat, req.lon, req.radius
@@ -643,8 +678,8 @@ async def api_fence_upload(req: FenceUploadRequest, drone_id: str = Query(...)):
 @app.post("/api/fence/clear")
 async def api_fence_clear(drone_id: str = Query(...)):
     drone, mission_mgr = get_drone(drone_id)
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+    if err := check_drone_link(drone):
+        return err
     success = mission_mgr.clear_fence()
     return {"status": "ok" if success else "error", "command": "fence_clear"}
 
@@ -654,8 +689,8 @@ async def api_fence_clear(drone_id: str = Query(...)):
 @app.post("/api/motor/test")
 async def api_motor_test(req: MotorTestRequest, drone_id: str = Query(...)):
     drone, _ = get_drone(drone_id)
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+    if err := check_drone_link(drone):
+        return err
 
     telemetry = drone.get_telemetry()
     if telemetry.get("armed", False):
@@ -674,8 +709,8 @@ async def api_motor_test(req: MotorTestRequest, drone_id: str = Query(...)):
 @app.post("/api/servo/test")
 async def api_servo_test(req: ServoTestRequest, drone_id: str = Query(...)):
     drone, _ = get_drone(drone_id)
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+    if err := check_drone_link(drone):
+        return err
     drone.servo_set(servo=req.servo, pwm=req.pwm)
     return {"status": "ok", "command": "servo_test", "servo": req.servo, "pwm": req.pwm}
 
@@ -849,6 +884,7 @@ async def api_params_metadata(vehicle: str):
                 return {"status": "ok", "metadata": metadata}
             return {"status": "error", "error": f"Failed to fetch: {resp.status_code}"}
     except Exception as e:
+        logger.warning("API error: %s", e)
         return {"status": "error", "error": str(e)}
 
 
@@ -915,8 +951,8 @@ async def api_settings_put(req: dict):
 @app.post("/api/calibrate")
 async def api_calibrate(req: CalibrationRequest, drone_id: str = Query(...)):
     drone, _ = get_drone(drone_id)
-    if not drone.connected:
-        return {"status": "error", "error": "Not connected"}
+    if err := check_drone_link(drone):
+        return err
     drone.calibrate(req.type)
     return {"status": "ok", "command": "calibrate", "type": req.type}
 
@@ -995,7 +1031,7 @@ async def api_terrain_elevation(locations: str = Query(...)):
                         # API error -- fill with None
                         for idx, _, _ in batch:
                             results.setdefault(idx, None)
-            except Exception:
+            except (httpx.HTTPError, OSError, TimeoutError):
                 # Network/timeout error -- fill with None
                 for idx, _, _ in batch:
                     results.setdefault(idx, None)
@@ -1053,6 +1089,7 @@ async def api_weather_point(lat: float = Query(...), lon: float = Query(...), fo
             }
         }
     except Exception as e:
+        logger.warning("API error: %s", e)
         return {"status": "error", "error": str(e)}
 
 
@@ -1095,6 +1132,7 @@ async def api_weather_route(req: RouteWeatherRequest):
             }
         }
     except Exception as e:
+        logger.warning("API error: %s", e)
         return {"status": "error", "error": str(e)}
 
 
@@ -1131,35 +1169,51 @@ async def api_weather_platform_set(req: PlatformSelectRequest):
             "name": current_platform.name
         }
     except Exception as e:
+        logger.warning("API error: %s", e)
         return {"status": "error", "error": str(e)}
 
 
 # --- Video stream proxy ---
 
-_SHELL_METACHAR_RE = re.compile(r'[;|&`$(){}]')
+_UNSAFE_URL_RE = re.compile(r'[;|&`$(){}<>!#\r\n\x00]')
 _ALLOWED_SCHEMES = {"rtsp", "http", "https", "udp"}
 _MAX_URL_LENGTH = 2048
+_BLOCKED_HOSTNAMES = {"localhost", "127.0.0.1", "::1", "0.0.0.0", "[::1]"}
+
+
+def _is_private_ip(hostname: str) -> bool:
+    """Check if hostname resolves to a private/loopback IP (SSRF protection)."""
+    import ipaddress
+    try:
+        addr = ipaddress.ip_address(hostname)
+        return addr.is_private or addr.is_loopback or addr.is_link_local
+    except ValueError:
+        return False
 
 
 @app.get("/api/video/stream")
 async def video_stream(url: str = Query(...)):
-    if not url:
-        return {"status": "error", "error": "No URL provided"}
+    if not url or not url.strip():
+        raise HTTPException(400, "No URL provided")
 
     if len(url) > _MAX_URL_LENGTH:
-        return {"status": "error", "error": f"URL exceeds maximum length of {_MAX_URL_LENGTH} characters"}
+        raise HTTPException(400, f"URL exceeds maximum length of {_MAX_URL_LENGTH} characters")
 
-    if _SHELL_METACHAR_RE.search(url):
-        return {"status": "error", "error": "URL contains disallowed characters"}
+    if _UNSAFE_URL_RE.search(url):
+        raise HTTPException(400, "URL contains disallowed characters")
 
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme not in _ALLOWED_SCHEMES:
-        return {"status": "error", "error": "Unsupported URL scheme"}
+        raise HTTPException(400, f"Unsupported URL scheme. Allowed: {', '.join(sorted(_ALLOWED_SCHEMES))}")
     if not parsed.hostname:
-        return {"status": "error", "error": "URL must contain a valid hostname"}
+        raise HTTPException(400, "URL must contain a valid hostname")
+
+    hostname = parsed.hostname.lower()
+    if hostname in _BLOCKED_HOSTNAMES or _is_private_ip(hostname):
+        raise HTTPException(400, "URLs targeting internal/private addresses are not allowed")
 
     if not shutil.which("ffmpeg"):
-        return {"status": "error", "error": "ffmpeg not installed on server"}
+        raise HTTPException(503, "ffmpeg not installed on server")
 
     args = ["ffmpeg", "-y"]
     if url.startswith("rtsp://"):
@@ -1191,7 +1245,7 @@ async def video_stream(url: str = Query(...)):
             try:
                 process.kill()
                 await process.wait()
-            except Exception:
+            except (OSError, ProcessLookupError):
                 pass
 
     return StreamingResponse(
@@ -1214,7 +1268,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     drone_id = msg.get("drone_id")
                     if drone_id and drone_id in drone_registry:
                         drone = drone_registry[drone_id]["drone"]
-                        if drone.connected:
+                        if drone.connected and not drone.link_lost:
                             raw_channels = msg.get("channels", [])
                             if raw_channels and isinstance(raw_channels, list):
                                 # Validate and sanitize channel values

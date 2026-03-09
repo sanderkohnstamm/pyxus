@@ -36,6 +36,9 @@ const INITIAL_DRONE_STATE = {
   paramsTotal: 0,
   availableModes: [],
   staticModes: [],
+  linkLost: false,
+  linkLostSince: null,
+  lastKnownPosition: null,
 };
 
 const useDroneStore = create((set, get) => ({
@@ -392,6 +395,24 @@ const useDroneStore = create((set, get) => ({
     if (!droneState) return;
     const updates = { availableModes: modes };
     if (staticModes) updates.staticModes = staticModes;
+    set({
+      drones: { ...drones, [droneId]: { ...droneState, ...updates } },
+    });
+  },
+
+  setDroneLinkStatus: (droneId, lost, lastTelemetry) => {
+    const { drones } = get();
+    const droneState = drones[droneId];
+    if (!droneState) return;
+    const updates = { linkLost: lost };
+    if (lost) {
+      updates.linkLostSince = Date.now();
+      if (lastTelemetry && lastTelemetry.lat && lastTelemetry.lon) {
+        updates.lastKnownPosition = { lat: lastTelemetry.lat, lon: lastTelemetry.lon, alt: lastTelemetry.alt };
+      }
+    } else {
+      updates.linkLostSince = null;
+    }
     set({
       drones: { ...drones, [droneId]: { ...droneState, ...updates } },
     });
