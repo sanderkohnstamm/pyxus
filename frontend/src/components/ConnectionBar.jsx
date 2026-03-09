@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Wifi, WifiOff, Heart, Sun, Moon, Grid3X3, Plus, X, Volume2, VolumeX } from 'lucide-react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
+import { Wifi, WifiOff, Heart, Sun, Moon, Grid3X3, Plus, X, Volume2, VolumeX, AlertTriangle } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
 import { INITIAL_TELEMETRY } from '../store/droneStore';
 import { droneApi } from '../utils/api';
@@ -171,7 +171,17 @@ export default function ConnectionBar() {
 
   const hasDrones = Object.keys(drones).length > 0;
 
+  // Link loss banner data — derived from drones but only recomputes when linkLost states change
+  const lostDrones = useMemo(() => {
+    const lost = [];
+    for (const [id, d] of Object.entries(drones)) {
+      if (d.linkLost) lost.push({ id, name: d.name || id, since: d.linkLostSince });
+    }
+    return lost;
+  }, [drones]);
+
   return (
+    <>
     <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-950/70 border-b border-gray-800/20 backdrop-blur-xl shrink-0">
       {/* Logo */}
       <span className="text-[13px] font-bold text-cyan-400/90 tracking-[0.15em] mr-0.5">PYXUS</span>
@@ -325,6 +335,33 @@ export default function ConnectionBar() {
           {theme === 'dark' ? <Sun size={12} /> : <Moon size={12} />}
         </button>
       </div>
+    </div>
+    {lostDrones.length > 0 && <LinkLostBanner drones={lostDrones} />}
+    </>
+  );
+}
+
+function LinkLostBanner({ drones }) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5 bg-red-950/80 border-b border-red-800/40 animate-pulse shrink-0">
+      <AlertTriangle size={14} className="text-red-400 shrink-0" />
+      <span className="text-[11px] font-bold text-red-300 tracking-wide">
+        LINK LOST:
+      </span>
+      {drones.map((d) => {
+        const elapsed = d.since ? Math.round((Date.now() - d.since) / 1000) : 0;
+        return (
+          <span key={d.id} className="text-[11px] text-red-200/80 font-medium">
+            {d.name} ({elapsed}s)
+          </span>
+        );
+      })}
     </div>
   );
 }

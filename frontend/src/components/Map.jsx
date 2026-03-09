@@ -1564,8 +1564,9 @@ export default function MapView() {
           const dHasPos = t.lat !== 0 && t.lon !== 0;
           const dYawDeg = t.heading || (t.yaw * 180) / Math.PI;
           const cIdx = droneColorMap[droneId] ?? 0;
-          const fillColor = DRONE_COLORS[cIdx];
-          const strokeColor = DRONE_STROKES[cIdx];
+          const isLinkLost = drone.linkLost;
+          const fillColor = isLinkLost ? '#ef4444' : DRONE_COLORS[cIdx];
+          const strokeColor = isLinkLost ? '#f87171' : DRONE_STROKES[cIdx];
           const vis = droneVisibility[droneId] || { trail: true, mission: true, fence: true };
 
           // Non-active drone mission polyline
@@ -1634,6 +1635,12 @@ export default function MapView() {
                     <Popup>
                       <div className="text-xs font-mono space-y-0.5">
                         <div className="font-semibold text-[11px] mb-1" style={{color: fillColor}}>{drone.name}</div>
+                        {isLinkLost && (
+                          <div style={{color:'#f87171',fontWeight:700,fontSize:'10px',marginBottom:'4px'}}>
+                            LAST KNOWN POSITION
+                            {drone.linkLostSince && <span style={{fontWeight:400,color:'#fca5a5'}}> ({Math.round((Date.now() - drone.linkLostSince) / 1000)}s ago)</span>}
+                          </div>
+                        )}
                         <div><span style={{color:'#94a3b8'}}>ALT</span> <span style={{color:'#e2e8f0'}}>{t.alt.toFixed(1)}m</span></div>
                         <div><span style={{color:'#94a3b8'}}>GS</span> <span style={{color:'#e2e8f0'}}>{t.groundspeed.toFixed(1)} m/s</span></div>
                         <div><span style={{color:'#94a3b8'}}>HDG</span> <span style={{color:'#e2e8f0'}}>{Math.round(dYawDeg)}&deg;</span></div>
