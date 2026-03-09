@@ -1,6 +1,6 @@
 ## Mission
 
-**Control any autonomous vehicle safely.** Pyxus is a ground control station for drones and other MAVLink vehicles. Every feature must make operations safer, more reliable, or more accessible. Reference https://mavlink.io for protocol specs.
+**Safe drone flight and mission success.** See `PROJECT.md` for full roadmap, priorities, and current state. Every feature must support graceful degradation when systems fail and keep operators informed. When things go wrong, Pyxus degrades safely — never silently. Reference https://mavlink.io for protocol specs.
 
 ## Workflow Orchestration
 
