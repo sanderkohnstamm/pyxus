@@ -120,6 +120,11 @@ class TelemetryState:
     # Mission
     mission_seq: int = -1  # Current mission item seq (-1 = none)
 
+    # Home position (from HOME_POSITION message)
+    home_lat: float = 0.0
+    home_lon: float = 0.0
+    home_alt: float = 0.0  # MSL altitude
+
     # Platform
     platform_type: str = "Unknown"
     last_heartbeat: float = 0.0
@@ -155,6 +160,9 @@ class TelemetryState:
             "system_status": self.system_status,
             "autopilot": self.autopilot,
             "mission_seq": self.mission_seq,
+            "home_lat": self.home_lat,
+            "home_lon": self.home_lon,
+            "home_alt": round(self.home_alt, 2),
             "platform_type": self.platform_type,
             "heartbeat_age": heartbeat_age,
             "link_lost": self.link_lost,
@@ -487,6 +495,7 @@ class DroneConnection:
                 (mavutil.mavlink.MAVLINK_MSG_ID_GPS_RAW_INT, 500000),       # 2Hz
                 (mavutil.mavlink.MAVLINK_MSG_ID_VFR_HUD, 100000),
                 (mavutil.mavlink.MAVLINK_MSG_ID_SYS_STATUS, 500000),
+                (mavutil.mavlink.MAVLINK_MSG_ID_HOME_POSITION, 2000000),    # 0.5Hz
             ]
             for msg_id, interval in messages:
                 self._enqueue_cmd("set_message_interval", msg_id=msg_id, interval=interval)
@@ -1088,6 +1097,12 @@ class DroneConnection:
                 self._telemetry.mission_seq = msg.seq
                 _updated = True
 
+            elif msg_type == "HOME_POSITION":
+                self._telemetry.home_lat = msg.latitude / 1e7
+                self._telemetry.home_lon = msg.longitude / 1e7
+                self._telemetry.home_alt = msg.altitude / 1000.0
+                _updated = True
+
             if _updated:
                 self._telemetry_generation += 1
 
@@ -1107,7 +1122,10 @@ class DroneConnection:
             self._enqueue_cmd("land")
 
     def rtl(self):
-        self._enqueue_cmd("set_mode", mode="RTL")
+        if self._is_ardupilot:
+            self._enqueue_cmd("set_mode", mode="RTL")
+        else:
+            self._enqueue_cmd("set_mode", mode="AUTO_RTL")
 
     def set_mode(self, mode: str):
         self._enqueue_cmd("set_mode", mode=mode)
