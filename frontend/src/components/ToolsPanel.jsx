@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { SlidersHorizontal, Cog, Gamepad2, Compass, Keyboard, Zap, Plus, X, Trash2, ChevronDown, ChevronUp, Radio, Activity, ArrowDownToLine, Gauge, Loader2, Check, Video } from 'lucide-react';
+import { SlidersHorizontal, Cog, Gamepad2, Compass, Keyboard, Zap, Plus, X, Trash2, ChevronDown, ChevronUp, Radio, Activity, ArrowDownToLine, Gauge, Loader2, Check, Video, ShieldAlert } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
 import { droneApi } from '../utils/api';
 import ParamsPanel from './ParamsPanel';
@@ -85,6 +85,10 @@ function ControlsPanel({ sendMessage }) {
   const addAlert = useDroneStore((s) => s.addAlert);
   const isConnected = !!activeDroneId;
 
+  // Dangerous command confirmation
+  const confirmDangerousCommands = useDroneStore((s) => s.confirmDangerousCommands);
+  const setConfirmDangerousCommands = useDroneStore((s) => s.setConfirmDangerousCommands);
+
   // Hotkeys state
   const commandHotkeys = useDroneStore((s) => s.commandHotkeys);
   const setCommandHotkey = useDroneStore((s) => s.setCommandHotkey);
@@ -152,6 +156,33 @@ function ControlsPanel({ sendMessage }) {
   return (
     <div className="p-4 space-y-3">
       <div className="text-[10px] text-gray-600 mb-2">Configure hotkeys, servos, and input devices. Hotkeys work globally when connected.</div>
+
+      {/* Dangerous command confirmation toggle */}
+      <div className={`flex items-center justify-between px-3 py-2.5 rounded-lg border transition-colors ${
+        confirmDangerousCommands ? 'bg-amber-950/20 border-amber-800/25' : 'bg-gray-800/40 border-gray-800/50'
+      }`}>
+        <div className="flex items-center gap-2">
+          <ShieldAlert size={12} className={confirmDangerousCommands ? 'text-amber-400' : 'text-gray-600'} />
+          <div>
+            <span className={`text-[11px] font-medium ${confirmDangerousCommands ? 'text-gray-300' : 'text-gray-400'}`}>
+              Confirm dangerous commands
+            </span>
+            <div className="text-[9px] text-gray-600">Disarm while airborne, dangerous modes</div>
+          </div>
+        </div>
+        <button
+          onClick={() => setConfirmDangerousCommands(!confirmDangerousCommands)}
+          className={`relative w-9 h-5 rounded-full transition-colors ${
+            confirmDangerousCommands ? 'bg-amber-600' : 'bg-gray-700'
+          }`}
+        >
+          <span
+            className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
+              confirmDangerousCommands ? 'translate-x-4' : ''
+            }`}
+          />
+        </button>
+      </div>
 
       {/* Command Hotkeys Section */}
       <div className="bg-gray-800/40 rounded-lg border border-gray-800/50 overflow-hidden">

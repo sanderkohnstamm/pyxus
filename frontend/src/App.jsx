@@ -4,6 +4,7 @@ import useWebSocket from './hooks/useWebSocket';
 import useDroneStore from './store/droneStore';
 import { INITIAL_TELEMETRY } from './store/droneStore';
 import { droneApi } from './utils/api';
+import { getCommandConfirmation } from './utils/commandSafety';
 
 const RC_CENTER = 1500;
 const RC_MIN = 1000;
@@ -28,8 +29,8 @@ function loadGamepadConfig() {
   };
 }
 
-// Execute gamepad button action
-async function executeGamepadAction(action, addAlert) {
+// Direct gamepad action execution (no confirmation)
+async function executeGamepadActionDirect(action, addAlert) {
   if (!action || action === 'none') return;
 
   if (action.startsWith('mode:')) {
@@ -83,6 +84,30 @@ async function executeGamepadAction(action, addAlert) {
     } catch {}
   }
 }
+
+// Gated gamepad action execution (with confirmation dialog if needed)
+function executeGamepadAction(action, addAlert) {
+  if (!action || action === 'none') return;
+
+  const store = useDroneStore.getState();
+  if (store.confirmDangerousCommands) {
+    const activeDrone = store.activeDroneId ? store.drones[store.activeDroneId] : null;
+    const tel = activeDrone?.telemetry || INITIAL_TELEMETRY;
+
+    // Resolve the actual command for toggle_arm
+    let command = action;
+    if (action === 'toggle_arm') {
+      command = tel.armed ? 'disarm' : 'arm';
+    }
+
+    const confirmation = getCommandConfirmation(command, tel);
+    if (confirmation) {
+      store.showConfirmationDialog({ ...confirmation, onConfirm: () => executeGamepadActionDirect(action, addAlert) });
+      return;
+    }
+  }
+  executeGamepadActionDirect(action, addAlert);
+}
 import ConnectionBar from './components/ConnectionBar';
 import MapView from './components/Map';
 import Telemetry from './components/Telemetry';
@@ -93,6 +118,7 @@ import FlyOverlay from './components/FlyOverlay';
 import AttitudeIndicator from './components/AttitudeIndicator';
 import BatteryMonitor from './components/BatteryMonitor';
 import ConnectionMonitor from './components/ConnectionMonitor';
+import ConfirmationDialog from './components/ConfirmationDialog';
 import BatteryChart from './components/BatteryChart';
 
 export default function App() {
@@ -120,8 +146,8 @@ export default function App() {
     }
   }, [isConnected, telemetry.home_lat, telemetry.home_lon, telemetry.home_alt, homePosition, setHomePosition]);
 
-  // Execute command helper
-  const executeCommand = useCallback(async (command) => {
+  // Direct command execution (no confirmation)
+  const executeCommandDirect = useCallback(async (command) => {
     if (!isConnected) return;
     try {
       if (command.startsWith('mode:')) {
@@ -151,6 +177,22 @@ export default function App() {
       addAlertStore(`Command failed: ${err.message}`, 'error');
     }
   }, [isConnected, addAlertStore]);
+
+  // Gated command execution (with confirmation dialog if needed)
+  const executeCommand = useCallback((command) => {
+    if (!isConnected) return;
+    const store = useDroneStore.getState();
+    if (store.confirmDangerousCommands) {
+      const activeDrone = store.activeDroneId ? store.drones[store.activeDroneId] : null;
+      const tel = activeDrone?.telemetry || INITIAL_TELEMETRY;
+      const confirmation = getCommandConfirmation(command, tel);
+      if (confirmation) {
+        store.showConfirmationDialog({ ...confirmation, onConfirm: () => executeCommandDirect(command) });
+        return;
+      }
+    }
+    executeCommandDirect(command);
+  }, [isConnected, executeCommandDirect]);
 
   // Actuate servo group
   const actuateServoGroup = useCallback(async (group, action) => {
@@ -406,6 +448,7 @@ export default function App() {
       {/* Headless monitors */}
       <BatteryMonitor />
       <ConnectionMonitor />
+      <ConfirmationDialog />
 
     </div>
   );

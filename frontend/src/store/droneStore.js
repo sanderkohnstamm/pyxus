@@ -199,6 +199,10 @@ const useDroneStore = create((set, get) => ({
   // Pre-flight checklist
   showPreFlightChecklist: false,
 
+  // Dangerous command confirmation
+  confirmDangerousCommands: localStorage.getItem('pyxus-confirm-dangerous') !== 'false',
+  confirmationDialog: null, // { variant, title, message, onConfirm, doubleConfirm }
+
   // Batch (multi-drone) operations
   selectedDroneIds: [],       // drone IDs selected for batch ops (empty = single-drone mode)
   batchCommandStatus: {},     // { [droneId]: 'pending'|'success'|'error' }
@@ -449,6 +453,14 @@ const useDroneStore = create((set, get) => ({
 
   // Pre-flight checklist
   setShowPreFlightChecklist: (show) => set({ showPreFlightChecklist: show }),
+
+  // Dangerous command confirmation
+  setConfirmDangerousCommands: (enabled) => {
+    localStorage.setItem('pyxus-confirm-dangerous', String(enabled));
+    set({ confirmDangerousCommands: enabled });
+  },
+  showConfirmationDialog: (dialog) => set({ confirmationDialog: dialog }),
+  hideConfirmationDialog: () => set({ confirmationDialog: null }),
 
   // Planned mission waypoints
   addWaypoint: (lat, lon, alt) => {

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import useDroneStore, { INITIAL_TELEMETRY } from '../store/droneStore';
 import { droneApi, executeBatchCommand } from '../utils/api';
+import { getCommandConfirmation, isAirborne } from '../utils/commandSafety';
 import PreFlightChecklist from './PreFlightChecklist';
 
 const ARDUPILOT_MODES = [
@@ -53,6 +54,8 @@ export default function FlyOverlay() {
   const takeoffAlt = useDroneStore((s) => s.takeoffAlt);
   const setShowPreFlightChecklist = useDroneStore((s) => s.setShowPreFlightChecklist);
   const setDroneMission = useDroneStore((s) => s.setDroneMission);
+  const confirmDangerousCommands = useDroneStore((s) => s.confirmDangerousCommands);
+  const showConfirmationDialog = useDroneStore((s) => s.showConfirmationDialog);
   const capabilities = telemetry.capabilities || null;
 
   // Fetch available modes when drone changes, with delay and retry
@@ -177,19 +180,39 @@ export default function FlyOverlay() {
   const isGroundOrSurface = capabilities?.category === 'ground' || capabilities?.category === 'surface';
   const landLabel = isGroundOrSurface ? 'Stop' : 'Land';
 
+  // Gate a command through confirmation dialog if needed
+  const gatedApiCall = useCallback((command, body, logMsg, callFn) => {
+    if (!confirmDangerousCommands) {
+      callFn();
+      return;
+    }
+    const confirmation = getCommandConfirmation(command, telemetry);
+    if (!confirmation) {
+      callFn();
+      return;
+    }
+    showConfirmationDialog({ ...confirmation, onConfirm: callFn });
+  }, [confirmDangerousCommands, telemetry, showConfirmationDialog]);
+
   const handleModeChange = useCallback((e) => {
     const val = e.target.value;
     if (useStandardModes) {
       const entry = availableModes.find((m) => String(m.standard_mode) === val);
       if (entry && entry.standard_mode > 0) {
-        apiCall('mode', { standard_mode: entry.standard_mode }, `Mode → ${entry.mode_name}`);
+        gatedApiCall(`mode:${entry.mode_name}`, null, null, () =>
+          apiCall('mode', { standard_mode: entry.standard_mode }, `Mode → ${entry.mode_name}`)
+        );
       } else if (entry) {
-        apiCall('mode', { mode: entry.mode_name }, `Mode → ${entry.mode_name}`);
+        gatedApiCall(`mode:${entry.mode_name}`, null, null, () =>
+          apiCall('mode', { mode: entry.mode_name }, `Mode → ${entry.mode_name}`)
+        );
       }
     } else {
-      apiCall('mode', { mode: val }, `Mode → ${val}`);
+      gatedApiCall(`mode:${val}`, null, null, () =>
+        apiCall('mode', { mode: val }, `Mode → ${val}`)
+      );
     }
-  }, [useStandardModes, availableModes, apiCall]);
+  }, [useStandardModes, availableModes, apiCall, gatedApiCall]);
 
   return (
     <div className="absolute bottom-4 right-4 z-[1000] flex flex-col gap-1.5 items-end">
@@ -261,7 +284,7 @@ export default function FlyOverlay() {
           <Shield size={10} className="inline -mt-0.5 mr-1" />Arm
         </button>
         <button
-          onClick={() => apiCall('disarm', {}, 'Disarm')}
+          onClick={() => gatedApiCall('disarm', null, null, () => apiCall('disarm', {}, 'Disarm'))}
           className={`${btn} bg-gray-800/50 hover:bg-gray-700/50 border-gray-700/30 hover:border-gray-600/40 text-gray-300`}
         >
           <ShieldOff size={10} className="inline -mt-0.5 mr-1" />Disarm
@@ -346,6 +369,8 @@ function BatchControlsBar() {
   const addAlert = useDroneStore((s) => s.addAlert);
   const addGcsLog = useDroneStore((s) => s.addGcsLog);
   const clearDroneSelection = useDroneStore((s) => s.clearDroneSelection);
+  const confirmDangerousCommands = useDroneStore((s) => s.confirmDangerousCommands);
+  const showConfirmationDialog = useDroneStore((s) => s.showConfirmationDialog);
   const [running, setRunning] = useState(false);
 
   if (selectedDroneIds.length < 2) return null;
@@ -400,7 +425,26 @@ function BatchControlsBar() {
           <Shield size={10} className="inline -mt-0.5 mr-1" />Arm All
         </button>
         <button
-          onClick={() => runBatch('disarm', 'Disarm')}
+          onClick={() => {
+            if (confirmDangerousCommands) {
+              // Check if any selected drone is airborne
+              const anyAirborne = selectedDroneIds.some((id) => {
+                const t = drones[id]?.telemetry;
+                return t && isAirborne(t);
+              });
+              if (anyAirborne) {
+                showConfirmationDialog({
+                  variant: 'danger',
+                  title: 'Disarm All While Airborne',
+                  message: 'One or more selected drones are airborne. Disarming will cause uncontrolled descent.',
+                  doubleConfirm: true,
+                  onConfirm: () => runBatch('disarm', 'Disarm'),
+                });
+                return;
+              }
+            }
+            runBatch('disarm', 'Disarm');
+          }}
           disabled={running}
           className={`${btn} bg-gray-800/50 hover:bg-gray-700/50 border-gray-700/30 hover:border-gray-600/40 text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed`}
         >

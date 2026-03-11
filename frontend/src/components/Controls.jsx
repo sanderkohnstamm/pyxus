@@ -9,6 +9,7 @@ import {
 import useDroneStore, { INITIAL_TELEMETRY, EMPTY_ARRAY } from '../store/droneStore';
 import { droneApi } from '../utils/api';
 import { formatCoord } from '../utils/formatCoord';
+import { getCommandConfirmation } from '../utils/commandSafety';
 
 const RC_CENTER = 1500;
 const RC_OFFSET = 300;
@@ -115,6 +116,14 @@ export default function Controls({ sendMessage }) {
 
         if (key === ' ') {
           if (telemetry.armed) {
+            const store = useDroneStore.getState();
+            if (store.confirmDangerousCommands) {
+              const confirmation = getCommandConfirmation('disarm', telemetry);
+              if (confirmation) {
+                store.showConfirmationDialog({ ...confirmation, onConfirm: () => apiCall('disarm') });
+                return;
+              }
+            }
             apiCall('disarm');
           } else {
             setShowPreFlightChecklist(true);
