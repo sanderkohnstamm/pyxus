@@ -4,7 +4,7 @@ import MapView from '../components/Map';
 import StatusStrip from './StatusStrip';
 import FloatingActions from './FloatingActions';
 import BottomSheet from './BottomSheet';
-import MissionPanel from '../components/MissionPanel';
+import PlanSheet from './sheets/PlanSheet';
 import Telemetry from '../components/Telemetry';
 import AttitudeIndicator from '../components/AttitudeIndicator';
 import BatteryChart from '../components/BatteryChart';
@@ -30,7 +30,7 @@ export default function MobileLayout() {
       {/* Bottom sheet */}
       <BottomSheet>
         {activeTab === 'planning' ? (
-          <MissionPanel />
+          <PlanSheet />
         ) : activeTab === 'flying' ? (
           <>
             <Telemetry />
