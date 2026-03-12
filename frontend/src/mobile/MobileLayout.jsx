@@ -1,8 +1,8 @@
 import React from 'react';
 import useDroneStore from '../store/droneStore';
 import MapView from '../components/Map';
-import FlyOverlay from '../components/FlyOverlay';
 import StatusStrip from './StatusStrip';
+import FloatingActions from './FloatingActions';
 import BottomSheet from './BottomSheet';
 import MissionPanel from '../components/MissionPanel';
 import Telemetry from '../components/Telemetry';
@@ -19,11 +19,13 @@ export default function MobileLayout() {
       {/* Full-screen map */}
       <div className="absolute inset-0">
         <MapView />
-        {activeTab === 'flying' && <FlyOverlay />}
       </div>
 
       {/* Status strip (top) */}
       <StatusStrip onTap={() => setBottomSheetSnap('half')} />
+
+      {/* Floating action buttons (left edge) */}
+      <FloatingActions />
 
       {/* Bottom sheet */}
       <BottomSheet>
