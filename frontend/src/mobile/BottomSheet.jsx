@@ -5,7 +5,7 @@ import { INITIAL_TELEMETRY } from '../store/droneStore';
 
 // Snap points as fraction of viewport height
 const SNAP_POINTS = {
-  peek: 0.10,   // ~80pt on iPhone
+  peek: 0.05,   // Just the grab handle visible
   half: 0.50,
   full: 0.92,
 };
@@ -207,11 +207,13 @@ export default function BottomSheet({ children }) {
         </div>
       )}
 
-      {/* Content area */}
+      {/* Content area — height based on visible portion of sheet */}
       <div
-        className="flex-1 overflow-y-auto px-4"
+        className="overflow-y-auto px-4 overscroll-contain"
         style={{
-          maxHeight: bottomSheetSnap === 'peek' ? '0px' : 'calc(100% - 100px)',
+          height: bottomSheetSnap === 'peek' ? '0px'
+            : bottomSheetSnap === 'half' ? 'calc(50vh - 90px)'
+            : 'calc(92vh - 90px)',
           opacity: bottomSheetSnap === 'peek' ? 0 : 1,
           transition: 'opacity 0.15s',
         }}

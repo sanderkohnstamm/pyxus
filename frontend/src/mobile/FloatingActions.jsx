@@ -1,5 +1,5 @@
-import React, { useCallback } from 'react';
-import { OctagonX, Home, Shield, ShieldOff } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { OctagonX, Home, Shield, ShieldOff, ArrowUp, ArrowDown } from 'lucide-react';
 import useDroneStore, { INITIAL_TELEMETRY } from '../store/droneStore';
 import { droneApi } from '../utils/api';
 import useEStopAction from '../hooks/useEStopAction';
@@ -10,6 +10,7 @@ export default function FloatingActions() {
   const telemetry = useDroneStore((s) =>
     s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry : INITIAL_TELEMETRY
   ) || INITIAL_TELEMETRY;
+  const takeoffAlt = useDroneStore((s) => s.takeoffAlt);
   const addAlert = useDroneStore((s) => s.addAlert);
   const addGcsLog = useDroneStore((s) => s.addGcsLog);
   const setShowPreFlightChecklist = useDroneStore((s) => s.setShowPreFlightChecklist);
@@ -20,6 +21,7 @@ export default function FloatingActions() {
 
   const isConnected = !!activeDroneId;
   const isArmed = telemetry.armed;
+  const isAirborne = telemetry.alt > 1;
 
   const handleEStop = useCallback(() => {
     triggerHaptic('heavy');
@@ -35,7 +37,7 @@ export default function FloatingActions() {
       doubleConfirm: false,
       onConfirm: async () => {
         try {
-          await fetch(droneApi('/api/rtl'), {
+          await fetch(droneApi(`/api/rtl?drone_id=${activeDroneId}`), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({}),
@@ -46,24 +48,23 @@ export default function FloatingActions() {
         }
       },
     });
-  }, [showConfirmationDialog, addAlert, addGcsLog, triggerHaptic]);
+  }, [activeDroneId, showConfirmationDialog, addAlert, addGcsLog, triggerHaptic]);
 
   const handleArm = useCallback(() => {
     triggerHaptic('medium');
     if (!isArmed) {
       setShowPreFlightChecklist(true);
     } else {
-      // Disarm
       showConfirmationDialog({
         variant: 'warning',
         title: 'Disarm',
-        message: telemetry.alt > 1
+        message: isAirborne
           ? `Vehicle is at ${telemetry.alt.toFixed(1)}m altitude. Disarming will cause uncontrolled descent.`
           : 'Disarm motors?',
-        doubleConfirm: telemetry.alt > 1,
+        doubleConfirm: isAirborne,
         onConfirm: async () => {
           try {
-            await fetch(droneApi('/api/disarm'), {
+            await fetch(droneApi(`/api/disarm?drone_id=${activeDroneId}`), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({}),
@@ -75,14 +76,62 @@ export default function FloatingActions() {
         },
       });
     }
-  }, [isArmed, telemetry.alt, setShowPreFlightChecklist, showConfirmationDialog, addAlert, addGcsLog, triggerHaptic]);
+  }, [activeDroneId, isArmed, isAirborne, telemetry.alt, setShowPreFlightChecklist, showConfirmationDialog, addAlert, addGcsLog, triggerHaptic]);
+
+  const handleTakeoff = useCallback(() => {
+    triggerHaptic('medium');
+    showConfirmationDialog({
+      variant: 'warning',
+      title: 'Takeoff',
+      message: `Vehicle will take off to ${takeoffAlt}m altitude.`,
+      doubleConfirm: false,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(droneApi(`/api/takeoff?drone_id=${activeDroneId}`), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ alt: takeoffAlt }),
+          });
+          const data = await res.json();
+          if (data.status === 'error') addAlert(data.error || 'Takeoff failed', 'error');
+          else addGcsLog(`Takeoff to ${takeoffAlt}m`, 'info');
+        } catch (err) {
+          addAlert(`Takeoff failed: ${err.message}`, 'error');
+        }
+      },
+    });
+  }, [activeDroneId, takeoffAlt, showConfirmationDialog, addAlert, addGcsLog, triggerHaptic]);
+
+  const handleLand = useCallback(() => {
+    triggerHaptic('medium');
+    showConfirmationDialog({
+      variant: 'warning',
+      title: 'Land',
+      message: 'Vehicle will land at current position.',
+      doubleConfirm: false,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(droneApi(`/api/land?drone_id=${activeDroneId}`), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+          });
+          const data = await res.json();
+          if (data.status === 'error') addAlert(data.error || 'Land failed', 'error');
+          else addGcsLog('Land command sent', 'info');
+        } catch (err) {
+          addAlert(`Land failed: ${err.message}`, 'error');
+        }
+      },
+    });
+  }, [activeDroneId, showConfirmationDialog, addAlert, addGcsLog, triggerHaptic]);
 
   if (!isConnected) return null;
 
   return (
     <div
       className="fixed left-5 z-[95] flex flex-col gap-3 items-center"
-      style={{ bottom: 'calc(env(safe-area-inset-bottom) + 100px)' }}
+      style={{ bottom: 'calc(env(safe-area-inset-bottom) + 80px)' }}
     >
       {/* E-Stop — only when armed */}
       {isArmed && (
@@ -105,6 +154,26 @@ export default function FloatingActions() {
           className="w-[52px] h-[52px] rounded-xl flex items-center justify-center shadow-2xl bg-amber-600/90 border-2 border-amber-500/50 active:scale-95 transition-transform"
         >
           <Home size={22} className="text-white" />
+        </button>
+      )}
+
+      {/* Takeoff — when armed but on ground */}
+      {isArmed && !isAirborne && (
+        <button
+          onClick={handleTakeoff}
+          className="w-[52px] h-[52px] rounded-xl flex items-center justify-center shadow-2xl bg-emerald-600/90 border-2 border-emerald-500/50 active:scale-95 transition-transform"
+        >
+          <ArrowUp size={22} className="text-white" />
+        </button>
+      )}
+
+      {/* Land — when armed and airborne */}
+      {isArmed && isAirborne && (
+        <button
+          onClick={handleLand}
+          className="w-[52px] h-[52px] rounded-xl flex items-center justify-center shadow-2xl bg-sky-600/90 border-2 border-sky-500/50 active:scale-95 transition-transform"
+        >
+          <ArrowDown size={22} className="text-white" />
         </button>
       )}
 
