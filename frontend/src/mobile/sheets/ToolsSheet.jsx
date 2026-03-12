@@ -4,6 +4,7 @@ import useDroneStore from '../../store/droneStore';
 import { droneApi } from '../../utils/api';
 import ParamsPanel from '../../components/ParamsPanel';
 import MavlinkInspector from '../../components/MavlinkInspector';
+import VideoControl from '../components/VideoControl';
 
 function AccordionSection({ icon: Icon, title, children, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -238,6 +239,9 @@ export default function ToolsSheet() {
     <div className="space-y-3 pb-8">
       <AccordionSection icon={Video} title="Video" defaultOpen>
         <VideoSection />
+        <div className="pt-3 border-t border-gray-800/20 mt-3">
+          <VideoControl />
+        </div>
       </AccordionSection>
 
       <AccordionSection icon={SlidersHorizontal} title="Parameters">

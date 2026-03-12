@@ -9,16 +9,42 @@ import SwiftUI
 
 struct ContentView: View {
     let pythonRunner: PythonRunner
+    let videoManager = VideoPlayerManager.shared
 
     var body: some View {
         ZStack {
             if pythonRunner.isReady {
                 WebViewContainer()
                     .ignoresSafeArea()
+
+                // Video PiP overlay (top-right when not fullscreen)
+                if videoManager.isPlaying && !videoManager.isFullscreen {
+                    VStack {
+                        HStack {
+                            Spacer()
+                            VideoPlayerPiP()
+                                .padding(.top, 56) // Below status strip
+                                .padding(.trailing, 12)
+                        }
+                        Spacer()
+                    }
+                }
+
+                // Fullscreen video overlay
+                if videoManager.isFullscreen {
+                    ZStack(alignment: .topLeading) {
+                        VideoPlayerFullscreen()
+                        VideoHUDOverlay()
+                            .padding(.top, 56)
+                            .padding(.leading, 16)
+                    }
+                    .transition(.opacity)
+                }
             } else {
                 LaunchView(status: pythonRunner.statusMessage)
             }
         }
+        .animation(.easeInOut(duration: 0.25), value: videoManager.isFullscreen)
     }
 }
 
