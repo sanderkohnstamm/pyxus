@@ -1,9 +1,11 @@
 import useDroneStore from '../store/droneStore';
 
-// API base URL - uses proxy in dev, direct URL in Electron production
+// API base URL - uses proxy in dev, direct URL in Electron/iOS production
 const isElectron = typeof window !== 'undefined' && window.location.protocol === 'file:';
-const API_BASE = isElectron ? 'http://localhost:8000' : '';
-const WS_BASE = isElectron ? 'ws://localhost:8000' : '';
+const isIOSApp = typeof window !== 'undefined' && window.__PYXIOS__?.platform === 'ios';
+const useDirectURL = isElectron || isIOSApp;
+const API_BASE = useDirectURL ? 'http://127.0.0.1:8000' : '';
+const WS_BASE = useDirectURL ? 'ws://127.0.0.1:8000' : '';
 
 export function apiUrl(path) {
   return `${API_BASE}${path}`;
@@ -11,7 +13,7 @@ export function apiUrl(path) {
 
 export function wsUrl(path) {
   // In browser with proxy, use relative ws path
-  if (!isElectron && typeof window !== 'undefined') {
+  if (!useDirectURL && typeof window !== 'undefined') {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     return `${protocol}//${window.location.host}${path}`;
   }
@@ -90,4 +92,4 @@ export async function executeBatchCommand(droneIds, endpoint, body = {}, addAler
   return results;
 }
 
-export default { apiUrl, wsUrl, droneApi, droneApiFor, executeBatchCommand, API_BASE, WS_BASE };
+export default { apiUrl, wsUrl, droneApi, droneApiFor, executeBatchCommand, API_BASE, WS_BASE, isIOSApp };

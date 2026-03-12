@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
@@ -364,6 +365,26 @@ logging.basicConfig(
 
 app = FastAPI(title="Pyxus Drone Control", lifespan=lifespan)
 
+# CORS — required for iOS WKWebView (origin is different from localhost backend)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://127.0.0.1:8000",
+        "http://localhost:8000",
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/api/health")
+async def health_check():
+    """Health check for iOS app to poll during backend startup."""
+    return {"status": "ok", "drones": len(drone_registry)}
+
 
 # --- Drone CRUD Endpoints ---
 
@@ -458,6 +479,13 @@ async def api_disarm(drone_id: str = Query(...)):
         return err
     drone.disarm()
     return {"status": "ok", "command": "disarm"}
+
+
+@app.post("/api/force_disarm")
+async def api_force_disarm(drone_id: str = Query(...)):
+    drone, _ = get_drone(drone_id)
+    drone.force_disarm()
+    return {"status": "ok", "command": "force_disarm"}
 
 
 @app.post("/api/takeoff")
