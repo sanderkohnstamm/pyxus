@@ -22,7 +22,6 @@ import MapClickHandler from './MapClickHandler';
 import FlyClickTarget from './FlyClickTarget';
 import QuickMissionLayer from './QuickMissionLayer';
 import MeasureOverlay from './MeasureOverlay';
-import WeatherLayer from './WeatherLayer';
 import MapOverlays from './MapOverlays';
 
 import MavLog from '../components/MavLog';
@@ -173,8 +172,6 @@ export default function MapView() {
         {/* Measure overlay */}
         <MeasureOverlay />
 
-        {/* Weather layer */}
-        <WeatherLayer />
       </Map>
 
       {/* Manual control overlay */}

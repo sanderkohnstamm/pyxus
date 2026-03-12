@@ -222,20 +222,6 @@ const useDroneStore = create((set, get) => ({
   // Connection history (persisted in localStorage)
   connectionHistory: JSON.parse(localStorage.getItem('pyxus-connection-history') || '[]'),
 
-  // Weather
-  weather: {
-    routeAnalysis: null,
-    pointWeather: null,
-    platforms: {},
-    currentPlatform: 'multirotor_medium',
-    loading: false,
-    lastUpdate: null,
-    autoRefresh: true,
-    showWindVectors: true,
-    showRiskOverlay: true,
-    forecastTime: null,
-  },
-
   // === Selectors / Getters ===
 
   getDroneCapabilities: (droneId) => {
@@ -721,43 +707,6 @@ const useDroneStore = create((set, get) => ({
     const { geofence } = get();
     set({ geofence: { ...geofence, ...updates } });
   },
-
-  // Weather
-  setWeatherRouteAnalysis: (analysis) => set((s) => ({
-    weather: { ...s.weather, routeAnalysis: analysis, lastUpdate: Date.now() }
-  })),
-
-  setWeatherPointData: (point) => set((s) => ({
-    weather: { ...s.weather, pointWeather: point }
-  })),
-
-  setWeatherPlatforms: (platforms, current) => set((s) => ({
-    weather: { ...s.weather, platforms, currentPlatform: current }
-  })),
-
-  setWeatherPlatform: (platformId) => set((s) => ({
-    weather: { ...s.weather, currentPlatform: platformId }
-  })),
-
-  setWeatherLoading: (loading) => set((s) => ({
-    weather: { ...s.weather, loading }
-  })),
-
-  toggleWeatherAutoRefresh: () => set((s) => ({
-    weather: { ...s.weather, autoRefresh: !s.weather.autoRefresh }
-  })),
-
-  toggleWeatherWindVectors: () => set((s) => ({
-    weather: { ...s.weather, showWindVectors: !s.weather.showWindVectors }
-  })),
-
-  toggleWeatherRiskOverlay: () => set((s) => ({
-    weather: { ...s.weather, showRiskOverlay: !s.weather.showRiskOverlay }
-  })),
-
-  setWeatherForecastTime: (time) => set((s) => ({
-    weather: { ...s.weather, forecastTime: time }
-  })),
 
   // Video
   setVideoUrl: (url) => set({ videoUrl: url }),

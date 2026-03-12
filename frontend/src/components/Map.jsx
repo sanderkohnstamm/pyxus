@@ -6,7 +6,6 @@ import { INITIAL_TELEMETRY, EMPTY_ARRAY } from '../store/droneStore';
 import { droneApi } from '../utils/api';
 import MavLog from './MavLog';
 import VideoOverlay from './VideoOverlay';
-import WeatherMapLayer from './WeatherMapLayer';
 import ManualControlOverlay from './ManualControlOverlay';
 import PatternModal from './PatternModal';
 import DroneListOverlay from './DroneListOverlay';
@@ -1739,8 +1738,6 @@ export default function MapView() {
         {/* Measure overlay */}
         <MeasureOverlay />
 
-        {/* Weather map overlay */}
-        <WeatherMapLayer />
       </MapContainer>
 
       {/* Manual control overlay */}
