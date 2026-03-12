@@ -219,6 +219,30 @@ export default function App() {
     if (!isConnected) return;
 
     const handleKeyDown = (e) => {
+      // Shift+Escape: Emergency Stop — works even in inputs
+      if (e.shiftKey && e.key === 'Escape') {
+        e.preventDefault();
+        const store = useDroneStore.getState();
+        store.showConfirmationDialog({
+          title: 'EMERGENCY STOP',
+          message: 'This will immediately kill all motors. The vehicle will fall from the sky. Continue?',
+          variant: 'danger',
+          doubleConfirm: false,
+          onConfirm: async () => {
+            try {
+              await fetch(droneApi('/api/force_disarm'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({}),
+              });
+            } catch {}
+            store.addGcsLog('EMERGENCY STOP — force disarm sent', 'error');
+            store.addAlert('EMERGENCY STOP — force disarm sent', 'error');
+          },
+        });
+        return;
+      }
+
       // Don't trigger if typing in input
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
 

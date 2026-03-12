@@ -1112,6 +1112,17 @@ class DroneConnection:
     def disarm(self):
         self._enqueue_cmd("disarm")
 
+    def force_disarm(self):
+        """Emergency motor kill — bypasses command queue, sends directly."""
+        if not self._mav:
+            return
+        self._mav.mav.command_long_send(
+            self._target_system, self._target_component,
+            mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
+            0, 0, 21196, 0, 0, 0, 0, 0  # param1=0 disarm, param2=21196 force
+        )
+        logger.critical("EMERGENCY FORCE DISARM sent to system %d", self._target_system)
+
     def takeoff(self, alt: float = 10):
         self._enqueue_cmd("takeoff", alt=alt)
 
@@ -1119,7 +1130,9 @@ class DroneConnection:
         if self._is_ardupilot:
             self._enqueue_cmd("set_mode", mode="LAND")
         else:
-            self._enqueue_cmd("land")
+            # PX4 and Parrot drones use AUTO_LAND mode instead of
+            # MAV_CMD_NAV_LAND (which Parrot only supports in flight plans)
+            self._enqueue_cmd("set_mode", mode="AUTO_LAND")
 
     def rtl(self):
         if self._is_ardupilot:

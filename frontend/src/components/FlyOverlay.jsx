@@ -14,7 +14,7 @@ import {
   X,
   Loader2,
 } from 'lucide-react';
-import useDroneStore, { INITIAL_TELEMETRY } from '../store/droneStore';
+import useDroneStore, { INITIAL_TELEMETRY, EMPTY_ARRAY } from '../store/droneStore';
 import { droneApi, executeBatchCommand } from '../utils/api';
 import { getCommandConfirmation, isAirborne } from '../utils/commandSafety';
 import PreFlightChecklist from './PreFlightChecklist';
@@ -46,8 +46,8 @@ export default function FlyOverlay() {
   const activeDroneId = useDroneStore((s) => s.activeDroneId);
   const telemetry = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry : INITIAL_TELEMETRY) || INITIAL_TELEMETRY;
   const missionStatus = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.missionStatus : 'idle') || 'idle';
-  const availableModes = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.availableModes : []) || [];
-  const backendStaticModes = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.staticModes : []) || [];
+  const availableModes = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.availableModes : EMPTY_ARRAY) || EMPTY_ARRAY;
+  const backendStaticModes = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.staticModes : EMPTY_ARRAY) || EMPTY_ARRAY;
   const setDroneAvailableModes = useDroneStore((s) => s.setDroneAvailableModes);
   const addAlert = useDroneStore((s) => s.addAlert);
   const addGcsLog = useDroneStore((s) => s.addGcsLog);

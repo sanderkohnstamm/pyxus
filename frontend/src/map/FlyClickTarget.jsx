@@ -116,17 +116,8 @@ export default function FlyClickTarget() {
 
   if (!flyClickTarget) return null;
 
-  const btnStyle = {
-    flex: 1,
-    padding: '6px 8px',
-    fontSize: '10px',
-    fontWeight: 600,
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    textAlign: 'center',
-  };
+  const btn = 'flex-1 px-2.5 py-1.5 text-[10px] font-semibold rounded-md border transition-all cursor-pointer text-center';
+  const neutral = `${btn} bg-gray-800/60 hover:bg-gray-700/60 border-gray-600/30 hover:border-gray-500/40 text-gray-300`;
 
   return (
     <>
@@ -136,10 +127,11 @@ export default function FlyClickTarget() {
         anchor="center"
       >
         <div style={{
-          width: 12, height: 12,
-          border: '2px solid #f97316',
+          width: 14, height: 14,
+          border: '2px solid rgb(148 163 184)',
           borderRadius: '50%',
-          background: 'rgba(249,115,22,0.3)',
+          background: 'rgba(148, 163, 184, 0.15)',
+          boxShadow: '0 0 6px rgba(148, 163, 184, 0.2)',
         }} />
       </Marker>
       <Popup
@@ -148,18 +140,18 @@ export default function FlyClickTarget() {
         anchor="bottom"
         onClose={clearFlyClickTarget}
         closeButton={true}
-        maxWidth="200px"
+        maxWidth="220px"
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '140px' }}>
-          <div style={{ fontSize: '9px', color: '#64748b', marginBottom: '2px', textAlign: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minWidth: '160px', padding: '10px 12px' }}>
+          <div style={{ fontSize: '9px', color: 'rgb(148 163 184)', textAlign: 'center', letterSpacing: '0.025em' }}>
             {formatCoord(flyClickTarget.lat, flyClickTarget.lon, coordFormat, 6)}
           </div>
-          <div style={{ display: 'flex', gap: '4px' }}>
-            <button onClick={handleGoto} style={{ ...btnStyle, background: '#06b6d4' }}>Go To</button>
-            <button onClick={handleRoi} style={{ ...btnStyle, background: '#f59e0b' }}>Look At</button>
+          <div style={{ display: 'flex', gap: '5px' }}>
+            <button onClick={handleGoto} className={neutral}>Go To</button>
+            <button onClick={handleRoi} className={neutral}>Look At</button>
           </div>
-          <button onClick={handleSetHome} style={{ ...btnStyle, background: '#10b981' }}>Set Home/Return</button>
-          <button onClick={handleQuickMission} style={{ ...btnStyle, background: '#8b5cf6' }}>Quick Mission</button>
+          <button onClick={handleSetHome} className={neutral}>Set Home / Return</button>
+          <button onClick={handleQuickMission} className={neutral}>Quick Mission</button>
         </div>
       </Popup>
     </>
