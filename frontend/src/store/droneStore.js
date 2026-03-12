@@ -115,6 +115,9 @@ const useDroneStore = create((set, get) => ({
     lastUpdate: 0,
   },
 
+  // Mobile: bottom sheet snap state
+  bottomSheetSnap: 'peek', // 'peek' | 'half' | 'full'
+
   // Sidebar
   sidebarCollapsed: false,
 
@@ -842,6 +845,9 @@ const useDroneStore = create((set, get) => ({
   updateManualControlRc: (channels) => set((s) => ({
     manualControl: { ...s.manualControl, lastRc: channels, lastUpdate: Date.now(), active: true }
   })),
+
+  // Mobile bottom sheet
+  setBottomSheetSnap: (snap) => set({ bottomSheetSnap: snap }),
 
   // Sidebar
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
