@@ -6,7 +6,7 @@ import FloatingActions from './FloatingActions';
 import BottomSheet from './BottomSheet';
 import PlanSheet from './sheets/PlanSheet';
 import FlySheet from './sheets/FlySheet';
-import ToolsPanel from '../components/ToolsPanel';
+import ToolsSheet from './sheets/ToolsSheet';
 import VirtualSticks from './components/VirtualSticks';
 
 export default function MobileLayout({ sendMessage }) {
@@ -39,7 +39,7 @@ export default function MobileLayout({ sendMessage }) {
         ) : activeTab === 'flying' ? (
           <FlySheet />
         ) : (
-          <ToolsPanel />
+          <ToolsSheet />
         )}
       </BottomSheet>
     </>
