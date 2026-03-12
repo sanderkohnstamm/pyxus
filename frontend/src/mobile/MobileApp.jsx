@@ -7,7 +7,7 @@ import ConfirmationDialog from '../components/ConfirmationDialog';
 import MobileLayout from './MobileLayout';
 
 export default function MobileApp() {
-  useWebSocket();
+  const { sendMessage } = useWebSocket();
   const theme = useDroneStore((s) => s.theme);
   const colorScheme = useDroneStore((s) => s.colorScheme);
   const alerts = useDroneStore((s) => s.alerts);
@@ -17,7 +17,7 @@ export default function MobileApp() {
 
   return (
     <div className={`h-full flex flex-col bg-gray-950 text-gray-100 ${themeClass} ${schemeClass}`}>
-      <MobileLayout />
+      <MobileLayout sendMessage={sendMessage} />
 
       {/* Alerts overlay — positioned below status strip */}
       <div className="fixed top-[calc(env(safe-area-inset-top)+52px)] left-3 right-3 z-[9999] flex flex-col gap-2">

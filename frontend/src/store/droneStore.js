@@ -118,6 +118,9 @@ const useDroneStore = create((set, get) => ({
   // Mobile: bottom sheet snap state
   bottomSheetSnap: 'peek', // 'peek' | 'half' | 'full'
 
+  // Mobile: virtual sticks for manual RC
+  virtualSticksEnabled: false,
+
   // Sidebar
   sidebarCollapsed: false,
 
@@ -848,6 +851,7 @@ const useDroneStore = create((set, get) => ({
 
   // Mobile bottom sheet
   setBottomSheetSnap: (snap) => set({ bottomSheetSnap: snap }),
+  setVirtualSticksEnabled: (enabled) => set({ virtualSticksEnabled: enabled }),
 
   // Sidebar
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),

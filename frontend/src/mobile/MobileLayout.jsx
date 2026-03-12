@@ -5,14 +5,14 @@ import StatusStrip from './StatusStrip';
 import FloatingActions from './FloatingActions';
 import BottomSheet from './BottomSheet';
 import PlanSheet from './sheets/PlanSheet';
-import Telemetry from '../components/Telemetry';
-import AttitudeIndicator from '../components/AttitudeIndicator';
-import BatteryChart from '../components/BatteryChart';
+import FlySheet from './sheets/FlySheet';
 import ToolsPanel from '../components/ToolsPanel';
+import VirtualSticks from './components/VirtualSticks';
 
-export default function MobileLayout() {
+export default function MobileLayout({ sendMessage }) {
   const activeTab = useDroneStore((s) => s.activeTab);
   const setBottomSheetSnap = useDroneStore((s) => s.setBottomSheetSnap);
+  const virtualSticksEnabled = useDroneStore((s) => s.virtualSticksEnabled);
 
   return (
     <>
@@ -27,18 +27,17 @@ export default function MobileLayout() {
       {/* Floating action buttons (left edge) */}
       <FloatingActions />
 
+      {/* Virtual sticks overlay (when manual control active) */}
+      {virtualSticksEnabled && (
+        <VirtualSticks sendMessage={sendMessage} />
+      )}
+
       {/* Bottom sheet */}
       <BottomSheet>
         {activeTab === 'planning' ? (
           <PlanSheet />
         ) : activeTab === 'flying' ? (
-          <>
-            <Telemetry />
-            <BatteryChart />
-            <div className="pb-4">
-              <AttitudeIndicator />
-            </div>
-          </>
+          <FlySheet />
         ) : (
           <ToolsPanel />
         )}
