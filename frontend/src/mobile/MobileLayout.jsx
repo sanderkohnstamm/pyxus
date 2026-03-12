@@ -16,8 +16,8 @@ export default function MobileLayout({ sendMessage }) {
 
   return (
     <>
-      {/* Full-screen map */}
-      <div className="absolute inset-0">
+      {/* Full-screen map — z-0 creates stacking context so map's internal z-indexes don't cover mobile overlays */}
+      <div className="absolute inset-0 z-0">
         <MapView />
       </div>
 

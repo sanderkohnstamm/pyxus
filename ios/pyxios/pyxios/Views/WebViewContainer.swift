@@ -124,6 +124,34 @@ struct WebViewContainer: UIViewRepresentable {
                     """
                 webView?.evaluateJavaScript(js)
 
+            // Video player bridge
+            case "videoPlay":
+                if let url = body["url"] as? String {
+                    DispatchQueue.main.async {
+                        VideoPlayerManager.shared.play(urlString: url)
+                    }
+                }
+            case "videoStop":
+                DispatchQueue.main.async {
+                    VideoPlayerManager.shared.stop()
+                }
+            case "videoFullscreen":
+                DispatchQueue.main.async {
+                    VideoPlayerManager.shared.enterFullscreen()
+                }
+            case "videoExitFullscreen":
+                DispatchQueue.main.async {
+                    VideoPlayerManager.shared.exitFullscreen()
+                }
+
+            // Telemetry HUD update (sent from React at ~1Hz)
+            case "hudUpdate":
+                if let data = body["data"] as? [String: Any] {
+                    DispatchQueue.main.async {
+                        TelemetryHUD.shared.update(from: data)
+                    }
+                }
+
             default:
                 break
             }

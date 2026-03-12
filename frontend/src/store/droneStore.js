@@ -121,6 +121,9 @@ const useDroneStore = create((set, get) => ({
   // Mobile: virtual sticks for manual RC
   virtualSticksEnabled: false,
 
+  // Mobile: native video player state
+  videoPlayerState: 'hidden', // 'hidden' | 'pip' | 'fullscreen'
+
   // Sidebar
   sidebarCollapsed: false,
 
@@ -852,6 +855,7 @@ const useDroneStore = create((set, get) => ({
   // Mobile bottom sheet
   setBottomSheetSnap: (snap) => set({ bottomSheetSnap: snap }),
   setVirtualSticksEnabled: (enabled) => set({ virtualSticksEnabled: enabled }),
+  setVideoPlayerState: (state) => set({ videoPlayerState: state }),
 
   // Sidebar
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
