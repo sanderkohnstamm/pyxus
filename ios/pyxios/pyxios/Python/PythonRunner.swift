@@ -3,8 +3,7 @@
 //  pyxios
 //
 //  Embeds CPython via python-apple-support and starts the FastAPI/uvicorn backend.
-//  For now this is a stub that will be completed once python-apple-support is integrated.
-//  In development mode, it can connect to an external backend instead.
+//  In development mode, it polls an external backend instead.
 //
 
 import Foundation
@@ -24,17 +23,79 @@ final class PythonRunner: Sendable {
     }
 
     /// Start the Python backend.
-    /// In development: polls an external backend until it responds.
-    /// In production: will embed CPython and boot uvicorn in-process.
+    /// Tries embedded CPython first; falls back to polling an external backend.
     func start() async {
-        // --- Phase 1: Development mode ---
-        // Connect to an external backend running on the Mac (via network).
-        // The iOS simulator shares the host network, so localhost works.
-        // On a real device, you'd need the Mac's IP or use Bonjour discovery.
+        let bundle = Bundle.main
+        let resourcePath = bundle.resourcePath ?? ""
 
+        // Check if we have bundled Python resources (production build)
+        let hasBundledBackend = FileManager.default.fileExists(
+            atPath: resourcePath + "/backend/main.py"
+        )
+
+        if hasBundledBackend {
+            await startEmbedded(resourcePath: resourcePath)
+        } else {
+            await pollExternalBackend()
+        }
+    }
+
+    // MARK: - Embedded CPython
+
+    private func startEmbedded(resourcePath: String) async {
+        statusMessage = "Starting Python…"
+
+        // Run CPython initialization + uvicorn on a background queue
+        // so it doesn't block the main/actor thread.
+        DispatchQueue.global(qos: .userInitiated).async {
+            self.initializePython(resourcePath: resourcePath)
+            self.runBootstrap(resourcePath: resourcePath)
+        }
+
+        // Poll /health until uvicorn is serving
+        await pollHealth()
+    }
+
+    private func initializePython(resourcePath: String) {
+        let pythonHome = resourcePath + "/python"
+        let sitePackages = resourcePath + "/site-packages"
+        let backendDir = resourcePath + "/backend"
+        let frontendDir = resourcePath + "/frontend-dist"
+
+        // Environment variables consumed by main.py / bootstrap.py
+        setenv("PYTHONHOME", pythonHome, 1)
+        setenv("PYTHONPATH", "\(sitePackages):\(backendDir)", 1)
+        setenv("PYTHONDONTWRITEBYTECODE", "1", 1)
+        setenv("PYXUS_DATA_DIR", backendDir, 1)
+        setenv("PYXUS_FRONTEND_DIR", frontendDir, 1)
+
+        Py_Initialize()
+    }
+
+    private func runBootstrap(resourcePath: String) {
+        let bootstrapPath = resourcePath + "/backend/bootstrap.py"
+
+        // Read and execute bootstrap.py — this blocks (uvicorn.run is blocking)
+        guard let script = try? String(contentsOfFile: bootstrapPath, encoding: .utf8) else {
+            DispatchQueue.main.async {
+                self.statusMessage = "Failed to read bootstrap.py"
+            }
+            return
+        }
+
+        PyRun_SimpleString(script)
+    }
+
+    // MARK: - Development mode (external backend)
+
+    private func pollExternalBackend() async {
         statusMessage = "Connecting to backend…"
+        await pollHealth()
+    }
 
-        // Poll /health until the backend is up (max 30s)
+    // MARK: - Health polling
+
+    private func pollHealth() async {
         let healthURL = baseURL.appendingPathComponent("api/health")
         let startTime = Date()
         let timeout: TimeInterval = 30
@@ -53,19 +114,8 @@ final class PythonRunner: Sendable {
             try? await Task.sleep(for: .milliseconds(500))
         }
 
-        statusMessage = "Backend not reachable — start it manually"
+        statusMessage = "Backend not reachable"
         // Still mark as ready so the WebView can load (it'll show connection errors)
         isReady = true
     }
-
-    // MARK: - Embedded Python (Phase 2 — not yet implemented)
-    //
-    // When python-apple-support is integrated:
-    // 1. Set PYTHONHOME to the bundled Python.framework
-    // 2. Set PYTHONPATH to include the bundled backend/ directory
-    // 3. Call Py_Initialize()
-    // 4. Run bootstrap.py which starts uvicorn
-    // 5. Poll /health until ready
-    //
-    // func startEmbeddedPython() async { ... }
 }
