@@ -5,19 +5,29 @@ import BatteryMonitor from '../components/BatteryMonitor';
 import ConnectionMonitor from '../components/ConnectionMonitor';
 import ConfirmationDialog from '../components/ConfirmationDialog';
 import MobileLayout from './MobileLayout';
+import ConnectionScreen from './ConnectionScreen';
 
 export default function MobileApp() {
   const { sendMessage } = useWebSocket();
   const theme = useDroneStore((s) => s.theme);
   const colorScheme = useDroneStore((s) => s.colorScheme);
   const alerts = useDroneStore((s) => s.alerts);
+  const activeDroneId = useDroneStore((s) => s.activeDroneId);
+  const wsConnected = useDroneStore((s) => s.wsConnected);
 
   const themeClass = theme === 'light' ? 'light' : '';
   const schemeClass = colorScheme !== 'cyan' ? `scheme-${colorScheme}` : '';
 
+  // Show connection screen when no drone is connected
+  const showConnectionScreen = !activeDroneId;
+
   return (
     <div className={`h-full flex flex-col bg-gray-950 text-gray-100 ${themeClass} ${schemeClass}`}>
-      <MobileLayout sendMessage={sendMessage} />
+      {showConnectionScreen ? (
+        <ConnectionScreen />
+      ) : (
+        <MobileLayout sendMessage={sendMessage} />
+      )}
 
       {/* Alerts overlay — positioned below status strip */}
       <div className="fixed top-[calc(env(safe-area-inset-top)+52px)] left-3 right-3 z-[9999] flex flex-col gap-2">

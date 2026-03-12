@@ -1,5 +1,5 @@
 import React, { useRef, useCallback, useEffect } from 'react';
-import { Map as MapIcon, Plane, Wrench } from 'lucide-react';
+import { Map as MapIcon, Plane, Wrench, ChevronDown } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
 import { INITIAL_TELEMETRY } from '../store/droneStore';
 
@@ -10,16 +10,16 @@ const SNAP_POINTS = {
   full: 0.92,
 };
 
-// Spring animation helper
-function animateTo(element, targetY, duration = 300) {
+// Spring-like animation with damping
+function animateTo(element, targetY, duration = 320) {
   const start = parseFloat(element.style.transform?.match(/translateY\((.+)px\)/)?.[1] || '0');
   const startTime = performance.now();
 
   function tick(now) {
     const elapsed = now - startTime;
     const progress = Math.min(elapsed / duration, 1);
-    // Ease-out cubic
-    const ease = 1 - Math.pow(1 - progress, 3);
+    // Spring-like ease: overshoot then settle
+    const ease = 1 - Math.pow(1 - progress, 3.5);
     const current = start + (targetY - start) * ease;
     element.style.transform = `translateY(${current}px)`;
     if (progress < 1) requestAnimationFrame(tick);
@@ -29,7 +29,7 @@ function animateTo(element, targetY, duration = 300) {
 
 export default function BottomSheet({ children }) {
   const sheetRef = useRef(null);
-  const dragState = useRef({ dragging: false, startY: 0, startTranslate: 0 });
+  const dragState = useRef({ dragging: false, startY: 0, startTranslate: 0, velocity: 0, lastY: 0, lastTime: 0 });
   const bottomSheetSnap = useDroneStore((s) => s.bottomSheetSnap);
   const setBottomSheetSnap = useDroneStore((s) => s.setBottomSheetSnap);
   const activeTab = useDroneStore((s) => s.activeTab);
@@ -43,7 +43,6 @@ export default function BottomSheet({ children }) {
   const getTranslateY = useCallback((snap) => {
     const vh = window.innerHeight;
     const fraction = SNAP_POINTS[snap] || SNAP_POINTS.peek;
-    // Sheet top = vh - (fraction * vh)
     return vh * (1 - fraction);
   }, []);
 
@@ -67,12 +66,13 @@ export default function BottomSheet({ children }) {
     return () => window.removeEventListener('resize', handleResize);
   }, [bottomSheetSnap, getTranslateY]);
 
-  // Touch handlers for drag
+  // Touch handlers for drag (on grab handle area)
   const onTouchStart = useCallback((e) => {
     const el = sheetRef.current;
     if (!el) return;
     const currentY = parseFloat(el.style.transform?.match(/translateY\((.+)px\)/)?.[1] || '0');
-    dragState.current = { dragging: true, startY: e.touches[0].clientY, startTranslate: currentY };
+    const now = Date.now();
+    dragState.current = { dragging: true, startY: e.touches[0].clientY, startTranslate: currentY, velocity: 0, lastY: e.touches[0].clientY, lastTime: now };
     el.style.transition = 'none';
   }, []);
 
@@ -80,12 +80,21 @@ export default function BottomSheet({ children }) {
     if (!dragState.current.dragging) return;
     const el = sheetRef.current;
     if (!el) return;
-    const deltaY = e.touches[0].clientY - dragState.current.startY;
+    const touchY = e.touches[0].clientY;
+    const deltaY = touchY - dragState.current.startY;
     const newY = dragState.current.startTranslate + deltaY;
-    // Clamp: don't go above full or below screen
     const minY = getTranslateY('full');
     const maxY = window.innerHeight;
     el.style.transform = `translateY(${Math.max(minY, Math.min(maxY, newY))}px)`;
+
+    // Track velocity for flick detection
+    const now = Date.now();
+    const dt = now - dragState.current.lastTime;
+    if (dt > 0) {
+      dragState.current.velocity = (touchY - dragState.current.lastY) / dt;
+    }
+    dragState.current.lastY = touchY;
+    dragState.current.lastTime = now;
   }, [getTranslateY]);
 
   const onTouchEnd = useCallback(() => {
@@ -96,22 +105,41 @@ export default function BottomSheet({ children }) {
 
     const currentY = parseFloat(el.style.transform?.match(/translateY\((.+)px\)/)?.[1] || '0');
     const vh = window.innerHeight;
+    const velocity = dragState.current.velocity; // px/ms, positive = downward
 
-    // Find nearest snap point
-    let nearest = 'peek';
-    let minDist = Infinity;
-    for (const [snap, fraction] of Object.entries(SNAP_POINTS)) {
-      const snapY = vh * (1 - fraction);
-      const dist = Math.abs(currentY - snapY);
-      if (dist < minDist) {
-        minDist = dist;
-        nearest = snap;
+    // Flick detection: fast swipe overrides nearest-snap
+    const FLICK_THRESHOLD = 0.5; // px/ms
+    let nearest;
+
+    if (velocity > FLICK_THRESHOLD) {
+      // Fast downward flick — snap to next lower point
+      const snapOrder = ['full', 'half', 'peek'];
+      const currentSnap = snapOrder.find(s => Math.abs(currentY - getTranslateY(s)) < vh * 0.15) || bottomSheetSnap;
+      const idx = snapOrder.indexOf(currentSnap);
+      nearest = snapOrder[Math.min(idx + 1, snapOrder.length - 1)];
+    } else if (velocity < -FLICK_THRESHOLD) {
+      // Fast upward flick — snap to next higher point
+      const snapOrder = ['peek', 'half', 'full'];
+      const currentSnap = snapOrder.find(s => Math.abs(currentY - getTranslateY(s)) < vh * 0.15) || bottomSheetSnap;
+      const idx = snapOrder.indexOf(currentSnap);
+      nearest = snapOrder[Math.min(idx + 1, snapOrder.length - 1)];
+    } else {
+      // No flick — find nearest snap point
+      nearest = 'peek';
+      let minDist = Infinity;
+      for (const [snap, fraction] of Object.entries(SNAP_POINTS)) {
+        const snapY = vh * (1 - fraction);
+        const dist = Math.abs(currentY - snapY);
+        if (dist < minDist) {
+          minDist = dist;
+          nearest = snap;
+        }
       }
     }
 
     setBottomSheetSnap(nearest);
     animateTo(el, getTranslateY(nearest));
-  }, [getTranslateY, setBottomSheetSnap]);
+  }, [getTranslateY, setBottomSheetSnap, bottomSheetSnap]);
 
   // Peek summary line
   const summaryParts = [];
@@ -137,9 +165,9 @@ export default function BottomSheet({ children }) {
         paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
-      {/* Grab handle + peek summary */}
+      {/* Grab handle + peek summary — always draggable */}
       <div
-        className="flex flex-col items-center pt-2 pb-1 cursor-grab active:cursor-grabbing"
+        className="flex flex-col items-center pt-2 pb-1 cursor-grab active:cursor-grabbing touch-none"
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -150,23 +178,32 @@ export default function BottomSheet({ children }) {
         )}
       </div>
 
-      {/* Tab pills — visible at half and full */}
+      {/* Tab pills + collapse button — visible at half and full */}
       {bottomSheetSnap !== 'peek' && (
-        <div className="flex mx-4 mb-3 p-1 bg-gray-900/60 rounded-xl">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-colors ${
-                activeTab === tab.id
-                  ? 'bg-gray-800/80 text-cyan-400'
-                  : 'text-gray-500'
-              }`}
-            >
-              <tab.icon size={13} />
-              {tab.label}
-            </button>
-          ))}
+        <div className="flex items-center mx-4 mb-3 gap-2">
+          <div className="flex flex-1 p-1 bg-gray-900/60 rounded-xl">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                  activeTab === tab.id
+                    ? 'bg-gray-800/80 text-cyan-400'
+                    : 'text-gray-500'
+                }`}
+              >
+                <tab.icon size={13} />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          {/* Collapse button — always visible when sheet is open */}
+          <button
+            onClick={() => setBottomSheetSnap('peek')}
+            className="w-9 h-9 rounded-lg bg-gray-900/60 flex items-center justify-center shrink-0 active:scale-95"
+          >
+            <ChevronDown size={16} className="text-gray-500" />
+          </button>
         </div>
       )}
 
