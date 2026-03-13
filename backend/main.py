@@ -27,7 +27,8 @@ logger = logging.getLogger(__name__)
 
 # --- Settings ---
 
-SETTINGS_PATH = os.path.join(os.path.dirname(__file__), "settings.json")
+_data_dir = os.environ.get("PYXUS_DATA_DIR", os.path.dirname(__file__))
+SETTINGS_PATH = os.path.join(_data_dir, "settings.json")
 
 
 def load_settings() -> dict:
@@ -1184,7 +1185,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
 # --- Static files (production) ---
 
-frontend_dist = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+frontend_dist = os.environ.get("PYXUS_FRONTEND_DIR", os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
 if os.path.isdir(frontend_dist):
     app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="assets")
 
