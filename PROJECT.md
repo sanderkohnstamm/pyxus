@@ -80,6 +80,6 @@ High-priority issues that make flight fundamentally safer.
 
 ## Current State
 
-Core GCS implemented: real-time telemetry, mission planning/upload/download, geofencing (circle + polygon), gamepad/keyboard control, parameter management, weather integration, video streaming, pre-flight checklists, dark/light theme.
+Core GCS implemented: real-time telemetry, mission planning/upload/download, geofencing (circle + polygon), gamepad/keyboard control, parameter management, video streaming, pre-flight checklists, dark/light theme.
 
 **Key gaps**: No graceful degradation handling. No operator alerts for system failures. No flight logging. Emergency stop not prominent enough. Connection loss not handled gracefully.
