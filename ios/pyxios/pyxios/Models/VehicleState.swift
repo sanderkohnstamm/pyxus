@@ -64,6 +64,7 @@ struct VehicleState {
     var flightMode: String = ""
     var landed: Bool = true
     var vehicleType: VehicleType = .copter
+    var isArdupilot: Bool = true
     var missionSeq: Int = -1
 
     // Home

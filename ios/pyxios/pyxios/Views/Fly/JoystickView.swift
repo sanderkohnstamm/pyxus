@@ -71,8 +71,8 @@ struct SingleJoystick: View {
     @State private var position: CGSize = .zero
     @State private var isDragging = false
 
-    private let outerRadius: CGFloat = 56
-    private let innerRadius: CGFloat = 22
+    private let outerRadius: CGFloat = 75
+    private let innerRadius: CGFloat = 28
 
     var body: some View {
         ZStack {

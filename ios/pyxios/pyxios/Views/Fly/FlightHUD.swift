@@ -71,6 +71,11 @@ struct FlightHUD: View {
             // Center: main telemetry
             VStack(alignment: .leading, spacing: 3) {
                 topRow
+                HStack(spacing: 8) {
+                    Text("\(state.vehicleType.description) · \(state.isArdupilot ? "ArduPilot" : "PX4")")
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.45))
+                }
                 HStack(spacing: 10) {
                     hudItem(icon: "arrow.up", value: altString)
                     hudItem(icon: "speedometer", value: speedString)

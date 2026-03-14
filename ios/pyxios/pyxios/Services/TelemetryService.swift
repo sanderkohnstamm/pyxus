@@ -63,7 +63,9 @@ final class TelemetryService {
         state.gpsFixType = Int(t.gpsFixType)
         state.armed = t.armed
         state.flightMode = t.mode
-        state.landed = !t.armed
+        // MAV_STATE: 3=STANDBY (ground), 4=ACTIVE (flying), 5=CRITICAL, 6=EMERGENCY
+        // Landed = on ground (standby or just armed but not yet in air)
+        state.landed = t.systemStatus <= 3 || (!t.armed)
         state.missionSeq = Int(t.missionSeq)
 
         if t.homeLat != 0 || t.homeLon != 0 {
@@ -76,6 +78,9 @@ final class TelemetryService {
             let droneLoc = CLLocation(latitude: t.lat, longitude: t.lon)
             state.distanceToHome = Float(droneLoc.distance(from: homeLoc))
         }
+
+        // Autopilot type
+        state.isArdupilot = t.isArdupilot
 
         // Vehicle type
         switch t.mavType {
