@@ -77,7 +77,7 @@ final class DroneManager {
 
     // MARK: - Private
 
-    private var drone: MAVLinkDrone?
+    private(set) var drone: MAVLinkDrone?
     private var manualControlTimer: Timer?
     private var paramCount: UInt16 = 0
     private var paramBuffer: [String: DroneParam] = [:]
@@ -305,33 +305,10 @@ final class DroneManager {
 
     func setFlightMode(_ mode: String) {
         guard let drone else { return }
-        switch mode.lowercased() {
-        case "rtl", "return":
-            returnToLaunch()
-        case "land":
-            land()
-        case "hold", "loiter":
-            hold()
-        case "takeoff":
-            takeoff()
-        case "auto":
-            startMission()
-        case "guided":
-            if state.hasValidPosition {
-                let alt = state.altitudeAMSL > 0 ? state.altitudeAMSL : 10
-                drone.gotoLocation(lat: state.coordinate.latitude,
-                                   lon: state.coordinate.longitude,
-                                   alt: alt)
-                statusMessage = "Guided mode"
-                HapticManager.shared.trigger(style: "success")
-            } else {
-                hold()
-            }
-        default:
-            // Try setting the mode directly by name
-            drone.setMode(mode.uppercased())
-            statusMessage = "Setting \(mode)"
-        }
+        // Set mode directly — MAVLinkDrone handles case-insensitive matching
+        drone.setMode(mode)
+        statusMessage = "Setting \(mode)"
+        HapticManager.shared.trigger(style: "success")
     }
 
     // MARK: - Manual Control

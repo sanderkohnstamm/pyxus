@@ -296,15 +296,12 @@ struct FlyView: View {
     }
 
     private var availableModes: [String] {
-        // Modes available via MAVSDK actions
-        switch droneManager.state.vehicleType {
-        case .copter:
-            return ["Guided", "Hold", "Auto", "Land", "RTL"]
-        case .plane:
-            return ["Guided", "Hold", "Auto", "Land", "RTL"]
-        case .rover:
-            return ["Guided", "Hold", "Auto", "RTL"]
+        // Get all modes from the drone's autopilot mode map
+        if let drone = droneManager.drone {
+            return drone.availableModes
         }
+        // Fallback when not connected
+        return ["STABILIZE", "ALT_HOLD", "LOITER", "GUIDED", "AUTO", "RTL", "LAND"]
     }
 
     // MARK: - Action Buttons

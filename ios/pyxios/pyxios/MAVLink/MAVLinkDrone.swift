@@ -165,6 +165,9 @@ final class MAVLinkDrone {
     // Stream rate tracking
     var messageRates: [String: (count: Int, firstSeen: Date, lastValue: String)] = [:]
 
+    // Last raw payload per message type (for inspector)
+    var lastPayloads: [String: Data] = [:]
+
     // Mission protocol queue
     private var missionQueue: [MAVLinkFrame] = []
     private let missionLock = NSLock()
@@ -242,6 +245,10 @@ final class MAVLinkDrone {
     }
 
     func takeoff(altitude: Float = 10) {
+        if isArdupilot {
+            // ArduPilot requires GUIDED mode for takeoff
+            setMode("GUIDED")
+        }
         // MAV_CMD_NAV_TAKEOFF = 22
         sendCommandLong(command: 22, param7: altitude)
     }
@@ -268,14 +275,24 @@ final class MAVLinkDrone {
     }
 
     func setMode(_ modeName: String) {
+        let upper = modeName.uppercased()
         if isArdupilot {
-            guard let modeID = ArduPilotModes.modeID(name: modeName, mavType: mavType) else { return }
+            guard let modeID = ArduPilotModes.modeID(name: upper, mavType: mavType) else { return }
             // MAV_CMD_DO_SET_MODE = 176, param1 = MAV_MODE_FLAG_CUSTOM_MODE_ENABLED (1)
             sendCommandLong(command: 176, param1: 1, param2: Float(modeID))
         } else {
-            guard let customMode = PX4Modes.encode(name: modeName) else { return }
+            guard let customMode = PX4Modes.encode(name: upper) else { return }
             // MAV_MODE_FLAG_CUSTOM_MODE_ENABLED = 1
             sendCommandLong(command: 176, param1: 1, param2: Float(customMode))
+        }
+    }
+
+    /// All available mode names for the current vehicle type and autopilot.
+    var availableModes: [String] {
+        if isArdupilot {
+            return ArduPilotModes.modesForType(mavType).values.sorted()
+        } else {
+            return Array(Set(PX4Modes.modes.values)).sorted()
         }
     }
 
@@ -562,9 +579,10 @@ final class MAVLinkDrone {
     private func handleFrame(_ frame: MAVLinkFrame) {
         let msgID = frame.messageID
 
-        // Track message rate
+        // Track message rate and store last payload
         let msgName = MAVLinkCRCExtras.messageNames[msgID] ?? "MSG_\(msgID)"
         trackRate(msgName)
+        lastPayloads[msgName] = frame.payload
 
         // Route mission protocol messages to dedicated queue
         switch msgID {
