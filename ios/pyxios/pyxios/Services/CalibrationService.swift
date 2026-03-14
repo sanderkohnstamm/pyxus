@@ -60,7 +60,7 @@ enum CalibrationType: String, CaseIterable, Identifiable {
 enum CalibrationState: Equatable {
     case idle
     case running(CalibrationType)
-    case waitingForPosition(Int)  // accel: waiting for user to place vehicle (1-6, 1-based)
+    case waitingForPosition(Int)  // accel: waiting for user to place vehicle (step 0-5 display)
     case compassProgress(Int)     // compass: completion percentage
     case completed(Bool)          // success or failure
 }
@@ -82,7 +82,10 @@ final class CalibrationService {
     // MARK: - Private
 
     private weak var drone: MAVLinkDrone?
-    private var savedCompassFitness: Float?
+    /// Track per-compass MAG_CAL_REPORT results: compassId → success
+    private var compassResults: [UInt8: Bool] = [:]
+    /// Expected number of compasses (from MAG_CAL_PROGRESS cal_mask)
+    private var compassCount: Int = 0
 
     /// Accel positions (display order matches ArduPilot param1 values 1-6)
     static let accelPositions = [
@@ -105,7 +108,8 @@ final class CalibrationService {
         compassPercent = 0
         messages = []
         isComplete = false
-        savedCompassFitness = nil
+        compassResults = [:]
+        compassCount = 0
     }
 
     // MARK: - Start Calibration
@@ -124,7 +128,7 @@ final class CalibrationService {
             addMessage("Gyro calibration — keep still...")
 
         case .accel:
-            state = .waitingForPosition(1)
+            state = .waitingForPosition(0)
             accelStep = 0
             drone.calibrate(accel: 1)
             addMessage("Accel calibration — place vehicle level, then tap Continue...")
@@ -137,6 +141,8 @@ final class CalibrationService {
         case .compass:
             state = .running(.compass)
             compassPercent = 0
+            compassResults = [:]
+            compassCount = 0
             if drone.isArdupilot {
                 // QGC sets COMPASS_CAL_FITNESS=100 before starting to ensure cal succeeds
                 drone.setParam(name: "COMPASS_CAL_FITNESS", value: 100)
@@ -192,7 +198,6 @@ final class CalibrationService {
         guard let drone, activeCal == .accel else { return }
 
         // ArduPilot expects COMMAND_ACK with command=0, result=1 to advance to next position
-        // (This is what QGC sends — command=0 means "ack the accel cal prompt", result=1 means accepted)
         var ack = MsgCommandAck()
         ack.command = 0
         ack.result = 1
@@ -200,7 +205,16 @@ final class CalibrationService {
         ack.target_component = drone.targetComponent
         drone.connection.sendMessage(id: MsgCommandAck.id, payload: ack.encode())
 
-        addMessage("Confirmed position, waiting for next...")
+        // Advance step immediately for visual feedback
+        if accelStep < 5 {
+            accelStep += 1
+            state = .waitingForPosition(accelStep)
+            let pos = Self.accelPositions[accelStep]
+            addMessage("Step \(accelStep + 1)/6: \(pos.0)")
+        } else {
+            addMessage("All positions done, waiting for result...")
+            state = .running(.accel)
+        }
     }
 
     // MARK: - Message Handlers
@@ -213,7 +227,6 @@ final class CalibrationService {
             // Result codes: 0=ACCEPTED, 1=TEMP_REJECTED, 2=DENIED, 3=UNSUPPORTED, 4=FAILED, 5=IN_PROGRESS
             switch result {
             case 0: // MAV_RESULT_ACCEPTED — calibration complete (success)
-                // For gyro/level/baro/simple-accel, ACCEPTED means done
                 if activeCal == .gyro || activeCal == .level || activeCal == .pressure {
                     addMessage("Calibration successful!")
                     completeCalibration(success: true)
@@ -246,14 +259,15 @@ final class CalibrationService {
             let posValue = Int(param1)
 
             if posValue >= 1 && posValue <= 6 {
-                // Position prompt (1-based): convert to 0-based for UI array
+                // Position prompt (1-based): convert to 0-based for UI
                 accelStep = posValue - 1
-                state = .waitingForPosition(posValue)
+                state = .waitingForPosition(accelStep)
                 let pos = Self.accelPositions[posValue - 1]
                 addMessage("Position \(posValue)/6: \(pos.0)")
                 HapticManager.shared.trigger(style: "success")
             } else if posValue == 7 {
                 // ACCELCAL_VEHICLE_POS_SUCCESS
+                accelStep = 6  // all done — fills all bars
                 addMessage("Accel calibration successful!")
                 completeCalibration(success: true)
             } else if posValue == 8 {
@@ -265,8 +279,20 @@ final class CalibrationService {
     }
 
     /// Handle MAG_CAL_PROGRESS message (191)
-    func handleMagCalProgress(compassId: UInt8, percent: UInt8, status: UInt8) {
+    func handleMagCalProgress(compassId: UInt8, calMask: UInt8, percent: UInt8, status: UInt8) {
         guard activeCal == .compass else { return }
+
+        // Derive compass count from cal_mask (bitmask of active compasses)
+        if compassCount == 0 && calMask > 0 {
+            var mask = calMask
+            var count = 0
+            while mask != 0 {
+                count += Int(mask & 1)
+                mask >>= 1
+            }
+            compassCount = count
+        }
+
         compassPercent = Int(percent)
         state = .compassProgress(Int(percent))
     }
@@ -276,22 +302,35 @@ final class CalibrationService {
     func handleMagCalReport(compassId: UInt8, status: UInt8, fitness: Float) {
         guard activeCal == .compass else { return }
 
-        if status == 3 {
-            addMessage("Compass calibration successful (fitness: \(String(format: "%.1f", fitness)))")
-            // Restore COMPASS_CAL_FITNESS and set COMPASS_LEARN=0 (like QGC)
-            if let drone {
-                drone.setParam(name: "COMPASS_LEARN", value: 0)
-            }
-            completeCalibration(success: true)
-        } else if status >= 4 {
+        let success = (status == 3)
+        compassResults[compassId] = success
+
+        if success {
+            addMessage("Compass \(compassId) calibrated (fitness: \(String(format: "%.1f", fitness)))")
+        } else {
             let reasons: [UInt8: String] = [4: "Failed", 5: "Bad orientation", 6: "Bad radius"]
             let reason = reasons[status] ?? "Error \(status)"
-            addMessage("Compass calibration: \(reason)")
-            completeCalibration(success: false)
+            addMessage("Compass \(compassId): \(reason)")
+        }
+
+        // Wait until all compasses have reported before declaring result
+        let expectedCount = compassCount > 0 ? compassCount : 1
+        if compassResults.count >= expectedCount {
+            let allSuccess = compassResults.values.allSatisfy { $0 }
+            if allSuccess {
+                addMessage("All compasses calibrated successfully")
+                if let drone {
+                    drone.setParam(name: "COMPASS_LEARN", value: 0)
+                }
+                completeCalibration(success: true)
+            } else {
+                addMessage("Compass calibration failed")
+                completeCalibration(success: false)
+            }
         }
     }
 
-    /// Handle STATUSTEXT — primarily for PX4 [cal] messages, also ArduPilot status display
+    /// Handle STATUSTEXT — primarily for PX4 [cal] messages
     func handleStatusText(text: String) {
         guard activeCal != nil else { return }
 
@@ -302,7 +341,7 @@ final class CalibrationService {
         // PX4 calibration uses [cal] prefix for state machine
         if lower.hasPrefix("[cal]") {
             if lower.contains("calibration done") || lower.contains("calibration passed") ||
-               lower.contains("done") && lower.contains("successful") {
+               (lower.contains("done") && lower.contains("successful")) {
                 completeCalibration(success: true)
                 return
             }

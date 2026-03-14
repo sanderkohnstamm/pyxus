@@ -125,6 +125,7 @@ struct TelemetrySnapshot: Sendable {
     var linkLost = false
     var mavType: UInt8 = 2
     var isArdupilot = true
+    var sensorHealth: UInt32 = 0
     var messageRates: [String: (count: Int, firstSeen: Date)] = [:]
     var lastPayloads: [String: Data] = [:]
 }
@@ -146,7 +147,7 @@ final class MAVLinkDrone {
     var onParamValue: ((String, Float, UInt8, UInt16, UInt16) -> Void)?  // (name, value, type, index, count)
     var onCommandAck: ((UInt16, UInt8) -> Void)?  // (command, result)
     var onCommandLongReceived: ((UInt16, Float) -> Void)?  // (command, param1) — for ArduPilot accel cal prompts
-    var onMagCalProgress: ((UInt8, UInt8, UInt8) -> Void)?  // (compassId, percent, status)
+    var onMagCalProgress: ((UInt8, UInt8, UInt8, UInt8) -> Void)?  // (compassId, calMask, percent, status)
     var onMagCalReport: ((UInt8, UInt8, Float) -> Void)?    // (compassId, status, fitness)
     var onCameraMessage: ((UInt32, Data) -> Void)?  // (messageID, payload)
     var onConnectionStateChanged: ((MAVLinkConnection.State) -> Void)?
@@ -178,6 +179,9 @@ final class MAVLinkDrone {
     private var batteryVoltage: Float = 0
     private var batteryCurrent: Float = 0
     private var batteryRemaining: Int8 = -1
+
+    // Sensor health
+    private var sensorHealth: UInt32 = 0
 
     // GPS
     private var gpsFixType: UInt8 = 0
@@ -216,6 +220,7 @@ final class MAVLinkDrone {
             homeLat: homeLat, homeLon: homeLon, homeAlt: homeAlt,
             missionSeq: missionSeq, linkLost: linkLost,
             mavType: mavType, isArdupilot: isArdupilot,
+            sensorHealth: sensorHealth,
             messageRates: messageRates, lastPayloads: lastPayloads
         )
     }
@@ -776,7 +781,7 @@ final class MAVLinkDrone {
         if msgID == MsgMagCalProgress.id {
             let prog = MsgMagCalProgress(from: frame.payload)
             DispatchQueue.main.async { [weak self] in
-                self?.onMagCalProgress?(prog.compass_id, prog.completion_pct, prog.cal_status)
+                self?.onMagCalProgress?(prog.compass_id, prog.cal_mask, prog.completion_pct, prog.cal_status)
             }
             return
         }
@@ -870,6 +875,7 @@ final class MAVLinkDrone {
             batteryVoltage = Float(sys.voltage_battery) / 1000.0
             batteryCurrent = sys.current_battery != -1 ? Float(sys.current_battery) / 100.0 : 0
             batteryRemaining = Int8(clamping: sys.battery_remaining)
+            sensorHealth = sys.onboard_control_sensors_health
             updated = true
 
         case MsgMissionCurrent.id:

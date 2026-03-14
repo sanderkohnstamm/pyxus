@@ -174,8 +174,8 @@ final class DroneManager {
             self?.calibrationService.handleCommandLong(command: command, param1: param1)
         }
 
-        mav.onMagCalProgress = { [weak self] compassId, percent, status in
-            self?.calibrationService.handleMagCalProgress(compassId: compassId, percent: percent, status: status)
+        mav.onMagCalProgress = { [weak self] compassId, calMask, percent, status in
+            self?.calibrationService.handleMagCalProgress(compassId: compassId, calMask: calMask, percent: percent, status: status)
         }
 
         mav.onMagCalReport = { [weak self] compassId, status, fitness in
