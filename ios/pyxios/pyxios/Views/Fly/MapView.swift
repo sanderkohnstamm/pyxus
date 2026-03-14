@@ -43,20 +43,13 @@ struct DroneMapView: View {
             ZStack {
                 MapReader { proxy in
                     Map(position: $cameraPosition) {
-                        // Drone marker
-                        if state.hasValidPosition {
-                            Annotation("Drone", coordinate: state.coordinate) {
-                                droneMarker
-                            }
-
-                            // Flight trail
-                            if settings.showTrail && trail.count >= 2 {
-                                MapPolyline(coordinates: trail)
-                                    .stroke(.cyan.opacity(0.5), lineWidth: 2)
-                            }
+                        // Flight trail
+                        if state.hasValidPosition && settings.showTrail && trail.count >= 2 {
+                            MapPolyline(coordinates: trail)
+                                .stroke(.cyan.opacity(0.5), lineWidth: 2)
                         }
 
-                        // Home marker
+                        // Home marker (below drone)
                         if let home = state.homeCoordinate {
                             Annotation("Home", coordinate: home) {
                                 Image(systemName: "house.fill")
@@ -66,6 +59,14 @@ struct DroneMapView: View {
                                     .background(.green)
                                     .clipShape(Circle())
                             }
+                        }
+
+                        // Drone marker (on top)
+                        if state.hasValidPosition {
+                            Annotation("", coordinate: state.coordinate) {
+                                droneMarker
+                            }
+                            .annotationTitles(.hidden)
                         }
 
                         // Mission waypoints overlay
@@ -176,19 +177,12 @@ struct DroneMapView: View {
     // MARK: - Drone Marker
 
     private var droneMarker: some View {
-        Image(systemName: droneIcon)
-            .font(.title2)
-            .foregroundStyle(.cyan)
+        Triangle()
+            .fill(.cyan)
+            .frame(width: 14, height: 18)
             .rotationEffect(.degrees(Double(state.heading)))
-            .shadow(color: .black, radius: 2)
-    }
-
-    private var droneIcon: String {
-        switch state.vehicleType {
-        case .copter: return "arrow.up.circle.fill"
-        case .plane: return "airplane"
-        case .rover: return "car.fill"
-        }
+            .shadow(color: .black.opacity(0.6), radius: 3)
+            .shadow(color: .cyan.opacity(0.4), radius: 6)
     }
 
     private func frameOnDroneIfNeeded() {
@@ -224,5 +218,18 @@ struct DroneMapView: View {
         if trail.count > 500 {
             trail.removeFirst(trail.count - 500)
         }
+    }
+}
+
+// MARK: - Triangle Shape
+
+struct Triangle: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.closeSubpath()
+        return path
     }
 }
