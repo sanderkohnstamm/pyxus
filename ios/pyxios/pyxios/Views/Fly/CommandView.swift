@@ -210,8 +210,7 @@ struct CommandView: View {
         .alert("Continue from waypoint?", isPresented: $showContinueConfirm) {
             Button("Continue") {
                 if let seq = continueFromSeq {
-                    droneManager.setMissionCurrent(seq: seq)
-                    droneManager.startMission()
+                    droneManager.startMission(fromSeq: seq)
                 }
                 continueFromSeq = nil
             }

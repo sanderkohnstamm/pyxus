@@ -465,9 +465,9 @@ final class DroneManager {
         }, completion: completion)
     }
 
-    /// Start mission via MissionService.
-    func startMission() {
-        missionService.startMission { [weak self] msg in
+    /// Start mission via MissionService, optionally from a specific waypoint seq.
+    func startMission(fromSeq: Int = 1) {
+        missionService.startMission(fromSeq: UInt16(fromSeq)) { [weak self] msg in
             self?.statusMessage = msg
         }
     }

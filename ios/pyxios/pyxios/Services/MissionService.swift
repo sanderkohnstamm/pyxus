@@ -198,17 +198,17 @@ final class MissionService {
 
     // MARK: - Mission Start / Pause / Clear
 
-    func startMission(statusCallback: @escaping (String) -> Void) {
+    func startMission(fromSeq: UInt16 = 1, statusCallback: @escaping (String) -> Void) {
         guard let drone else { return }
-        drone.sendMissionSetCurrent(seq: 1)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+        drone.sendMissionSetCurrent(seq: fromSeq)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             if drone.isArdupilot {
                 drone.setMode("AUTO")
             } else {
                 drone.setMode("AUTO_MISSION")
             }
         }
-        statusCallback("Mission started")
+        statusCallback(fromSeq > 1 ? "Continuing from WP \(fromSeq)" : "Mission started")
         HapticManager.shared.trigger(style: "success")
     }
 
