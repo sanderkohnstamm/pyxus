@@ -485,9 +485,10 @@ def _gen_decode_field(f, lines):
     sz = f["wire_size"]
 
     if base == "char" and arr > 0:
-        # String: read arr bytes, convert to UTF-8, trim nulls
-        lines.append(f"        if o + {arr} <= d.count {{")
-        lines.append(f"            {name} = String(bytes: d[d.startIndex+o..<d.startIndex+o+{arr}], encoding: .utf8)?.trimmingCharacters(in: CharacterSet([\"\\0\"])) ?? \"\"")
+        # String: read available bytes (up to arr), handle MAVLink v2 zero-trimming
+        lines.append(f"        if o < d.count {{")
+        lines.append(f"            let strEnd = min(o + {arr}, d.count)")
+        lines.append(f"            {name} = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet([\"\\0\"])) ?? \"\"")
         lines.append(f"        }}")
         lines.append(f"        o += {arr}")
     elif arr > 0:

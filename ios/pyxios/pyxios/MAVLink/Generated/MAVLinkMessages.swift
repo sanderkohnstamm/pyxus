@@ -290,8 +290,9 @@ struct MsgChangeOperatorControl: Sendable {
             version = d[d.startIndex+o]
         }
         o += 1
-        if o + 25 <= d.count {
-            passkey = String(bytes: d[d.startIndex+o..<d.startIndex+o+25], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 25, d.count)
+            passkey = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 25
     }
@@ -369,8 +370,9 @@ struct MsgAuthKey: Sendable {
     init(from payload: Data) {
         let d = payload
         var o = 0
-        if o + 32 <= d.count {
-            key = String(bytes: d[d.startIndex+o..<d.startIndex+o+32], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 32, d.count)
+            key = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 32
     }
@@ -457,8 +459,9 @@ struct MsgParamRequestRead: Sendable {
             target_component = d[d.startIndex+o]
         }
         o += 1
-        if o + 16 <= d.count {
-            param_id = String(bytes: d[d.startIndex+o..<d.startIndex+o+16], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 16, d.count)
+            param_id = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 16
     }
@@ -545,8 +548,9 @@ struct MsgParamValue: Sendable {
             param_index = UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8
         }
         o += 2
-        if o + 16 <= d.count {
-            param_id = String(bytes: d[d.startIndex+o..<d.startIndex+o+16], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 16, d.count)
+            param_id = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 16
         if o + 1 <= d.count {
@@ -604,8 +608,9 @@ struct MsgParamSet: Sendable {
             target_component = d[d.startIndex+o]
         }
         o += 1
-        if o + 16 <= d.count {
-            param_id = String(bytes: d[d.startIndex+o..<d.startIndex+o+16], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 16, d.count)
+            param_id = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 16
         if o + 1 <= d.count {
@@ -2611,8 +2616,9 @@ struct MsgParamMapRc: Sendable {
             target_component = d[d.startIndex+o]
         }
         o += 1
-        if o + 16 <= d.count {
-            param_id = String(bytes: d[d.startIndex+o..<d.startIndex+o+16], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 16, d.count)
+            param_id = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 16
         if o + 1 <= d.count {
@@ -14206,8 +14212,9 @@ struct MsgAdsbVehicle: Sendable {
             altitude_type = d[d.startIndex+o]
         }
         o += 1
-        if o + 9 <= d.count {
-            callsign = String(bytes: d[d.startIndex+o..<d.startIndex+o+9], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 9, d.count)
+            callsign = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 9
         if o + 1 <= d.count {
@@ -14472,8 +14479,9 @@ struct MsgDebugVect: Sendable {
             z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
-        if o + 10 <= d.count {
-            name = String(bytes: d[d.startIndex+o..<d.startIndex+o+10], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 10, d.count)
+            name = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 10
     }
@@ -14521,8 +14529,9 @@ struct MsgNamedValueFloat: Sendable {
             value = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
-        if o + 10 <= d.count {
-            name = String(bytes: d[d.startIndex+o..<d.startIndex+o+10], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 10, d.count)
+            name = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 10
     }
@@ -14566,8 +14575,9 @@ struct MsgNamedValueInt: Sendable {
             value = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
-        if o + 10 <= d.count {
-            name = String(bytes: d[d.startIndex+o..<d.startIndex+o+10], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 10, d.count)
+            name = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 10
     }
@@ -14608,8 +14618,9 @@ struct MsgStatustext: Sendable {
             severity = d[d.startIndex+o]
         }
         o += 1
-        if o + 50 <= d.count {
-            text = String(bytes: d[d.startIndex+o..<d.startIndex+o+50], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 50, d.count)
+            text = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 50
         // Extension fields (only present in longer payloads)
@@ -14804,14 +14815,16 @@ struct MsgPlayTune: Sendable {
             target_component = d[d.startIndex+o]
         }
         o += 1
-        if o + 30 <= d.count {
-            tune = String(bytes: d[d.startIndex+o..<d.startIndex+o+30], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 30, d.count)
+            tune = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 30
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
-        if o + 200 <= d.count {
-            tune2 = String(bytes: d[d.startIndex+o..<d.startIndex+o+200], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 200, d.count)
+            tune2 = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 200
     }
@@ -14915,8 +14928,9 @@ struct MsgCameraInformation: Sendable {
             lens_id = d[d.startIndex+o]
         }
         o += 1
-        if o + 140 <= d.count {
-            cam_definition_uri = String(bytes: d[d.startIndex+o..<d.startIndex+o+140], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 140, d.count)
+            cam_definition_uri = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 140
         // Extension fields (only present in longer payloads)
@@ -15087,8 +15101,9 @@ struct MsgStorageInformation: Sendable {
         }
         o += 1
         guard o < d.count else { return }
-        if o + 32 <= d.count {
-            name = String(bytes: d[d.startIndex+o..<d.startIndex+o+32], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 32, d.count)
+            name = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 32
     }
@@ -15262,8 +15277,9 @@ struct MsgCameraImageCaptured: Sendable {
             capture_result = Int8(bitPattern: d[d.startIndex+o])
         }
         o += 1
-        if o + 205 <= d.count {
-            file_url = String(bytes: d[d.startIndex+o..<d.startIndex+o+205], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 205, d.count)
+            file_url = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 205
     }
@@ -15650,12 +15666,14 @@ struct MsgVideoStreamInformation: Sendable {
             type = d[d.startIndex+o]
         }
         o += 1
-        if o + 32 <= d.count {
-            name = String(bytes: d[d.startIndex+o..<d.startIndex+o+32], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 32, d.count)
+            name = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 32
-        if o + 160 <= d.count {
-            uri = String(bytes: d[d.startIndex+o..<d.startIndex+o+160], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 160, d.count)
+            uri = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 160
         // Extension fields (only present in longer payloads)
@@ -16475,16 +16493,19 @@ struct MsgGimbalDeviceInformation: Sendable {
             custom_cap_flags = UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8
         }
         o += 2
-        if o + 32 <= d.count {
-            vendor_name = String(bytes: d[d.startIndex+o..<d.startIndex+o+32], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 32, d.count)
+            vendor_name = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 32
-        if o + 32 <= d.count {
-            model_name = String(bytes: d[d.startIndex+o..<d.startIndex+o+32], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 32, d.count)
+            model_name = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 32
-        if o + 32 <= d.count {
-            custom_name = String(bytes: d[d.startIndex+o..<d.startIndex+o+32], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 32, d.count)
+            custom_name = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 32
         // Extension fields (only present in longer payloads)
@@ -17016,12 +17037,14 @@ struct MsgWifiConfigAp: Sendable {
     init(from payload: Data) {
         let d = payload
         var o = 0
-        if o + 32 <= d.count {
-            ssid = String(bytes: d[d.startIndex+o..<d.startIndex+o+32], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 32, d.count)
+            ssid = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 32
-        if o + 64 <= d.count {
-            password = String(bytes: d[d.startIndex+o..<d.startIndex+o+64], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 64, d.count)
+            password = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 64
     }
@@ -17132,12 +17155,14 @@ struct MsgAisVessel: Sendable {
             dimension_starboard = d[d.startIndex+o]
         }
         o += 1
-        if o + 7 <= d.count {
-            callsign = String(bytes: d[d.startIndex+o..<d.startIndex+o+7], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 7, d.count)
+            callsign = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 7
-        if o + 20 <= d.count {
-            name = String(bytes: d[d.startIndex+o..<d.startIndex+o+20], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 20, d.count)
+            name = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 20
     }
@@ -17285,8 +17310,9 @@ struct MsgUavcanNodeInfo: Sendable {
             sw_vcs_commit = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24
         }
         o += 4
-        if o + 80 <= d.count {
-            name = String(bytes: d[d.startIndex+o..<d.startIndex+o+80], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 80, d.count)
+            name = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 80
         if o + 1 <= d.count {
@@ -17371,8 +17397,9 @@ struct MsgParamExtRequestRead: Sendable {
             target_component = d[d.startIndex+o]
         }
         o += 1
-        if o + 16 <= d.count {
-            param_id = String(bytes: d[d.startIndex+o..<d.startIndex+o+16], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 16, d.count)
+            param_id = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 16
     }
@@ -17455,12 +17482,14 @@ struct MsgParamExtValue: Sendable {
             param_index = UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8
         }
         o += 2
-        if o + 16 <= d.count {
-            param_id = String(bytes: d[d.startIndex+o..<d.startIndex+o+16], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 16, d.count)
+            param_id = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 16
-        if o + 128 <= d.count {
-            param_value = String(bytes: d[d.startIndex+o..<d.startIndex+o+128], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 128, d.count)
+            param_value = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 128
         if o + 1 <= d.count {
@@ -17517,12 +17546,14 @@ struct MsgParamExtSet: Sendable {
             target_component = d[d.startIndex+o]
         }
         o += 1
-        if o + 16 <= d.count {
-            param_id = String(bytes: d[d.startIndex+o..<d.startIndex+o+16], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 16, d.count)
+            param_id = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 16
-        if o + 128 <= d.count {
-            param_value = String(bytes: d[d.startIndex+o..<d.startIndex+o+128], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 128, d.count)
+            param_value = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 128
         if o + 1 <= d.count {
@@ -17570,12 +17601,14 @@ struct MsgParamExtAck: Sendable {
     init(from payload: Data) {
         let d = payload
         var o = 0
-        if o + 16 <= d.count {
-            param_id = String(bytes: d[d.startIndex+o..<d.startIndex+o+16], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 16, d.count)
+            param_id = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 16
-        if o + 128 <= d.count {
-            param_value = String(bytes: d[d.startIndex+o..<d.startIndex+o+128], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 128, d.count)
+            param_value = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 128
         if o + 1 <= d.count {
@@ -18408,8 +18441,9 @@ struct MsgDebugFloatArray: Sendable {
             array_id = UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8
         }
         o += 2
-        if o + 10 <= d.count {
-            name = String(bytes: d[d.startIndex+o..<d.startIndex+o+10], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 10, d.count)
+            name = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 10
         // Extension fields (only present in longer payloads)
@@ -18511,12 +18545,14 @@ struct MsgSmartBatteryInfo: Sendable {
             type = d[d.startIndex+o]
         }
         o += 1
-        if o + 16 <= d.count {
-            serial_number = String(bytes: d[d.startIndex+o..<d.startIndex+o+16], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 16, d.count)
+            serial_number = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 16
-        if o + 50 <= d.count {
-            device_name = String(bytes: d[d.startIndex+o..<d.startIndex+o+50], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 50, d.count)
+            device_name = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 50
         // Extension fields (only present in longer payloads)
@@ -18541,8 +18577,9 @@ struct MsgSmartBatteryInfo: Sendable {
         }
         o += 4
         guard o < d.count else { return }
-        if o + 11 <= d.count {
-            manufacture_date = String(bytes: d[d.startIndex+o..<d.startIndex+o+11], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 11, d.count)
+            manufacture_date = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 11
     }
@@ -19195,8 +19232,9 @@ struct MsgUavionixAdsbOutCfg: Sendable {
             stallSpeed = UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8
         }
         o += 2
-        if o + 9 <= d.count {
-            callsign = String(bytes: d[d.startIndex+o..<d.startIndex+o+9], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 9, d.count)
+            callsign = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 9
         if o + 1 <= d.count {
@@ -19421,8 +19459,9 @@ struct MsgUavionixAdsbOutCfgRegistration: Sendable {
     init(from payload: Data) {
         let d = payload
         var o = 0
-        if o + 9 <= d.count {
-            registration = String(bytes: d[d.startIndex+o..<d.startIndex+o+9], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 9, d.count)
+            registration = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 9
     }
@@ -19452,8 +19491,9 @@ struct MsgUavionixAdsbOutCfgFlightid: Sendable {
     init(from payload: Data) {
         let d = payload
         var o = 0
-        if o + 9 <= d.count {
-            flight_id = String(bytes: d[d.startIndex+o..<d.startIndex+o+9], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 9, d.count)
+            flight_id = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 9
     }
@@ -19532,8 +19572,9 @@ struct MsgUavionixAdsbOutControl: Sendable {
             emergencyStatus = d[d.startIndex+o]
         }
         o += 1
-        if o + 8 <= d.count {
-            flight_id = String(bytes: d[d.startIndex+o..<d.startIndex+o+8], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 8, d.count)
+            flight_id = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 8
         if o + 1 <= d.count {
@@ -19602,8 +19643,9 @@ struct MsgUavionixAdsbOutStatus: Sendable {
             fault = d[d.startIndex+o]
         }
         o += 1
-        if o + 8 <= d.count {
-            flight_id = String(bytes: d[d.startIndex+o..<d.startIndex+o+8], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 8, d.count)
+            flight_id = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 8
     }
@@ -19858,8 +19900,9 @@ struct MsgDeviceOpRead: Sendable {
             address = d[d.startIndex+o]
         }
         o += 1
-        if o + 40 <= d.count {
-            busname = String(bytes: d[d.startIndex+o..<d.startIndex+o+40], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 40, d.count)
+            busname = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 40
         if o + 1 <= d.count {
@@ -20024,8 +20067,9 @@ struct MsgDeviceOpWrite: Sendable {
             address = d[d.startIndex+o]
         }
         o += 1
-        if o + 40 <= d.count {
-            busname = String(bytes: d[d.startIndex+o..<d.startIndex+o+40], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 40, d.count)
+            busname = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 40
         if o + 1 <= d.count {
@@ -20786,8 +20830,9 @@ struct MsgOsdParamConfig: Sendable {
             osd_index = d[d.startIndex+o]
         }
         o += 1
-        if o + 16 <= d.count {
-            param_id = String(bytes: d[d.startIndex+o..<d.startIndex+o+16], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 16, d.count)
+            param_id = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 16
         if o + 1 <= d.count {
@@ -20956,8 +21001,9 @@ struct MsgOsdParamShowConfigReply: Sendable {
             result = d[d.startIndex+o]
         }
         o += 1
-        if o + 16 <= d.count {
-            param_id = String(bytes: d[d.startIndex+o..<d.startIndex+o+16], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 16, d.count)
+            param_id = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 16
         if o + 1 <= d.count {
@@ -22019,8 +22065,9 @@ struct MsgOpenDroneIdSelfId: Sendable {
             description_type = d[d.startIndex+o]
         }
         o += 1
-        if o + 23 <= d.count {
-            description = String(bytes: d[d.startIndex+o..<d.startIndex+o+23], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 23, d.count)
+            description = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 23
     }
@@ -22212,8 +22259,9 @@ struct MsgOpenDroneIdOperatorId: Sendable {
             operator_id_type = d[d.startIndex+o]
         }
         o += 1
-        if o + 20 <= d.count {
-            operator_id = String(bytes: d[d.startIndex+o..<d.startIndex+o+20], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 20, d.count)
+            operator_id = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 20
     }
@@ -22329,8 +22377,9 @@ struct MsgOpenDroneIdArmStatus: Sendable {
             status = d[d.startIndex+o]
         }
         o += 1
-        if o + 50 <= d.count {
-            error = String(bytes: d[d.startIndex+o..<d.startIndex+o+50], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 50, d.count)
+            error = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 50
     }
@@ -22695,8 +22744,9 @@ struct MsgHerelinkVideoStreamInformation: Sendable {
             status = d[d.startIndex+o]
         }
         o += 1
-        if o + 230 <= d.count {
-            uri = String(bytes: d[d.startIndex+o..<d.startIndex+o+230], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 230, d.count)
+            uri = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 230
     }
@@ -22902,12 +22952,14 @@ struct MsgAirlinkAuth: Sendable {
     init(from payload: Data) {
         let d = payload
         var o = 0
-        if o + 50 <= d.count {
-            login = String(bytes: d[d.startIndex+o..<d.startIndex+o+50], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 50, d.count)
+            login = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 50
-        if o + 50 <= d.count {
-            password = String(bytes: d[d.startIndex+o..<d.startIndex+o+50], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
+        if o < d.count {
+            let strEnd = min(o + 50, d.count)
+            password = String(bytes: d[d.startIndex+o..<d.startIndex+strEnd], encoding: .utf8)?.trimmingCharacters(in: CharacterSet(["\0"])) ?? ""
         }
         o += 50
     }
