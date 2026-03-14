@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Compass, Activity, ArrowDownToLine, Gauge, Loader2, X, Check, ChevronRight } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
-import { droneApi } from '../utils/api';
+import { droneApi, fetchWithTimeout } from '../utils/api';
 
 // Accel calibration positions (ArduPilot order)
 const ACCEL_POSITIONS = [
@@ -116,7 +116,7 @@ export default function CalibrationPanel() {
     setCalibrationActive(true, type);
 
     try {
-      const res = await fetch(droneApi('/api/calibrate'), {
+      const res = await fetchWithTimeout(droneApi('/api/calibrate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type }),
@@ -150,7 +150,7 @@ export default function CalibrationPanel() {
   const cancelCalibration = useCallback(async () => {
     try {
       // Send cancel command (all zeros cancels calibration)
-      await fetch(droneApi('/api/calibrate'), {
+      await fetchWithTimeout(droneApi('/api/calibrate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'cancel' }),
@@ -290,7 +290,7 @@ export default function CalibrationPanel() {
                   <button
                     onClick={async () => {
                       try {
-                        await fetch(droneApi('/api/calibrate'), {
+                        await fetchWithTimeout(droneApi('/api/calibrate'), {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ type: 'next_step' }),

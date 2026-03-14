@@ -19,6 +19,8 @@ struct FlyView: View {
     @State private var showMissionPicker = false
     @State private var savedMissions: [SavedMission] = []
     @State private var missionUploadProgress: String?
+    @State private var followMode = true
+    @State private var activeMission: [Waypoint] = []
     private let videoManager = VideoPlayerManager.shared
 
     private var isConnected: Bool { droneManager.state.connectionState.isConnected }
@@ -38,7 +40,7 @@ struct FlyView: View {
                 VideoFeedView()
                     .ignoresSafeArea()
             } else {
-                DroneMapView(droneManager: droneManager)
+                DroneMapView(droneManager: droneManager, followMode: $followMode, missionWaypoints: activeMission)
                     .ignoresSafeArea(edges: .top)
             }
 
@@ -71,12 +73,24 @@ struct FlyView: View {
                         JoystickOverlay(droneManager: droneManager)
                     }
 
-                    VStack(spacing: 12) {
-                        modeSelector
-                        actionButtons
+                    if isLandscape {
+                        HStack {
+                            Spacer()
+                            VStack(spacing: 12) {
+                                modeSelector
+                                actionButtons
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 16)
+                    } else {
+                        VStack(spacing: 12) {
+                            modeSelector
+                            actionButtons
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 16)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 16)
                 }
             }
 
@@ -146,6 +160,29 @@ struct FlyView: View {
                     Spacer()
                 }
             }
+
+            // Follow toggle button (bottom-right)
+            if isConnected && !showVideo {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button {
+                            followMode.toggle()
+                        } label: {
+                            Image(systemName: followMode ? "location.fill" : "location")
+                                .font(.title3)
+                                .foregroundStyle(followMode ? .cyan : .white.opacity(0.7))
+                                .padding(10)
+                                .background(followMode ? Color.cyan.opacity(0.2) : Color.clear)
+                                .background(.ultraThinMaterial)
+                                .clipShape(Circle())
+                        }
+                        .padding(.trailing, 16)
+                        .padding(.bottom, isLandscape ? 16 : 120)
+                    }
+                }
+            }
         }
         .sheet(isPresented: $showConnectSheet) {
             ConnectSheet(droneManager: droneManager, isPresented: $showConnectSheet)
@@ -156,6 +193,11 @@ struct FlyView: View {
                 wasConnected = true
             } else {
                 showJoysticks = false
+            }
+        }
+        .onChange(of: droneManager.missionService.downloadedMission) { _, newMission in
+            if !newMission.isEmpty {
+                activeMission = newMission
             }
         }
         .onGeometryChange(for: Bool.self) { proxy in
@@ -254,6 +296,14 @@ struct FlyView: View {
                     }
                 }
                 Divider()
+                Button {
+                    droneManager.downloadMission { waypoints in
+                        activeMission = waypoints ?? []
+                    }
+                } label: {
+                    Label("Download Mission", systemImage: "arrow.down.doc")
+                }
+                Divider()
                 if droneManager.state.flightMode == "Auto" {
                     Button {
                         droneManager.pauseMission()
@@ -268,6 +318,7 @@ struct FlyView: View {
                 }
                 Button(role: .destructive) {
                     droneManager.clearMission()
+                    activeMission = []
                 } label: {
                     Label("Clear Mission", systemImage: "trash")
                 }
@@ -350,6 +401,7 @@ struct FlyView: View {
         missionUploadProgress = "Uploading..."
         droneManager.uploadMission(waypoints: mission.waypoints) { success in
             if success {
+                activeMission = mission.waypoints
                 missionUploadProgress = "Uploaded \(mission.name)"
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                     missionUploadProgress = nil

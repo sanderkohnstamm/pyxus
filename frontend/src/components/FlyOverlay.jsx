@@ -15,7 +15,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import useDroneStore, { INITIAL_TELEMETRY, EMPTY_ARRAY } from '../store/droneStore';
-import { droneApi, executeBatchCommand } from '../utils/api';
+import { droneApi, fetchWithTimeout, executeBatchCommand } from '../utils/api';
 import { getCommandConfirmation, isAirborne } from '../utils/commandSafety';
 import PreFlightChecklist from './PreFlightChecklist';
 
@@ -66,7 +66,7 @@ export default function FlyOverlay() {
 
     const fetchModes = async () => {
       try {
-        const res = await fetch(droneApi(`/api/modes?drone_id=${activeDroneId}`));
+        const res = await fetchWithTimeout(droneApi(`/api/modes?drone_id=${activeDroneId}`));
         const data = await res.json();
         if (cancelled) return null;
         if (data.status === 'ok') {
@@ -109,7 +109,7 @@ export default function FlyOverlay() {
     async (endpoint, body = {}, logMsg) => {
       const label = logMsg || endpoint;
       try {
-        const res = await fetch(droneApi(`/api/${endpoint}`), {
+        const res = await fetchWithTimeout(droneApi(`/api/${endpoint}`), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
@@ -132,7 +132,7 @@ export default function FlyOverlay() {
   const missionApiCall = useCallback(
     async (endpoint) => {
       try {
-        const res = await fetch(droneApi(`/api/mission/${endpoint}`), {
+        const res = await fetchWithTimeout(droneApi(`/api/mission/${endpoint}`), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
         });

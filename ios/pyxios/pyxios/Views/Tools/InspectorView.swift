@@ -42,14 +42,14 @@ struct InspectorView: View {
 
     private var streamsView: some View {
         Group {
-            if droneManager.telemetryStreams.isEmpty {
+            if droneManager.telemetryService.telemetryStreams.isEmpty {
                 ContentUnavailableView {
                     Label("No Streams", systemImage: "waveform.path")
                 } description: {
                     Text("Telemetry streams will appear here when connected.")
                 }
             } else {
-                List(droneManager.telemetryStreams) { stream in
+                List(droneManager.telemetryService.telemetryStreams) { stream in
                     Button {
                         selectedStream = stream
                     } label: {
@@ -186,7 +186,7 @@ struct MessageDetailSheet: View {
                     Divider()
 
                     // Raw payload hex dump
-                    if let payload = droneManager.latestPayloads[stream.name] {
+                    if let payload = droneManager.telemetryService.latestPayloads[stream.name] {
                         Text("Last Payload (\(payload.count) bytes)")
                             .font(.caption.bold())
                             .foregroundStyle(.secondary)

@@ -68,4 +68,6 @@ Pyxus is a ground control station that gives pilots full control of their drones
 
 Core GCS implemented: real-time telemetry, mission planning/upload/download, geofencing (circle + polygon), gamepad/keyboard control, parameter management, video streaming, pre-flight checklists, dark/light theme. iOS app with native MAVLink v2 stack (no MAVSDK dependency).
 
+iOS FlyView: follow-mode (auto-centers on drone, disables on manual pan), mission waypoint overlay on map, mission download from drone, auto-download on connect, landscape-optimized bottom-right button layout. iOS PlanView: live drone position marker, geofence planning (tap to place center, radius slider 50-2000m), mission download from drone. Geofence data persisted with saved missions.
+
 **Key gaps**: No flight logging. Connection loss not surfaced well. Emergency stop could be more prominent. No offline map support.

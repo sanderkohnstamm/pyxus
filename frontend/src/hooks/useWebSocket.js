@@ -2,7 +2,8 @@ import { useEffect, useRef, useCallback } from 'react';
 import useDroneStore from '../store/droneStore';
 import { wsUrl } from '../utils/api';
 
-const WS_RECONNECT_DELAY = 2000;
+const WS_RECONNECT_INITIAL = 2000;
+const WS_RECONNECT_MAX = 30000;
 
 // Calibration-related keywords in STATUSTEXT
 const CALIBRATION_KEYWORDS = [
@@ -20,6 +21,7 @@ function isCalibrationMessage(text) {
 export default function useWebSocket() {
   const wsRef = useRef(null);
   const reconnectTimer = useRef(null);
+  const backoffDelay = useRef(WS_RECONNECT_INITIAL);
   const setWsConnected = useDroneStore((s) => s.setWsConnected);
   const addMavMessages = useDroneStore((s) => s.addMavMessages);
 
@@ -94,6 +96,7 @@ export default function useWebSocket() {
     const ws = new WebSocket(wsUrl('/ws'));
 
     ws.onopen = () => {
+      backoffDelay.current = WS_RECONNECT_INITIAL;
       setWsConnected(true);
     };
 
@@ -141,7 +144,9 @@ export default function useWebSocket() {
     ws.onclose = () => {
       setWsConnected(false);
       wsRef.current = null;
-      reconnectTimer.current = setTimeout(connect, WS_RECONNECT_DELAY);
+      const jitter = Math.random() * 1000;
+      reconnectTimer.current = setTimeout(connect, backoffDelay.current + jitter);
+      backoffDelay.current = Math.min(backoffDelay.current * 2, WS_RECONNECT_MAX);
     };
 
     ws.onerror = () => {

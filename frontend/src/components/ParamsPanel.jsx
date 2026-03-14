@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { SlidersHorizontal, RefreshCw, Search, Check, X, Download, Shield, ChevronDown, ChevronUp } from 'lucide-react';
 import useDroneStore, { EMPTY_OBJECT } from '../store/droneStore';
-import { droneApi } from '../utils/api';
+import { droneApi, fetchWithTimeout } from '../utils/api';
 
 // Safety-critical parameter prefixes (must match backend CRITICAL_PARAM_PREFIXES)
 const CRITICAL_PREFIXES = ['BATT_', 'FS_', 'ARMING_', 'MOT_', 'INS_'];
@@ -269,7 +269,7 @@ export default function ParamsPanel() {
     const droneId = useDroneStore.getState().activeDroneId;
     if (!droneId) return;
     try {
-      const res = await fetch(droneApi('/api/params'));
+      const res = await fetchWithTimeout(droneApi('/api/params'));
       const data = await res.json();
       if (data.status === 'ok') {
         setDroneParams(droneId, data.params, data.total);
@@ -280,7 +280,7 @@ export default function ParamsPanel() {
   const requestRefresh = useCallback(async () => {
     if (!isConnected) return;
     try {
-      await fetch(droneApi('/api/params/refresh'), { method: 'POST' });
+      await fetchWithTimeout(droneApi('/api/params/refresh'), { method: 'POST' });
       addAlert('Requesting parameters...', 'info');
     } catch (err) {
       addAlert('Failed to request params', 'error');
@@ -288,7 +288,7 @@ export default function ParamsPanel() {
   }, [isConnected, addAlert]);
 
   const sendParamSet = useCallback(async (paramId, value, confirm = false) => {
-    const res = await fetch(droneApi('/api/params/set'), {
+    const res = await fetchWithTimeout(droneApi('/api/params/set'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ param_id: paramId, value, confirm }),

@@ -14,14 +14,14 @@ struct ParamsView: View {
     @State private var editValue: String = ""
 
     private var filteredParams: [DroneParam] {
-        if searchText.isEmpty { return droneManager.params }
+        if searchText.isEmpty { return droneManager.paramService.params }
         let query = searchText.lowercased()
-        return droneManager.params.filter { $0.name.lowercased().contains(query) }
+        return droneManager.paramService.params.filter { $0.name.lowercased().contains(query) }
     }
 
     var body: some View {
         Group {
-            if droneManager.isLoadingParams {
+            if droneManager.paramService.isLoadingParams {
                 VStack(spacing: 12) {
                     ProgressView()
                     Text("Loading parameters...")
@@ -29,7 +29,7 @@ struct ParamsView: View {
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if droneManager.params.isEmpty {
+            } else if droneManager.paramService.params.isEmpty {
                 ContentUnavailableView {
                     Label("No Parameters", systemImage: "slider.horizontal.3")
                 } description: {
@@ -44,7 +44,7 @@ struct ParamsView: View {
             } else {
                 List {
                     Section {
-                        Text("\(droneManager.params.count) parameters loaded")
+                        Text("\(droneManager.paramService.params.count) parameters loaded")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -113,11 +113,11 @@ struct ParamsView: View {
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
-                .disabled(droneManager.isLoadingParams)
+                .disabled(droneManager.paramService.isLoadingParams)
             }
         }
         .onAppear {
-            if droneManager.params.isEmpty && droneManager.state.connectionState.isConnected {
+            if droneManager.paramService.params.isEmpty && droneManager.state.connectionState.isConnected {
                 droneManager.fetchAllParams()
             }
         }

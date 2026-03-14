@@ -3,6 +3,7 @@
 //  pyxios
 //
 //  Mission planning: toggle add-mode to place waypoints, free map pan otherwise.
+//  Shows drone position, geofence planning, and mission download.
 //
 
 import SwiftUI
@@ -17,6 +18,9 @@ struct PlanView: View {
     @State private var showLoadSheet = false
     @State private var isAddMode = true  // starts in add mode
     @State private var mapCameraPosition: MapCameraPosition = .automatic
+    @State private var isGeofenceMode = false
+    @State private var geofenceCenter: CLLocationCoordinate2D?
+    @State private var geofenceRadius: Double = 200
 
     var body: some View {
         NavigationStack {
@@ -24,7 +28,7 @@ struct PlanView: View {
                 mapContent
 
                 // Placeholder
-                if flightPlan.waypoints.isEmpty && isAddMode {
+                if flightPlan.waypoints.isEmpty && isAddMode && !isGeofenceMode {
                     VStack {
                         Spacer()
                         Text("Tap map to add waypoints")
@@ -39,10 +43,42 @@ struct PlanView: View {
                     .allowsHitTesting(false)
                 }
 
+                if isGeofenceMode && geofenceCenter == nil {
+                    VStack {
+                        Spacer()
+                        Text("Tap map to set geofence center")
+                            .font(.callout)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(.red.opacity(0.6))
+                            .clipShape(Capsule())
+                            .padding(.bottom, 80)
+                    }
+                    .allowsHitTesting(false)
+                }
+
                 // Bottom toolbar
                 VStack {
                     Spacer()
-                    bottomBar
+                    VStack(spacing: 8) {
+                        // Geofence radius slider
+                        if geofenceCenter != nil {
+                            HStack(spacing: 8) {
+                                Text("\(Int(geofenceRadius))m")
+                                    .font(.system(.caption, design: .monospaced))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 50)
+                                Slider(value: $geofenceRadius, in: 50...2000, step: 10)
+                                    .tint(.red)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Capsule())
+                        }
+                        bottomBar
+                    }
                 }
 
                 // Inline waypoint editor
@@ -81,13 +117,22 @@ struct PlanView: View {
                                 droneManager.uploadMission(waypoints: flightPlan.waypoints) { _ in }
                             }
                             .disabled(flightPlan.waypoints.isEmpty)
+
+                            Button("Download from Drone", systemImage: "arrow.down.doc") {
+                                droneManager.downloadMission { waypoints in
+                                    if let waypoints {
+                                        flightPlan.waypoints = waypoints
+                                    }
+                                }
+                            }
                         }
                         Divider()
                         Button("Clear All", systemImage: "trash", role: .destructive) {
                             selectedWaypointID = nil
                             flightPlan.clear()
+                            geofenceCenter = nil
                         }
-                        .disabled(flightPlan.waypoints.isEmpty)
+                        .disabled(flightPlan.waypoints.isEmpty && geofenceCenter == nil)
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
@@ -106,7 +151,6 @@ struct PlanView: View {
                     .presentationDetents([.medium])
             }
             .onAppear {
-                // Zoom to drone position if connected, otherwise zoom to last known
                 let coord = droneManager.state.coordinate
                 if droneManager.state.hasValidPosition {
                     mapCameraPosition = .camera(MapCamera(
@@ -135,14 +179,35 @@ struct PlanView: View {
                     MapPolyline(coordinates: flightPlan.waypoints.map(\.coordinate))
                         .stroke(.orange.opacity(0.7), lineWidth: 2)
                 }
+
+                // Drone position marker
+                if droneManager.state.hasValidPosition {
+                    Annotation("Drone", coordinate: droneManager.state.coordinate) {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(.cyan)
+                            .rotationEffect(.degrees(Double(droneManager.state.heading)))
+                            .shadow(color: .black, radius: 2)
+                    }
+                }
+
+                // Geofence circle
+                if let center = geofenceCenter {
+                    MapCircle(center: center, radius: geofenceRadius)
+                        .stroke(.red, lineWidth: 2)
+                        .foregroundStyle(.red.opacity(0.1))
+                }
             }
             .mapStyle(.imagery(elevation: .flat))
             .mapControls { }
             .onTapGesture { screenPoint in
-                guard isAddMode else { return }
                 if let coordinate = proxy.convert(screenPoint, from: .local) {
-                    flightPlan.addWaypoint(at: coordinate)
-                    selectedWaypointID = flightPlan.waypoints.last?.id
+                    if isGeofenceMode {
+                        geofenceCenter = coordinate
+                    } else if isAddMode {
+                        flightPlan.addWaypoint(at: coordinate)
+                        selectedWaypointID = flightPlan.waypoints.last?.id
+                    }
                 }
             }
         }
@@ -175,7 +240,10 @@ struct PlanView: View {
             // Add mode toggle
             Button {
                 isAddMode.toggle()
-                if isAddMode { selectedWaypointID = nil }
+                if isAddMode {
+                    isGeofenceMode = false
+                    selectedWaypointID = nil
+                }
             } label: {
                 HStack(spacing: 5) {
                     Image(systemName: isAddMode ? "plus.circle.fill" : "plus.circle")
@@ -191,6 +259,22 @@ struct PlanView: View {
                 .background(isAddMode ? Color.orange : Color.clear)
                 .background(.ultraThinMaterial)
                 .clipShape(Capsule())
+            }
+
+            // Geofence toggle
+            Button {
+                isGeofenceMode.toggle()
+                if isGeofenceMode {
+                    isAddMode = false
+                }
+            } label: {
+                Image(systemName: isGeofenceMode ? "circle.circle.fill" : "circle.circle")
+                    .font(.body)
+                    .foregroundStyle(isGeofenceMode ? .red : .white.opacity(0.7))
+                    .padding(10)
+                    .background(isGeofenceMode ? Color.red.opacity(0.2) : Color.clear)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Circle())
             }
 
             // Waypoint list

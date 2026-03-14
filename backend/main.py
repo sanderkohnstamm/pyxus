@@ -17,7 +17,9 @@ from pydantic import BaseModel
 
 # --- Terrain elevation cache ---
 # Keyed by (round(lat, 4), round(lon, 4)) -> elevation in meters
+# Bounded: when exceeding 10,000 entries, evict the oldest half.
 _terrain_cache: dict[tuple[float, float], float] = {}
+_TERRAIN_CACHE_MAX = 10_000
 
 from drone import DroneConnection
 from mission import MissionManager, Waypoint
@@ -881,6 +883,7 @@ async def api_params_metadata(vehicle: str):
                     return {"status": "ok", "metadata": metadata}
                 return {"status": "error", "error": f"Failed to fetch: {resp.status_code}"}
         except Exception as e:
+            logger.warning("Param metadata fetch failed (PX4): %s", e)
             return {"status": "error", "error": str(e)}
 
     vehicle_name = ardupilot_map.get(vehicle_lower, vehicle)
@@ -949,18 +952,19 @@ async def api_mavlink_components(drone_id: str = Query(...)):
 
 @app.get("/api/settings")
 async def api_settings_get():
-    return {"status": "ok", "settings": load_settings()}
+    settings = await asyncio.to_thread(load_settings)
+    return {"status": "ok", "settings": settings}
 
 
 @app.put("/api/settings")
 async def api_settings_put(req: dict):
-    current = load_settings()
+    current = await asyncio.to_thread(load_settings)
     for key, val in req.items():
         if isinstance(val, dict) and isinstance(current.get(key), dict):
             current[key].update(val)
         else:
             current[key] = val
-    save_settings(current)
+    await asyncio.to_thread(save_settings, current)
     return {"status": "ok"}
 
 
@@ -1059,6 +1063,12 @@ async def api_terrain_elevation(locations: str = Query(...)):
                 for idx, _, _ in batch:
                     results.setdefault(idx, None)
 
+    # Evict oldest half if cache exceeds limit (dict preserves insertion order in Python 3.7+)
+    if len(_terrain_cache) > _TERRAIN_CACHE_MAX:
+        keys = list(_terrain_cache.keys())
+        for k in keys[:len(keys) // 2]:
+            del _terrain_cache[k]
+
     # Build response preserving input order
     elevations = []
     for i, (lat, lon) in enumerate(parsed):
@@ -1141,8 +1151,12 @@ async def video_stream(url: str = Query(...)):
                 yield chunk
         finally:
             try:
-                process.kill()
-                await process.wait()
+                process.terminate()
+                try:
+                    await asyncio.wait_for(process.wait(), timeout=3.0)
+                except asyncio.TimeoutError:
+                    process.kill()
+                    await process.wait()
             except (OSError, ProcessLookupError):
                 pass
 

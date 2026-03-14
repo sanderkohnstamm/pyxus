@@ -1,5 +1,20 @@
 import useDroneStore from '../store/droneStore';
 
+/**
+ * Fetch with an AbortController timeout. Rejects with an AbortError if the
+ * request takes longer than `timeoutMs` milliseconds.
+ */
+export async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    return response;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 // API base URL - uses proxy in dev, direct URL in Electron/iOS production
 const isElectron = typeof window !== 'undefined' && window.location.protocol === 'file:';
 const isIOSApp = typeof window !== 'undefined' && window.__PYXIOS__?.platform === 'ios';
@@ -63,7 +78,7 @@ export async function executeBatchCommand(droneIds, endpoint, body = {}, addAler
   for (const droneId of droneIds) {
     const droneName = drones[droneId]?.name || droneId;
     try {
-      const res = await fetch(droneApiFor(`/api/${endpoint}`, droneId), {
+      const res = await fetchWithTimeout(droneApiFor(`/api/${endpoint}`, droneId), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -92,4 +107,4 @@ export async function executeBatchCommand(droneIds, endpoint, body = {}, addAler
   return results;
 }
 
-export default { apiUrl, wsUrl, droneApi, droneApiFor, executeBatchCommand, API_BASE, WS_BASE, isIOSApp };
+export default { apiUrl, wsUrl, droneApi, droneApiFor, executeBatchCommand, fetchWithTimeout, API_BASE, WS_BASE, isIOSApp };

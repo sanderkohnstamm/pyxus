@@ -2,7 +2,8 @@
 //  MapView.swift
 //  pyxios
 //
-//  MapKit view showing drone position, heading, home marker, and flight trail.
+//  MapKit view showing drone position, heading, home marker, flight trail,
+//  and optional mission waypoint overlay.
 //
 
 import SwiftUI
@@ -10,10 +11,14 @@ import MapKit
 
 struct DroneMapView: View {
     let droneManager: DroneManager
+    @Binding var followMode: Bool
+    let missionWaypoints: [Waypoint]
+
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var hasInitiallyFramed = false
     @State private var trail: [CLLocationCoordinate2D] = []
     @State private var lastTrailUpdate = Date.distantPast
+    @State private var isProgrammaticMove = false
 
     private var state: VehicleState { droneManager.state }
 
@@ -43,12 +48,42 @@ struct DroneMapView: View {
                         .clipShape(Circle())
                 }
             }
+
+            // Mission waypoints overlay
+            if !missionWaypoints.isEmpty {
+                MapPolyline(coordinates: missionWaypoints.map(\.coordinate))
+                    .stroke(.orange.opacity(0.8), lineWidth: 2)
+
+                ForEach(Array(missionWaypoints.enumerated()), id: \.element.id) { idx, wp in
+                    Annotation("", coordinate: wp.coordinate) {
+                        ZStack {
+                            Circle()
+                                .fill(wp.action.markerColor)
+                                .frame(width: 24, height: 24)
+                            Text("\(idx + 1)")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
+                    }
+                }
+            }
         }
         .mapStyle(.imagery(elevation: .flat))
         .mapControls { }
+        .onMapCameraChange(frequency: .continuous) { _ in
+            // Manual pan disables follow mode (but not programmatic camera updates)
+            if followMode && hasInitiallyFramed && !isProgrammaticMove {
+                followMode = false
+            }
+            isProgrammaticMove = false
+        }
         .onChange(of: state.coordinate.latitude + state.coordinate.longitude) { _, _ in
             updateTrail()
-            frameOnDroneIfNeeded()
+            if followMode {
+                updateFollowCamera()
+            } else {
+                frameOnDroneIfNeeded()
+            }
         }
     }
 
@@ -71,6 +106,19 @@ struct DroneMapView: View {
     private func frameOnDroneIfNeeded() {
         guard state.hasValidPosition, !hasInitiallyFramed else { return }
         hasInitiallyFramed = true
+        isProgrammaticMove = true
+        cameraPosition = .camera(MapCamera(
+            centerCoordinate: state.coordinate,
+            distance: 500,
+            heading: 0,
+            pitch: 0
+        ))
+    }
+
+    private func updateFollowCamera() {
+        guard state.hasValidPosition else { return }
+        if !hasInitiallyFramed { hasInitiallyFramed = true }
+        isProgrammaticMove = true
         cameraPosition = .camera(MapCamera(
             centerCoordinate: state.coordinate,
             distance: 500,
@@ -81,12 +129,10 @@ struct DroneMapView: View {
 
     private func updateTrail() {
         guard state.hasValidPosition else { return }
-        // Throttle trail updates to every 0.5s
         let now = Date()
         guard now.timeIntervalSince(lastTrailUpdate) > 0.5 else { return }
         lastTrailUpdate = now
         trail.append(state.coordinate)
-        // Keep last 500 points
         if trail.count > 500 {
             trail.removeFirst(trail.count - 500)
         }

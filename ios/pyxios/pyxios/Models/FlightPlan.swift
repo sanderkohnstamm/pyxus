@@ -8,7 +8,7 @@
 import SwiftUI
 import CoreLocation
 
-struct Waypoint: Identifiable, Codable {
+struct Waypoint: Identifiable, Codable, Equatable {
     let id: UUID
     var latitude: Double
     var longitude: Double
@@ -110,9 +110,9 @@ final class FlightPlan {
 
     // MARK: - Persistence
 
-    func save() {
+    func save(geofence: GeofenceData? = nil) {
         let file = Self.storageDir.appendingPathComponent(sanitizedName + ".json")
-        let data = SavedMission(name: name, waypoints: waypoints)
+        let data = SavedMission(name: name, waypoints: waypoints, geofence: geofence)
         if let encoded = try? JSONEncoder().encode(data) {
             try? encoded.write(to: file)
         }
@@ -151,8 +151,15 @@ final class FlightPlan {
     }
 }
 
+struct GeofenceData: Codable {
+    let latitude: Double
+    let longitude: Double
+    let radius: Double
+}
+
 struct SavedMission: Codable, Identifiable {
     var id: String { name }
     let name: String
     let waypoints: [Waypoint]
+    var geofence: GeofenceData?
 }

@@ -3,7 +3,7 @@ import { Map as MapIcon, Plane, Wrench, PanelRightClose, PanelRightOpen } from '
 import useWebSocket from './hooks/useWebSocket';
 import useDroneStore from './store/droneStore';
 import { INITIAL_TELEMETRY } from './store/droneStore';
-import { droneApi } from './utils/api';
+import { droneApi, fetchWithTimeout } from './utils/api';
 import { getCommandConfirmation } from './utils/commandSafety';
 
 const RC_CENTER = 1500;
@@ -36,7 +36,7 @@ async function executeGamepadActionDirect(action, addAlert) {
   if (action.startsWith('mode:')) {
     const mode = action.slice(5);
     try {
-      await fetch(droneApi('/api/mode'), {
+      await fetchWithTimeout(droneApi('/api/mode'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode }),
@@ -62,7 +62,7 @@ async function executeGamepadActionDirect(action, addAlert) {
     const armed = activeDrone?.telemetry?.armed || false;
     const ep = armed ? 'disarm' : 'arm';
     try {
-      await fetch(droneApi(`/api/${ep}`), {
+      await fetchWithTimeout(droneApi(`/api/${ep}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -75,7 +75,7 @@ async function executeGamepadActionDirect(action, addAlert) {
   const ep = endpoints[action];
   if (ep) {
     try {
-      await fetch(droneApi(`/api/${ep}`), {
+      await fetchWithTimeout(droneApi(`/api/${ep}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(action === 'takeoff' ? { alt: 10 } : {}),
@@ -120,6 +120,7 @@ import BatteryMonitor from './components/BatteryMonitor';
 import ConnectionMonitor from './components/ConnectionMonitor';
 import ConfirmationDialog from './components/ConfirmationDialog';
 import BatteryChart from './components/BatteryChart';
+import ErrorBoundary from './components/ErrorBoundary';
 
 export default function App() {
   const { sendMessage } = useWebSocket();
@@ -152,7 +153,7 @@ export default function App() {
     try {
       if (command.startsWith('mode:')) {
         const mode = command.slice(5);
-        await fetch(droneApi('/api/mode'), {
+        await fetchWithTimeout(droneApi('/api/mode'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mode }),
@@ -165,7 +166,7 @@ export default function App() {
         };
         const ep = endpoints[command];
         if (ep) {
-          await fetch(droneApi(`/api/${ep}`), {
+          await fetchWithTimeout(droneApi(`/api/${ep}`), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(command === 'takeoff' ? { alt: 10 } : {}),
@@ -201,7 +202,7 @@ export default function App() {
     try {
       for (const s of servos) {
         const pwm = action === 'open' ? s.openPwm : s.closePwm;
-        await fetch(droneApi('/api/servo/test'), {
+        await fetchWithTimeout(droneApi('/api/servo/test'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ servo: s.servo, pwm }),
@@ -230,11 +231,11 @@ export default function App() {
           doubleConfirm: false,
           onConfirm: async () => {
             try {
-              await fetch(droneApi('/api/force_disarm'), {
+              await fetchWithTimeout(droneApi('/api/force_disarm'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({}),
-              });
+              }, 5000);
             } catch {}
             store.addGcsLog('EMERGENCY STOP — force disarm sent', 'error');
             store.addAlert('EMERGENCY STOP — force disarm sent', 'error');
@@ -389,9 +390,15 @@ export default function App() {
       <div className="flex-1 flex overflow-hidden">
         {/* Left: Map */}
         <div className="flex-1 relative">
-          <MapView />
+          <ErrorBoundary name="MapView">
+            <MapView />
+          </ErrorBoundary>
           {/* Fly controls overlay */}
-          {activeTab === 'flying' && <FlyOverlay />}
+          {activeTab === 'flying' && (
+            <ErrorBoundary name="FlyOverlay">
+              <FlyOverlay />
+            </ErrorBoundary>
+          )}
         </div>
 
         {/* Sidebar collapse toggle */}
@@ -431,20 +438,22 @@ export default function App() {
 
           {/* Tab content */}
           <div className="flex-1 overflow-y-auto">
-            {activeTab === 'planning' ? (
-              <MissionPanel />
-            ) : activeTab === 'flying' ? (
-              <>
-                <Telemetry />
-                <BatteryChart />
-                <div className="px-4 pb-4">
-                  <AttitudeIndicator />
-                </div>
-                <Controls sendMessage={sendMessage} />
-              </>
-            ) : (
-              <ToolsPanel sendMessage={sendMessage} />
-            )}
+            <ErrorBoundary name="SidebarPanel">
+              {activeTab === 'planning' ? (
+                <MissionPanel />
+              ) : activeTab === 'flying' ? (
+                <>
+                  <Telemetry />
+                  <BatteryChart />
+                  <div className="px-4 pb-4">
+                    <AttitudeIndicator />
+                  </div>
+                  <Controls sendMessage={sendMessage} />
+                </>
+              ) : (
+                <ToolsPanel sendMessage={sendMessage} />
+              )}
+            </ErrorBoundary>
           </div>
         </div>
       </div>

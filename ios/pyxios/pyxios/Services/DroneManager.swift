@@ -2,8 +2,8 @@
 //  DroneManager.swift
 //  pyxios
 //
-//  Singleton wrapping MAVLinkDrone for direct MAVLink v2 communication.
-//  Publishes @Observable properties for SwiftUI consumption.
+//  Thin coordinator: connection lifecycle, flight actions, manual control.
+//  Delegates mission, parameter, and telemetry work to focused services.
 //
 
 import Foundation
@@ -53,20 +53,19 @@ struct TelemetryStream: Identifiable {
 final class DroneManager {
     static let shared = DroneManager()
 
+    // MARK: - Services
+
+    let missionService = MissionService()
+    let paramService = ParameterService()
+    let telemetryService = TelemetryService()
+
     // MARK: - Published State
 
     var state = VehicleState()
     var statusMessage: String = ""
-
-    // Tools state
-    var params: [DroneParam] = []
-    var isLoadingParams = false
     var statusMessages: [StatusMessage] = []
     var logEntries: [LogEntry] = []
     var isLoadingLogs = false
-
-    // Telemetry stream rates for inspector
-    var telemetryStreams: [TelemetryStream] = []
 
     // Manual control state (normalized -1..1, throttle 0..1)
     var manualControlActive = false
@@ -79,8 +78,6 @@ final class DroneManager {
 
     private var drone: MAVLinkDrone?
     private var manualControlTimer: Timer?
-    private var paramCount: UInt16 = 0
-    private var paramBuffer: [String: DroneParam] = [:]
 
     private init() {}
 
@@ -99,6 +96,8 @@ final class DroneManager {
 
         let mav = MAVLinkDrone()
         drone = mav
+        missionService.update(drone: mav)
+        paramService.update(drone: mav)
 
         mav.onConnectionStateChanged = { [weak self] connState in
             guard let self else { return }
@@ -106,6 +105,17 @@ final class DroneManager {
             case .ready:
                 self.state.connectionState = .connected
                 self.statusMessage = "Connected"
+                // Auto-download mission after connection stabilizes
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+                    guard let self, self.state.connectionState.isConnected else { return }
+                    self.missionService.downloadMission(statusCallback: { [weak self] msg in
+                        self?.statusMessage = msg
+                    }) { [weak self] waypoints in
+                        if let waypoints, !waypoints.isEmpty {
+                            self?.missionService.downloadedMission = waypoints
+                        }
+                    }
+                }
             case .failed(let err):
                 self.state.connectionState = .error(err)
                 self.statusMessage = "Connection failed: \(err)"
@@ -117,7 +127,10 @@ final class DroneManager {
         }
 
         mav.onTelemetryUpdate = { [weak self] snapshot in
-            self?.updateTelemetry(from: snapshot)
+            guard let self else { return }
+            if let linkMsg = self.telemetryService.updateTelemetry(from: snapshot, state: &self.state) {
+                self.statusMessage = linkMsg
+            }
         }
 
         mav.onStatusText = { [weak self] severity, text in
@@ -125,7 +138,9 @@ final class DroneManager {
         }
 
         mav.onParamValue = { [weak self] name, value, type, index, count in
-            self?.handleParamValue(name: name, value: value, type: type, index: index, count: count)
+            self?.paramService.handleParamValue(name: name, value: value, type: type, index: index, count: count) { [weak self] msg in
+                self?.statusMessage = msg
+            }
         }
 
         mav.onCommandAck = { [weak self] command, result in
@@ -147,7 +162,7 @@ final class DroneManager {
             mav.connect(host: parsed.host, port: parsed.port)
         }
 
-        startStreamFlush()
+        telemetryService.startStreamFlush()
         AppSettings.shared.addToHistory(address)
     }
 
@@ -230,15 +245,13 @@ final class DroneManager {
 
         state = VehicleState()
         state.connectionState = .disconnected
-        streamFlushTimer?.invalidate()
-        streamFlushTimer = nil
-        streamBuffer = [:]
         statusMessage = "Disconnected"
-        params = []
-        paramBuffer = [:]
         statusMessages = []
         logEntries = []
-        telemetryStreams = []
+
+        missionService.reset()
+        paramService.reset()
+        telemetryService.reset()
     }
 
     // MARK: - Flight Actions
@@ -266,7 +279,6 @@ final class DroneManager {
         } else {
             drone.arm()
             statusMessage = "Arming..."
-            // Wait for armed state then takeoff
             waitForArmedThenTakeoff(altitude: altitude, attempts: 0)
         }
     }
@@ -305,7 +317,6 @@ final class DroneManager {
 
     func setFlightMode(_ mode: String) {
         guard let drone else { return }
-        // Set mode directly — MAVLinkDrone handles case-insensitive matching
         drone.setMode(mode)
         statusMessage = "Setting \(mode)"
         HapticManager.shared.trigger(style: "success")
@@ -344,7 +355,6 @@ final class DroneManager {
 
     private func sendManualControlInput() {
         guard let drone, manualControlActive else { return }
-        // MANUAL_CONTROL uses int16 for all axes: x/y/r (-1000..1000), z (0..1000)
         drone.sendManualControl(
             x: Int16(manualX * 1000),
             y: Int16(manualY * 1000),
@@ -353,273 +363,11 @@ final class DroneManager {
         )
     }
 
-    // MARK: - Parameters
-
-    func fetchAllParams() {
-        guard let drone else { return }
-        isLoadingParams = true
-        paramBuffer = [:]
-        paramCount = 0
-        drone.requestAllParams()
-    }
-
-    func setParam(name: String, value: String) {
-        guard let drone else { return }
-        if let floatVal = Float(value) {
-            drone.setParam(name: name, value: floatVal)
-            statusMessage = "Setting \(name) = \(value)"
-        }
-    }
-
     // MARK: - Log Files
 
     func fetchLogEntries() {
-        // Log file management requires MAVLink FTP or LOG_REQUEST_LIST
-        // Not directly supported in basic MAVLink — placeholder for future implementation
         statusMessage = "Log download not yet available via native MAVLink"
     }
-
-    // MARK: - Mission Upload
-
-    var missionUploadStatus: String = ""
-    var isMissionUploading = false
-
-    func uploadMission(waypoints: [Waypoint], completion: @escaping (Bool) -> Void) {
-        guard let drone else {
-            missionUploadStatus = "No drone connected"
-            completion(false)
-            return
-        }
-
-        guard !waypoints.isEmpty else {
-            missionUploadStatus = "No waypoints to upload"
-            completion(false)
-            return
-        }
-
-        isMissionUploading = true
-        missionUploadStatus = "Clearing old mission..."
-        statusMessage = "Uploading mission..."
-
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self else { return }
-
-            // Clear existing mission
-            drone.sendMissionClearAll()
-            Thread.sleep(forTimeInterval: 0.3)
-
-            // Upload
-            drone.drainMissionQueue()
-            let totalCount = UInt16(waypoints.count + 1)  // +1 for home at seq 0
-            drone.sendMissionCount(totalCount)
-
-            DispatchQueue.main.async {
-                self.missionUploadStatus = "Uploading \(waypoints.count) waypoints..."
-            }
-
-            let deadline = Date().addingTimeInterval(30)
-            var success = false
-
-            while Date() < deadline {
-                guard let frame = drone.recvMissionMessage(timeout: 5.0) else {
-                    break
-                }
-
-                switch frame.messageID {
-                case MsgMissionAck.id:
-                    let ack = MsgMissionAck(from: frame.payload)
-                    success = (ack.type == 0)  // MAV_MISSION_ACCEPTED
-                    if !success {
-                        DispatchQueue.main.async {
-                            self.missionUploadStatus = "Upload rejected: type=\(ack.type)"
-                        }
-                    }
-                    // Break out of loop on any ACK
-                    DispatchQueue.main.async {
-                        self.finishMissionUpload(success: success, count: waypoints.count, completion: completion)
-                    }
-                    return
-
-                case MsgMissionRequestInt.id, MsgMissionRequest.id:
-                    let seq: UInt16
-                    if frame.messageID == MsgMissionRequestInt.id {
-                        seq = MsgMissionRequestInt(from: frame.payload).seq
-                    } else {
-                        seq = MsgMissionRequest(from: frame.payload).seq
-                    }
-
-                    if seq == 0 {
-                        // Home position
-                        drone.sendMissionItemInt(
-                            seq: 0,
-                            frame: 0,  // MAV_FRAME_GLOBAL
-                            command: 16,  // MAV_CMD_NAV_WAYPOINT
-                            x: Int32(waypoints[0].latitude * 1e7),
-                            y: Int32(waypoints[0].longitude * 1e7),
-                            z: 0
-                        )
-                    } else if seq <= waypoints.count {
-                        let wp = waypoints[Int(seq) - 1]
-                        self.sendMissionItem(drone: drone, seq: seq, waypoint: wp)
-                    }
-
-                default:
-                    break
-                }
-            }
-
-            // Timeout
-            DispatchQueue.main.async {
-                self.finishMissionUpload(success: false, count: waypoints.count, completion: completion)
-            }
-        }
-    }
-
-    private func sendMissionItem(drone: MAVLinkDrone, seq: UInt16, waypoint: Waypoint) {
-        let command: UInt16
-        let frame: UInt8
-        var x: Int32 = Int32(waypoint.latitude * 1e7)
-        var y: Int32 = Int32(waypoint.longitude * 1e7)
-        var z: Float = waypoint.altitude
-
-        switch waypoint.action {
-        case .waypoint:
-            command = 16  // MAV_CMD_NAV_WAYPOINT
-            frame = 3     // MAV_FRAME_GLOBAL_RELATIVE_ALT_INT
-        case .takeoff:
-            command = 22  // MAV_CMD_NAV_TAKEOFF
-            frame = 3
-        case .land:
-            command = 21  // MAV_CMD_NAV_LAND
-            frame = 3
-        case .loiter:
-            command = 17  // MAV_CMD_NAV_LOITER_UNLIM
-            frame = 3
-        case .loiterTurns:
-            command = 18  // MAV_CMD_NAV_LOITER_TURNS
-            frame = 3
-        case .returnToLaunch:
-            command = 20  // MAV_CMD_NAV_RETURN_TO_LAUNCH
-            frame = 2     // MAV_FRAME_MISSION
-            x = 0; y = 0; z = 0
-        case .speedChange:
-            command = 178 // MAV_CMD_DO_CHANGE_SPEED
-            frame = 2
-            x = 0; y = 0; z = 0
-        case .regionOfInterest:
-            command = 201 // MAV_CMD_DO_SET_ROI
-            frame = 2
-            x = 0; y = 0; z = 0
-        }
-
-        drone.sendMissionItemInt(
-            seq: seq,
-            frame: frame,
-            command: command,
-            param1: waypoint.loiterTime,
-            param2: waypoint.acceptRadius,
-            param3: waypoint.loiterRadius,
-            param4: waypoint.yawAngle,
-            x: x, y: y, z: z
-        )
-    }
-
-    private func finishMissionUpload(success: Bool, count: Int, completion: @escaping (Bool) -> Void) {
-        isMissionUploading = false
-        if success {
-            missionUploadStatus = "Uploaded (\(count) items)"
-            statusMessage = "Mission uploaded"
-            HapticManager.shared.trigger(style: "success")
-        } else {
-            if missionUploadStatus.isEmpty || !missionUploadStatus.contains("rejected") {
-                missionUploadStatus = "Upload failed"
-            }
-            statusMessage = "Mission upload failed"
-            HapticManager.shared.trigger(style: "error")
-        }
-        completion(success)
-    }
-
-    func startMission() {
-        guard let drone else { return }
-        drone.sendMissionSetCurrent(seq: 1)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            if drone.isArdupilot {
-                drone.setMode("AUTO")
-            } else {
-                drone.setMode("AUTO_MISSION")
-            }
-        }
-        statusMessage = "Mission started"
-        HapticManager.shared.trigger(style: "success")
-    }
-
-    func pauseMission() {
-        drone?.hold()
-        statusMessage = "Mission paused"
-    }
-
-    func clearMission() {
-        drone?.sendMissionClearAll()
-        statusMessage = "Mission cleared"
-    }
-
-    // MARK: - Telemetry Updates
-
-    private func updateTelemetry(from t: TelemetrySnapshot) {
-        state.coordinate = CLLocationCoordinate2D(latitude: t.lat, longitude: t.lon)
-        state.altitudeRelative = t.altRelative
-        state.altitudeAMSL = t.altMSL
-        state.heading = Float(t.heading)
-        state.pitch = t.pitch * 180 / .pi
-        state.roll = t.roll * 180 / .pi
-        state.groundSpeed = t.groundSpeed
-        state.verticalSpeed = t.climbRate
-        state.batteryVoltage = t.batteryVoltage
-        state.batteryPercent = t.batteryRemaining >= 0 ? Float(t.batteryRemaining) : -1
-        state.satellites = Int(t.satellites)
-        state.gpsFixType = Int(t.gpsFixType)
-        state.armed = t.armed
-        state.flightMode = t.mode
-        state.landed = !t.armed
-
-        if t.homeLat != 0 || t.homeLon != 0 {
-            state.homeCoordinate = CLLocationCoordinate2D(latitude: t.homeLat, longitude: t.homeLon)
-        }
-
-        // Distance to home
-        if let home = state.homeCoordinate, state.hasValidPosition {
-            let homeLoc = CLLocation(latitude: home.latitude, longitude: home.longitude)
-            let droneLoc = CLLocation(latitude: t.lat, longitude: t.lon)
-            state.distanceToHome = Float(droneLoc.distance(from: homeLoc))
-        }
-
-        // Vehicle type
-        switch t.mavType {
-        case 1: state.vehicleType = .plane
-        case 10, 11: state.vehicleType = .rover
-        default: state.vehicleType = .copter
-        }
-
-        // Link status
-        if t.linkLost {
-            state.connectionState = .error("Link lost")
-            statusMessage = "Link lost"
-        }
-
-        // Update stream rates
-        for (name, info) in t.messageRates {
-            let elapsed = Date().timeIntervalSince(info.firstSeen)
-            let hz = elapsed > 1 ? Double(info.count) / elapsed : 0
-            updateStreamRate(name: name, value: "\(hz > 0 ? String(format: "%.1f Hz", hz) : "—")")
-        }
-
-        // Store latest payloads for inspector
-        latestPayloads = t.lastPayloads
-    }
-
-    /// Last payloads snapshot (thread-safe, updated from telemetry)
-    var latestPayloads: [String: Data] = [:]
 
     /// Available flight modes for the current vehicle/autopilot
     var availableModes: [String] {
@@ -645,41 +393,9 @@ final class DroneManager {
         }
     }
 
-    // MARK: - Parameter Handler
-
-    private func handleParamValue(name: String, value: Float, type: UInt8, index: UInt16, count: UInt16) {
-        paramCount = count
-
-        // Determine if integer or float based on MAV_PARAM_TYPE
-        let isFloat = (type >= 9)  // REAL32=9, REAL64=10
-        let displayValue: String
-        let intVal: Int32?
-        let floatVal: Float?
-        if isFloat {
-            displayValue = String(format: "%.4f", value)
-            floatVal = value
-            intVal = nil
-        } else {
-            intVal = Int32(bitPattern: value.bitPattern)
-            displayValue = "\(intVal!)"
-            floatVal = nil
-        }
-
-        let param = DroneParam(name: name, value: displayValue, floatValue: floatVal, intValue: intVal, isFloat: isFloat)
-        paramBuffer[name] = param
-
-        // Check if we have all params
-        if paramBuffer.count >= Int(count) {
-            params = paramBuffer.values.sorted { $0.name < $1.name }
-            isLoadingParams = false
-            statusMessage = "Loaded \(params.count) parameters"
-        }
-    }
-
     // MARK: - Command ACK Handler
 
     private func handleCommandAck(command: UInt16, result: UInt8) {
-        // MAV_CMD_PREFLIGHT_CALIBRATION = 241
         if command == 241 {
             let resultTexts: [UInt8: String] = [
                 0: "Calibration accepted",
@@ -694,7 +410,6 @@ final class DroneManager {
             handleStatusText(severity: result == 0 || result == 5 ? 6 : 4, text: text)
         }
 
-        // MAV_CMD_COMPONENT_ARM_DISARM = 400
         if command == 400 {
             if result == 0 {
                 statusMessage = state.armed ? "Armed" : "Disarmed"
@@ -705,41 +420,52 @@ final class DroneManager {
         }
     }
 
-    // MARK: - Stream Rate Tracking
+    // MARK: - Convenience Forwarding
 
-    private var streamBuffer: [String: TelemetryStream] = [:]
-    private var streamFlushTimer: Timer?
+    /// Upload mission via MissionService.
+    func uploadMission(waypoints: [Waypoint], completion: @escaping (Bool) -> Void) {
+        missionService.uploadMission(waypoints: waypoints, statusCallback: { [weak self] msg in
+            self?.statusMessage = msg
+        }, completion: completion)
+    }
 
-    private func startStreamFlush() {
-        streamFlushTimer?.invalidate()
-        streamFlushTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-            self?.flushStreams()
+    /// Download mission via MissionService.
+    func downloadMission(completion: @escaping ([Waypoint]?) -> Void) {
+        missionService.downloadMission(statusCallback: { [weak self] msg in
+            self?.statusMessage = msg
+        }, completion: completion)
+    }
+
+    /// Start mission via MissionService.
+    func startMission() {
+        missionService.startMission { [weak self] msg in
+            self?.statusMessage = msg
         }
     }
 
-    private func flushStreams() {
-        telemetryStreams = streamBuffer.values.sorted { $0.name < $1.name }
+    /// Pause mission via MissionService.
+    func pauseMission() {
+        missionService.pauseMission { [weak self] msg in
+            self?.statusMessage = msg
+        }
     }
 
-    private func updateStreamRate(name: String, value: String) {
-        let now = Date()
-        if var existing = streamBuffer[name] {
-            existing.updateCount += 1
-            existing.lastValue = value
-            existing.lastUpdate = now
-            let elapsed = now.timeIntervalSince(existing.firstUpdate)
-            if elapsed > 1 {
-                existing.hz = Double(existing.updateCount) / elapsed
-            }
-            streamBuffer[name] = existing
-        } else {
-            var stream = TelemetryStream(id: name, name: name)
-            stream.lastValue = value
-            stream.lastUpdate = now
-            stream.firstUpdate = now
-            stream.updateCount = 1
-            streamBuffer[name] = stream
-            flushStreams()
+    /// Clear mission via MissionService.
+    func clearMission() {
+        missionService.clearMission { [weak self] msg in
+            self?.statusMessage = msg
+        }
+    }
+
+    /// Fetch all params via ParameterService.
+    func fetchAllParams() {
+        paramService.fetchAllParams()
+    }
+
+    /// Set param via ParameterService.
+    func setParam(name: String, value: String) {
+        paramService.setParam(name: name, value: value) { [weak self] msg in
+            self?.statusMessage = msg
         }
     }
 }

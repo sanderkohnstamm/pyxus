@@ -95,6 +95,7 @@ struct WaypointEditor: View {
                 paramField(label: "Accept (m)", value: $waypoint.acceptRadius)
             }
         }
+        .onDisappear { clampValues() }
     }
 
     private func paramField(label: String, value: Binding<Float>) -> some View {
@@ -107,5 +108,16 @@ struct WaypointEditor: View {
                 .background(Color(.systemGray6))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
         }
+    }
+
+    /// Clamp all waypoint parameters to safe ranges.
+    private func clampValues() {
+        waypoint.altitude = min(max(waypoint.altitude, 0), 500)
+        waypoint.speed = min(max(waypoint.speed, 0), 50)
+        waypoint.loiterRadius = min(max(waypoint.loiterRadius, 0.1), 1000)
+        waypoint.loiterTime = min(max(waypoint.loiterTime, 0), 3600)
+        waypoint.yawAngle = waypoint.yawAngle.truncatingRemainder(dividingBy: 360)
+        if waypoint.yawAngle < 0 { waypoint.yawAngle += 360 }
+        waypoint.acceptRadius = min(max(waypoint.acceptRadius, 0.1), 1000)
     }
 }

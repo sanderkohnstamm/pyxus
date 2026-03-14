@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Video, Play, X, Link, Camera, Crosshair, ChevronDown, ChevronUp, RefreshCw, Activity } from 'lucide-react';
 import useDroneStore, { EMPTY_ARRAY, INITIAL_TELEMETRY } from '../store/droneStore';
-import { droneApi } from '../utils/api';
+import { droneApi, fetchWithTimeout } from '../utils/api';
 
 const FIX_TYPES = { 0: 'No GPS', 1: 'No Fix', 2: '2D', 3: '3D', 4: 'DGPS', 5: 'RTK Flt', 6: 'RTK Fix' };
 
@@ -84,7 +84,7 @@ function GimbalControl() {
   const sendGimbalCommand = useCallback(async (p, y) => {
     if (!isConnected) return;
     try {
-      await fetch(droneApi('/api/gimbal/control'), {
+      await fetchWithTimeout(droneApi('/api/gimbal/control'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pitch: p, yaw: y }),
@@ -164,7 +164,7 @@ function CameraList() {
     if (!isConnected) return;
     setLoading(true);
     try {
-      const res = await fetch(droneApi('/api/cameras'));
+      const res = await fetchWithTimeout(droneApi('/api/cameras'));
       const data = await res.json();
       if (data.status === 'ok') {
         const currentDroneId = useDroneStore.getState().activeDroneId;

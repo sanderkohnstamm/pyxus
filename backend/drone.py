@@ -13,11 +13,12 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from pymavlink import mavutil
-from vehicle_profiles import get_profile
+from vehicle_profiles import get_profile, MAV_TYPE_NAMES, VEHICLE_TYPES, PERIPHERAL_TYPES
 
 logger = logging.getLogger(__name__)
 
 HEARTBEAT_TIMEOUT = 3.0  # seconds before declaring link lost
+HEARTBEAT_MISS_THRESHOLD = 2  # consecutive misses before declaring link lost
 
 
 def sanitize_for_json(value):
@@ -30,53 +31,6 @@ def sanitize_for_json(value):
     elif isinstance(value, (list, tuple)):
         return [sanitize_for_json(v) for v in value]
     return value
-
-
-MAV_TYPES = {
-    0: "Generic",
-    1: "Fixed Wing",
-    2: "Quadrotor",
-    3: "Coaxial",
-    4: "Helicopter",
-    5: "Antenna Tracker",
-    6: "GCS",
-    7: "Airship",
-    8: "Free Balloon",
-    9: "Rocket",
-    10: "Ground Rover",
-    11: "Surface Boat",
-    12: "Submarine",
-    13: "Hexarotor",
-    14: "Octorotor",
-    15: "Tricopter",
-    16: "Flapping Wing",
-    17: "Kite",
-    18: "Companion Computer",
-    19: "VTOL Tiltrotor",
-    20: "VTOL Duo",
-    21: "VTOL Quad",
-    22: "VTOL Tailsitter",
-    23: "VTOL Reserved",
-    24: "VTOL Reserved",
-    25: "VTOL Reserved",
-    26: "Gimbal",
-    27: "ADSB",
-    28: "Parafoil",
-    29: "Dodecarotor",
-    30: "Camera",
-    31: "Charging Station",
-    32: "FLARM",
-    33: "Servo",
-    34: "ODID",
-    35: "Decarotor",
-    36: "Battery",
-    37: "Parachute",
-    38: "Log",
-    39: "OSD",
-    40: "IMU",
-    41: "GPS",
-    42: "Winch",
-}
 
 
 @dataclass
@@ -219,56 +173,6 @@ def ardupilot_modes_for_type(mav_type: int) -> dict:
     """Return the ArduPilot custom_mode->name mapping for a given MAV_TYPE."""
     return _ARDUPILOT_MODE_MAP_BY_TYPE.get(mav_type, ARDUPILOT_COPTER_MODES)
 
-# Vehicle MAV_TYPEs - these are actual aircraft/vehicles we should connect to
-VEHICLE_TYPES = {
-    0,   # Generic (could be autopilot in some configs)
-    1,   # Fixed Wing
-    2,   # Quadrotor
-    3,   # Coaxial
-    4,   # Helicopter
-    7,   # Airship
-    8,   # Free Balloon
-    9,   # Rocket
-    10,  # Ground Rover
-    11,  # Surface Boat
-    12,  # Submarine
-    13,  # Hexarotor
-    14,  # Octorotor
-    15,  # Tricopter
-    16,  # Flapping Wing
-    17,  # Kite
-    19,  # VTOL Tiltrotor
-    20,  # VTOL Duo
-    21,  # VTOL Quad
-    22,  # VTOL Tailsitter
-    23,  # VTOL Reserved
-    24,  # VTOL Reserved
-    25,  # VTOL Reserved
-    28,  # Parafoil
-    29,  # Dodecarotor
-    35,  # Decarotor
-}
-
-# Peripheral types we track but don't connect to
-PERIPHERAL_TYPES = {
-    5: "Antenna Tracker",
-    6: "GCS",
-    18: "Companion Computer",
-    26: "Gimbal",
-    27: "ADSB",
-    30: "Camera",
-    31: "Charging Station",
-    32: "FLARM",
-    33: "Servo",
-    34: "ODID",
-    36: "Battery",
-    37: "Parachute",
-    38: "Log",
-    39: "OSD",
-    40: "IMU",
-    41: "GPS",
-    42: "Winch",
-}
 
 # PX4 main mode and sub-mode mappings
 # Main modes: 1=MANUAL, 2=ALTCTL, 3=POSCTL, 4=AUTO, 5=ACRO, 6=OFFBOARD, 7=STABILIZED, 8=RATTITUDE
@@ -292,12 +196,13 @@ PX4_MODES = {
 class DroneConnection:
     def __init__(self):
         self._mav = None
+        self._mav_lock = threading.Lock()  # Protects _mav access across threads
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._lock = threading.Lock()
         self._telemetry = TelemetryState()
         self._cmd_queue: queue.Queue = queue.Queue()
-        self._mission_msg_queue: queue.Queue = queue.Queue()
+        self._mission_msg_queue: queue.Queue = queue.Queue(maxsize=100)
         self._is_ardupilot = True
         self._mav_type = 0  # MAV_TYPE from heartbeat (for mode mapping)
         self._target_system = 1
@@ -308,6 +213,7 @@ class DroneConnection:
         # Link loss tracking
         self._link_lost: bool = False
         self._link_lost_time: float = 0
+        self._missed_heartbeats: int = 0
 
         # Parameters
         self._params: dict = {}  # name -> {value, type, index}
@@ -320,7 +226,7 @@ class DroneConnection:
         self._msg_history: dict = {}  # msg_type -> list of timestamps for rate calculation
         self._params_lock = threading.Lock()
         # Status text messages
-        self._statustext_queue: list = []
+        self._statustext_queue: deque = deque(maxlen=100)
         self._statustext_lock = threading.Lock()
 
         # Cameras and gimbals discovered
@@ -362,12 +268,14 @@ class DroneConnection:
             self.disconnect()
 
         try:
-            self._mav = mavutil.mavlink_connection(
+            mav = mavutil.mavlink_connection(
                 connection_string,
                 baud=57600,
                 source_system=255,
                 source_component=0,
             )
+            with self._mav_lock:
+                self._mav = mav
 
             # Wait for a heartbeat from component 1 (autopilot)
             # Component 1 is the standard MAVLink component ID for autopilots
@@ -407,13 +315,14 @@ class DroneConnection:
                     vehicle_msg = msg
                     break
                 else:
-                    type_name = PERIPHERAL_TYPES.get(mav_type, MAV_TYPES.get(mav_type, f"Type {mav_type}"))
+                    type_name = PERIPHERAL_TYPES.get(mav_type, MAV_TYPE_NAMES.get(mav_type, f"Type {mav_type}"))
                     logger.info("Registered %s (sys=%d, comp=%d), waiting for autopilot...", type_name, src_system, src_component)
 
             if vehicle_msg is None:
                 logger.error("No autopilot (component 1) heartbeat received within timeout")
-                self._mav.close()
-                self._mav = None
+                with self._mav_lock:
+                    self._mav.close()
+                    self._mav = None
                 return False
 
             self._target_system = vehicle_msg.get_srcSystem()
@@ -427,7 +336,7 @@ class DroneConnection:
             self._mav_type = vehicle_msg.type
             with self._lock:
                 self._telemetry.autopilot = "ardupilot" if self._is_ardupilot else "px4"
-                self._telemetry.platform_type = MAV_TYPES.get(vehicle_msg.type, f"Type {vehicle_msg.type}")
+                self._telemetry.platform_type = MAV_TYPE_NAMES.get(vehicle_msg.type, f"Type {vehicle_msg.type}")
 
             logger.info("Connected to %s (sys=%d, comp=%d)", self._telemetry.platform_type, self._target_system, self._target_component)
 
@@ -448,12 +357,13 @@ class DroneConnection:
 
         except (OSError, ConnectionError, TimeoutError) as e:
             logger.error("Connection failed: %s", e)
-            if self._mav:
-                try:
-                    self._mav.close()
-                except OSError as close_err:
-                    logger.warning("Error closing connection during cleanup: %s", close_err)
-                self._mav = None
+            with self._mav_lock:
+                if self._mav:
+                    try:
+                        self._mav.close()
+                    except OSError as close_err:
+                        logger.warning("Error closing connection during cleanup: %s", close_err)
+                    self._mav = None
             return False
 
     def disconnect(self):
@@ -462,12 +372,13 @@ class DroneConnection:
         if self._thread:
             self._thread.join(timeout=3)
             self._thread = None
-        if self._mav:
-            try:
-                self._mav.close()
-            except OSError as e:
-                logger.warning("Error closing connection during disconnect: %s", e)
-            self._mav = None
+        with self._mav_lock:
+            if self._mav:
+                try:
+                    self._mav.close()
+                except OSError as e:
+                    logger.warning("Error closing connection during disconnect: %s", e)
+                self._mav = None
         with self._lock:
             self._telemetry = TelemetryState()
 
@@ -510,14 +421,17 @@ class DroneConnection:
             # Send GCS heartbeat every 1s
             now = time.time()
             if now - last_heartbeat >= 1.0:
-                try:
-                    self._mav.mav.heartbeat_send(
-                        mavutil.mavlink.MAV_TYPE_GCS,
-                        mavutil.mavlink.MAV_AUTOPILOT_INVALID,
-                        0, 0, 0
-                    )
-                except (OSError, struct.error) as e:
-                    logger.warning("Error sending GCS heartbeat: %s", e)
+                with self._mav_lock:
+                    mav = self._mav
+                if mav:
+                    try:
+                        mav.mav.heartbeat_send(
+                            mavutil.mavlink.MAV_TYPE_GCS,
+                            mavutil.mavlink.MAV_AUTOPILOT_INVALID,
+                            0, 0, 0
+                        )
+                    except (OSError, struct.error) as e:
+                        logger.warning("Error sending GCS heartbeat: %s", e)
                 last_heartbeat = now
 
             # Drain command queue
@@ -529,26 +443,34 @@ class DroneConnection:
                     break
 
             # Receive messages
-            try:
-                msg = self._mav.recv_match(blocking=True, timeout=0.05)
-                if msg is not None:
-                    self._handle_message(msg)
-            except (OSError, struct.error, ValueError) as e:
-                if self._running:
-                    logger.warning("Error receiving MAVLink message: %s", e)
-                    time.sleep(0.01)
+            with self._mav_lock:
+                mav = self._mav
+            if mav:
+                try:
+                    msg = mav.recv_match(blocking=True, timeout=0.05)
+                    if msg is not None:
+                        self._handle_message(msg)
+                except (OSError, struct.error, ValueError) as e:
+                    if self._running:
+                        logger.warning("Error receiving MAVLink message: %s", e)
+                        time.sleep(0.01)
 
-            # Link loss detection
+            # Link loss detection (hysteresis: require consecutive misses)
             with self._lock:
                 hb_time = self._telemetry.last_heartbeat
             if hb_time > 0 and (time.time() - hb_time) > HEARTBEAT_TIMEOUT:
                 if not self._link_lost:
-                    self._link_lost = True
-                    self._link_lost_time = time.time()
-                    with self._lock:
-                        self._telemetry.link_lost = True
-                        self._telemetry_generation += 1
-                    logger.warning("Link lost — no heartbeat for %.1fs", HEARTBEAT_TIMEOUT)
+                    self._missed_heartbeats += 1
+                    if self._missed_heartbeats >= HEARTBEAT_MISS_THRESHOLD:
+                        self._link_lost = True
+                        self._link_lost_time = time.time()
+                        with self._lock:
+                            self._telemetry.link_lost = True
+                            self._telemetry_generation += 1
+                        logger.warning("Link lost — no heartbeat for %.1fs (%d consecutive misses)",
+                                       HEARTBEAT_TIMEOUT, self._missed_heartbeats)
+                    else:
+                        logger.debug("Heartbeat miss %d/%d", self._missed_heartbeats, HEARTBEAT_MISS_THRESHOLD)
                 # Drain command queue while link is lost to prevent stale commands
                 while not self._cmd_queue.empty():
                     try:
@@ -882,7 +804,10 @@ class DroneConnection:
         # Route mission protocol messages to dedicated queue (avoids race with _run_loop)
         if msg_type in ("MISSION_REQUEST_INT", "MISSION_REQUEST", "MISSION_ACK",
                         "MISSION_COUNT", "MISSION_ITEM_INT"):
-            self._mission_msg_queue.put(msg)
+            try:
+                self._mission_msg_queue.put_nowait(msg)
+            except queue.Full:
+                logger.warning("Mission message queue full, dropping message: %s", msg_type)
             return
 
         # Store parameter values
@@ -895,6 +820,8 @@ class DroneConnection:
                     'index': msg.param_index,
                 }
                 self._params_total = msg.param_count
+                if len(self._params) > 5000:
+                    logger.warning("Parameters dict exceeds 5000 entries (%d) — possible runaway param stream", len(self._params))
             return
 
         # Store camera information
@@ -953,9 +880,7 @@ class DroneConnection:
                     'text': text,
                     'time': now,
                 })
-                # Keep max 100 messages
-                if len(self._statustext_queue) > 100:
-                    self._statustext_queue = self._statustext_queue[-100:]
+                # deque(maxlen=100) auto-evicts oldest entries
             return
 
         # Handle COMMAND_ACK and convert to status messages for calibration feedback
@@ -1034,7 +959,10 @@ class DroneConnection:
                 self._telemetry.armed = bool(base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED)
                 self._telemetry.system_status = msg.system_status
                 self._telemetry.last_heartbeat = time.time()
-                self._telemetry.platform_type = MAV_TYPES.get(msg.type, f"Type {msg.type}")
+                self._telemetry.platform_type = MAV_TYPE_NAMES.get(msg.type, f"Type {msg.type}")
+
+                # Reset missed heartbeat counter on any heartbeat
+                self._missed_heartbeats = 0
 
                 # Link recovery detection
                 if self._link_lost:
@@ -1114,9 +1042,11 @@ class DroneConnection:
 
     def force_disarm(self):
         """Emergency motor kill — bypasses command queue, sends directly."""
-        if not self._mav:
+        with self._mav_lock:
+            mav = self._mav
+        if not mav:
             return
-        self._mav.mav.command_long_send(
+        mav.mav.command_long_send(
             self._target_system, self._target_component,
             mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
             0, 0, 21196, 0, 0, 0, 0, 0  # param1=0 disarm, param2=21196 force
@@ -1404,13 +1334,13 @@ class DroneConnection:
         # Determine component category and name
         if mav_type in VEHICLE_TYPES:
             category = "vehicle"
-            type_name = MAV_TYPES.get(mav_type, f"Type {mav_type}")
+            type_name = MAV_TYPE_NAMES.get(mav_type, f"Type {mav_type}")
         elif mav_type in PERIPHERAL_TYPES:
             category = "peripheral"
             type_name = PERIPHERAL_TYPES[mav_type]
         else:
             category = "unknown"
-            type_name = MAV_TYPES.get(mav_type, f"Type {mav_type}")
+            type_name = MAV_TYPE_NAMES.get(mav_type, f"Type {mav_type}")
 
         # Autopilot type
         autopilot_name = "unknown"
