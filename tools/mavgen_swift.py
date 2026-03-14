@@ -434,12 +434,16 @@ def _gen_message_struct(msg, lines):
         st = swift_type_for_field(f)
         lines.append(f"    var {f['name']}: {st} = {swift_default_for_field(f)}")
 
+    # Check if any field is named 'payload' to avoid collision
+    has_payload_field = any(f["name"] == "payload" for f in all_fields)
+    data_param = "_data" if has_payload_field else "payload"
+
     # init(from payload: Data)
     lines.append("")
     lines.append("    init() {}")
     lines.append("")
-    lines.append("    init(from payload: Data) {")
-    lines.append("        let d = payload")
+    lines.append(f"    init(from {data_param}: Data) {{")
+    lines.append(f"        let d = {data_param}")
     lines.append("        var o = 0")
 
     # Decode base fields in wire order
@@ -490,7 +494,7 @@ def _gen_decode_field(f, lines):
         # Typed array
         swift_t = TYPE_MAP.get(base, ("UInt8",))[0]
         lines.append(f"        if o + {arr * sz} <= d.count {{")
-        lines.append(f"            {name} = (0..<{arr}).map {{ i in")
+        lines.append(f"            {name} = (0..<{arr}).map {{ (i: Int) -> {swift_t} in")
         _gen_single_read(base, f"d.startIndex+o+i*{sz}", "                return ", lines)
         lines.append(f"            }}")
         lines.append(f"        }}")
@@ -509,19 +513,36 @@ def _gen_single_read(base_type, offset, prefix, lines):
     swift_t = TYPE_MAP[base_type][0]
 
     if sz == 1:
-        lines.append(f"{prefix}d[{offset}]")
+        if swift_t == "Int8":
+            lines.append(f"{prefix}Int8(bitPattern: d[{offset}])")
+        else:
+            lines.append(f"{prefix}d[{offset}]")
         return
 
+    # For multi-byte reads, use a helper variable to avoid type-checker timeout
     if base_type == "float":
-        lines.append(f"{prefix}Float(bitPattern: UInt32(d[{offset}]) | UInt32(d[{offset}+1]) << 8 | UInt32(d[{offset}+2]) << 16 | UInt32(d[{offset}+3]) << 24)")
+        lines.append(f"{prefix}{{ let b = UInt32(d[{offset}]) | UInt32(d[{offset}+1]) << 8 | UInt32(d[{offset}+2]) << 16 | UInt32(d[{offset}+3]) << 24; return Float(bitPattern: b) }}()")
     elif base_type == "double":
-        lines.append(f"{prefix}Double(bitPattern: UInt64(d[{offset}]) | UInt64(d[{offset}+1]) << 8 | UInt64(d[{offset}+2]) << 16 | UInt64(d[{offset}+3]) << 24 | UInt64(d[{offset}+4]) << 32 | UInt64(d[{offset}+5]) << 40 | UInt64(d[{offset}+6]) << 48 | UInt64(d[{offset}+7]) << 56)")
+        lines.append(f"{prefix}{{ let lo = UInt64(d[{offset}]) | UInt64(d[{offset}+1]) << 8 | UInt64(d[{offset}+2]) << 16 | UInt64(d[{offset}+3]) << 24; let hi = UInt64(d[{offset}+4]) << 32 | UInt64(d[{offset}+5]) << 40 | UInt64(d[{offset}+6]) << 48 | UInt64(d[{offset}+7]) << 56; return Double(bitPattern: lo | hi) }}()")
     elif sz == 2:
-        lines.append(f"{prefix}{swift_t}(d[{offset}]) | {swift_t}(d[{offset}+1]) << 8")
+        # Use unsigned intermediate for signed types
+        unsigned_t = "UInt16"
+        if swift_t in ("Int16",):
+            lines.append(f"{prefix}{swift_t}(bitPattern: {unsigned_t}(d[{offset}]) | {unsigned_t}(d[{offset}+1]) << 8)")
+        else:
+            lines.append(f"{prefix}{swift_t}(d[{offset}]) | {swift_t}(d[{offset}+1]) << 8")
     elif sz == 4:
-        lines.append(f"{prefix}{swift_t}(d[{offset}]) | {swift_t}(d[{offset}+1]) << 8 | {swift_t}(d[{offset}+2]) << 16 | {swift_t}(d[{offset}+3]) << 24")
+        unsigned_t = "UInt32"
+        if swift_t in ("Int32",):
+            lines.append(f"{prefix}{swift_t}(bitPattern: {unsigned_t}(d[{offset}]) | {unsigned_t}(d[{offset}+1]) << 8 | {unsigned_t}(d[{offset}+2]) << 16 | {unsigned_t}(d[{offset}+3]) << 24)")
+        else:
+            lines.append(f"{prefix}{swift_t}(d[{offset}]) | {swift_t}(d[{offset}+1]) << 8 | {swift_t}(d[{offset}+2]) << 16 | {swift_t}(d[{offset}+3]) << 24")
     elif sz == 8:
-        lines.append(f"{prefix}{swift_t}(d[{offset}]) | {swift_t}(d[{offset}+1]) << 8 | {swift_t}(d[{offset}+2]) << 16 | {swift_t}(d[{offset}+3]) << 24 | {swift_t}(d[{offset}+4]) << 32 | {swift_t}(d[{offset}+5]) << 40 | {swift_t}(d[{offset}+6]) << 48 | {swift_t}(d[{offset}+7]) << 56")
+        unsigned_t = "UInt64"
+        if swift_t in ("Int64",):
+            lines.append(f"{prefix}{{ let lo = {unsigned_t}(d[{offset}]) | {unsigned_t}(d[{offset}+1]) << 8 | {unsigned_t}(d[{offset}+2]) << 16 | {unsigned_t}(d[{offset}+3]) << 24; let hi = {unsigned_t}(d[{offset}+4]) << 32 | {unsigned_t}(d[{offset}+5]) << 40 | {unsigned_t}(d[{offset}+6]) << 48 | {unsigned_t}(d[{offset}+7]) << 56; return {swift_t}(bitPattern: lo | hi) }}()")
+        else:
+            lines.append(f"{prefix}{{ let lo = {swift_t}(d[{offset}]) | {swift_t}(d[{offset}+1]) << 8 | {swift_t}(d[{offset}+2]) << 16 | {swift_t}(d[{offset}+3]) << 24; let hi = {swift_t}(d[{offset}+4]) << 32 | {swift_t}(d[{offset}+5]) << 40 | {swift_t}(d[{offset}+6]) << 48 | {swift_t}(d[{offset}+7]) << 56; return lo | hi }}()")
 
 
 def _gen_encode_field(f, lines):
@@ -549,6 +570,7 @@ def _gen_encode_field(f, lines):
 
 def _gen_single_write(base_type, field, is_array, lines):
     sz = TYPE_MAP[base_type][1]
+    swift_t = TYPE_MAP[base_type][0]
     name = field["name"]
 
     if is_array:
@@ -565,13 +587,26 @@ def _gen_single_write(base_type, field, is_array, lines):
         bits = f"{val_expr}.bitPattern"
         lines.append(f"        do {{ let b = {bits}; p[{off}] = UInt8(b & 0xFF); p[{off}+1] = UInt8((b >> 8) & 0xFF); p[{off}+2] = UInt8((b >> 16) & 0xFF); p[{off}+3] = UInt8((b >> 24) & 0xFF); p[{off}+4] = UInt8((b >> 32) & 0xFF); p[{off}+5] = UInt8((b >> 40) & 0xFF); p[{off}+6] = UInt8((b >> 48) & 0xFF); p[{off}+7] = UInt8((b >> 56) & 0xFF) }}")
     elif sz == 1:
-        lines.append(f"        p[{off}] = UInt8(truncatingIfNeeded: {val_expr})")
+        if swift_t == "Int8":
+            lines.append(f"        p[{off}] = UInt8(bitPattern: {val_expr})")
+        else:
+            lines.append(f"        p[{off}] = UInt8(truncatingIfNeeded: {val_expr})")
     elif sz == 2:
-        lines.append(f"        do {{ let v = UInt16(truncatingIfNeeded: {val_expr}); p[{off}] = UInt8(v & 0xFF); p[{off}+1] = UInt8((v >> 8) & 0xFF) }}")
+        # Use bitPattern for signed types
+        if swift_t in ("Int16",):
+            lines.append(f"        do {{ let v = UInt16(bitPattern: {val_expr}); p[{off}] = UInt8(v & 0xFF); p[{off}+1] = UInt8((v >> 8) & 0xFF) }}")
+        else:
+            lines.append(f"        do {{ let v = UInt16(truncatingIfNeeded: {val_expr}); p[{off}] = UInt8(v & 0xFF); p[{off}+1] = UInt8((v >> 8) & 0xFF) }}")
     elif sz == 4:
-        lines.append(f"        do {{ let v = UInt32(truncatingIfNeeded: {val_expr}); p[{off}] = UInt8(v & 0xFF); p[{off}+1] = UInt8((v >> 8) & 0xFF); p[{off}+2] = UInt8((v >> 16) & 0xFF); p[{off}+3] = UInt8((v >> 24) & 0xFF) }}")
+        if swift_t in ("Int32",):
+            lines.append(f"        do {{ let v = UInt32(bitPattern: {val_expr}); p[{off}] = UInt8(v & 0xFF); p[{off}+1] = UInt8((v >> 8) & 0xFF); p[{off}+2] = UInt8((v >> 16) & 0xFF); p[{off}+3] = UInt8((v >> 24) & 0xFF) }}")
+        else:
+            lines.append(f"        do {{ let v = UInt32(truncatingIfNeeded: {val_expr}); p[{off}] = UInt8(v & 0xFF); p[{off}+1] = UInt8((v >> 8) & 0xFF); p[{off}+2] = UInt8((v >> 16) & 0xFF); p[{off}+3] = UInt8((v >> 24) & 0xFF) }}")
     elif sz == 8:
-        lines.append(f"        do {{ let v = UInt64(truncatingIfNeeded: {val_expr}); p[{off}] = UInt8(v & 0xFF); p[{off}+1] = UInt8((v >> 8) & 0xFF); p[{off}+2] = UInt8((v >> 16) & 0xFF); p[{off}+3] = UInt8((v >> 24) & 0xFF); p[{off}+4] = UInt8((v >> 32) & 0xFF); p[{off}+5] = UInt8((v >> 40) & 0xFF); p[{off}+6] = UInt8((v >> 48) & 0xFF); p[{off}+7] = UInt8((v >> 56) & 0xFF) }}")
+        if swift_t in ("Int64",):
+            lines.append(f"        do {{ let v = UInt64(bitPattern: {val_expr}); p[{off}] = UInt8(v & 0xFF); p[{off}+1] = UInt8((v >> 8) & 0xFF); p[{off}+2] = UInt8((v >> 16) & 0xFF); p[{off}+3] = UInt8((v >> 24) & 0xFF); p[{off}+4] = UInt8((v >> 32) & 0xFF); p[{off}+5] = UInt8((v >> 40) & 0xFF); p[{off}+6] = UInt8((v >> 48) & 0xFF); p[{off}+7] = UInt8((v >> 56) & 0xFF) }}")
+        else:
+            lines.append(f"        do {{ let v = UInt64(truncatingIfNeeded: {val_expr}); p[{off}] = UInt8(v & 0xFF); p[{off}+1] = UInt8((v >> 8) & 0xFF); p[{off}+2] = UInt8((v >> 16) & 0xFF); p[{off}+3] = UInt8((v >> 24) & 0xFF); p[{off}+4] = UInt8((v >> 32) & 0xFF); p[{off}+5] = UInt8((v >> 40) & 0xFF); p[{off}+6] = UInt8((v >> 48) & 0xFF); p[{off}+7] = UInt8((v >> 56) & 0xFF) }}")
 
 
 def generate_crc_extras_swift(messages, out_path):

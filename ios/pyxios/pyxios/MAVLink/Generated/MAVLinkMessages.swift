@@ -112,7 +112,7 @@ struct MsgSysStatus: Sendable {
         }
         o += 2
         if o + 2 <= d.count {
-            current_battery = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            current_battery = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
@@ -140,7 +140,7 @@ struct MsgSysStatus: Sendable {
         }
         o += 2
         if o + 1 <= d.count {
-            battery_remaining = d[d.startIndex+o]
+            battery_remaining = Int8(bitPattern: d[d.startIndex+o])
         }
         o += 1
     }
@@ -158,7 +158,7 @@ struct MsgSysStatus: Sendable {
         o += 2
         do { let v = UInt16(truncatingIfNeeded: voltage_battery); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: current_battery); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: current_battery); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         do { let v = UInt16(truncatingIfNeeded: drop_rate_comm); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
@@ -172,7 +172,7 @@ struct MsgSysStatus: Sendable {
         o += 2
         do { let v = UInt16(truncatingIfNeeded: errors_count4); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        p[o] = UInt8(truncatingIfNeeded: battery_remaining)
+        p[o] = UInt8(bitPattern: battery_remaining)
         o += 1
         return p
     }
@@ -193,7 +193,7 @@ struct MsgSystemTime: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_unix_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_unix_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
@@ -230,7 +230,7 @@ struct MsgPing: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
@@ -446,7 +446,7 @@ struct MsgParamRequestRead: Sendable {
         let d = payload
         var o = 0
         if o + 2 <= d.count {
-            param_index = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            param_index = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 1 <= d.count {
@@ -466,7 +466,7 @@ struct MsgParamRequestRead: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 20)
         var o = 0
-        do { let v = UInt16(truncatingIfNeeded: param_index); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: param_index); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         p[o] = UInt8(truncatingIfNeeded: target_system)
         o += 1
@@ -534,7 +534,7 @@ struct MsgParamValue: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            param_value = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param_value = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -593,7 +593,7 @@ struct MsgParamSet: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            param_value = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param_value = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -663,19 +663,19 @@ struct MsgGpsRawInt: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lon = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lon = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            alt = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            alt = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 2 <= d.count {
@@ -705,7 +705,7 @@ struct MsgGpsRawInt: Sendable {
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            alt_ellipsoid = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            alt_ellipsoid = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         guard o < d.count else { return }
@@ -740,11 +740,11 @@ struct MsgGpsRawInt: Sendable {
         var o = 0
         do { let v = UInt64(truncatingIfNeeded: time_usec); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF); p[o+4] = UInt8((v >> 32) & 0xFF); p[o+5] = UInt8((v >> 40) & 0xFF); p[o+6] = UInt8((v >> 48) & 0xFF); p[o+7] = UInt8((v >> 56) & 0xFF) }
         o += 8
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let v = UInt16(truncatingIfNeeded: eph); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
@@ -758,7 +758,7 @@ struct MsgGpsRawInt: Sendable {
         o += 1
         p[o] = UInt8(truncatingIfNeeded: satellites_visible)
         o += 1
-        do { let v = UInt32(truncatingIfNeeded: alt_ellipsoid); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: alt_ellipsoid); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let v = UInt32(truncatingIfNeeded: h_acc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
@@ -797,31 +797,31 @@ struct MsgGpsStatus: Sendable {
         }
         o += 1
         if o + 20 <= d.count {
-            satellite_prn = (0..<20).map { i in
+            satellite_prn = (0..<20).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
         o += 20
         if o + 20 <= d.count {
-            satellite_used = (0..<20).map { i in
+            satellite_used = (0..<20).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
         o += 20
         if o + 20 <= d.count {
-            satellite_elevation = (0..<20).map { i in
+            satellite_elevation = (0..<20).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
         o += 20
         if o + 20 <= d.count {
-            satellite_azimuth = (0..<20).map { i in
+            satellite_azimuth = (0..<20).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
         o += 20
         if o + 20 <= d.count {
-            satellite_snr = (0..<20).map { i in
+            satellite_snr = (0..<20).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -885,45 +885,45 @@ struct MsgScaledImu: Sendable {
         }
         o += 4
         if o + 2 <= d.count {
-            xacc = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            xacc = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            yacc = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            yacc = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            zacc = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            zacc = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            xgyro = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            xgyro = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            ygyro = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            ygyro = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            zgyro = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            zgyro = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            xmag = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            xmag = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            ymag = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            ymag = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            zmag = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            zmag = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 2 <= d.count {
-            temperature = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            temperature = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
     }
@@ -933,25 +933,25 @@ struct MsgScaledImu: Sendable {
         var o = 0
         do { let v = UInt32(truncatingIfNeeded: time_boot_ms); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt16(truncatingIfNeeded: xacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: xacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: yacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: yacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: zacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: zacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: xgyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: xgyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: ygyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: ygyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: zgyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: zgyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: xmag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: xmag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: ymag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: ymag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: zmag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: zmag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         return p
     }
@@ -982,43 +982,43 @@ struct MsgRawImu: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 2 <= d.count {
-            xacc = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            xacc = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            yacc = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            yacc = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            zacc = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            zacc = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            xgyro = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            xgyro = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            ygyro = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            ygyro = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            zgyro = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            zgyro = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            xmag = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            xmag = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            ymag = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            ymag = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            zmag = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            zmag = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         // Extension fields (only present in longer payloads)
@@ -1029,7 +1029,7 @@ struct MsgRawImu: Sendable {
         o += 1
         guard o < d.count else { return }
         if o + 2 <= d.count {
-            temperature = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            temperature = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
     }
@@ -1039,27 +1039,27 @@ struct MsgRawImu: Sendable {
         var o = 0
         do { let v = UInt64(truncatingIfNeeded: time_usec); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF); p[o+4] = UInt8((v >> 32) & 0xFF); p[o+5] = UInt8((v >> 40) & 0xFF); p[o+6] = UInt8((v >> 48) & 0xFF); p[o+7] = UInt8((v >> 56) & 0xFF) }
         o += 8
-        do { let v = UInt16(truncatingIfNeeded: xacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: xacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: yacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: yacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: zacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: zacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: xgyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: xgyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: ygyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: ygyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: zgyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: zgyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: xmag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: xmag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: ymag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: ymag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: zmag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: zmag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         p[o] = UInt8(truncatingIfNeeded: id)
         o += 1
-        do { let v = UInt16(truncatingIfNeeded: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         return p
     }
@@ -1083,23 +1083,23 @@ struct MsgRawPressure: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 2 <= d.count {
-            press_abs = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            press_abs = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            press_diff1 = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            press_diff1 = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            press_diff2 = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            press_diff2 = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            temperature = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            temperature = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
     }
@@ -1109,13 +1109,13 @@ struct MsgRawPressure: Sendable {
         var o = 0
         do { let v = UInt64(truncatingIfNeeded: time_usec); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF); p[o+4] = UInt8((v >> 32) & 0xFF); p[o+5] = UInt8((v >> 40) & 0xFF); p[o+6] = UInt8((v >> 48) & 0xFF); p[o+7] = UInt8((v >> 56) & 0xFF) }
         o += 8
-        do { let v = UInt16(truncatingIfNeeded: press_abs); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: press_abs); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: press_diff1); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: press_diff1); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: press_diff2); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: press_diff2); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         return p
     }
@@ -1143,21 +1143,21 @@ struct MsgScaledPressure: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            press_abs = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            press_abs = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            press_diff = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            press_diff = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
-            temperature = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            temperature = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 2 <= d.count {
-            temperature_press_diff = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            temperature_press_diff = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
     }
@@ -1171,9 +1171,9 @@ struct MsgScaledPressure: Sendable {
         o += 4
         do { let b = press_diff.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt16(truncatingIfNeeded: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: temperature_press_diff); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: temperature_press_diff); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         return p
     }
@@ -1203,27 +1203,27 @@ struct MsgAttitude: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            roll = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            roll = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitch = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            rollspeed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            rollspeed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitchspeed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitchspeed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yawspeed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yawspeed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
     }
@@ -1275,38 +1275,38 @@ struct MsgAttitudeQuaternion: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            q1 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            q1 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            q2 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            q2 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            q3 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            q3 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            q4 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            q4 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            rollspeed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            rollspeed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitchspeed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitchspeed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yawspeed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yawspeed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 16 <= d.count {
-            repr_offset_q = (0..<4).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            repr_offset_q = (0..<4).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 16
@@ -1363,27 +1363,27 @@ struct MsgLocalPositionNed: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vx = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vx = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vy = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vy = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vz = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vz = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
     }
@@ -1435,31 +1435,31 @@ struct MsgGlobalPositionInt: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lon = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lon = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            alt = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            alt = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            relative_alt = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            relative_alt = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 2 <= d.count {
-            vx = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            vx = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            vy = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            vy = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            vz = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            vz = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
@@ -1473,19 +1473,19 @@ struct MsgGlobalPositionInt: Sendable {
         var o = 0
         do { let v = UInt32(truncatingIfNeeded: time_boot_ms); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: relative_alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: relative_alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt16(truncatingIfNeeded: vx); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: vx); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: vy); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: vy); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: vz); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: vz); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         do { let v = UInt16(truncatingIfNeeded: hdg); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
@@ -1521,35 +1521,35 @@ struct MsgRcChannelsScaled: Sendable {
         }
         o += 4
         if o + 2 <= d.count {
-            chan1_scaled = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            chan1_scaled = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            chan2_scaled = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            chan2_scaled = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            chan3_scaled = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            chan3_scaled = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            chan4_scaled = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            chan4_scaled = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            chan5_scaled = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            chan5_scaled = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            chan6_scaled = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            chan6_scaled = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            chan7_scaled = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            chan7_scaled = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            chan8_scaled = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            chan8_scaled = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 1 <= d.count {
@@ -1567,21 +1567,21 @@ struct MsgRcChannelsScaled: Sendable {
         var o = 0
         do { let v = UInt32(truncatingIfNeeded: time_boot_ms); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt16(truncatingIfNeeded: chan1_scaled); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: chan1_scaled); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: chan2_scaled); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: chan2_scaled); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: chan3_scaled); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: chan3_scaled); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: chan4_scaled); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: chan4_scaled); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: chan5_scaled); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: chan5_scaled); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: chan6_scaled); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: chan6_scaled); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: chan7_scaled); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: chan7_scaled); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: chan8_scaled); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: chan8_scaled); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         p[o] = UInt8(truncatingIfNeeded: port)
         o += 1
@@ -1863,11 +1863,11 @@ struct MsgMissionRequestPartialList: Sendable {
         let d = payload
         var o = 0
         if o + 2 <= d.count {
-            start_index = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            start_index = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            end_index = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            end_index = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 1 <= d.count {
@@ -1889,9 +1889,9 @@ struct MsgMissionRequestPartialList: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 7)
         var o = 0
-        do { let v = UInt16(truncatingIfNeeded: start_index); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: start_index); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: end_index); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: end_index); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         p[o] = UInt8(truncatingIfNeeded: target_system)
         o += 1
@@ -1921,11 +1921,11 @@ struct MsgMissionWritePartialList: Sendable {
         let d = payload
         var o = 0
         if o + 2 <= d.count {
-            start_index = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            start_index = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            end_index = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            end_index = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 1 <= d.count {
@@ -1947,9 +1947,9 @@ struct MsgMissionWritePartialList: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 7)
         var o = 0
-        do { let v = UInt16(truncatingIfNeeded: start_index); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: start_index); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: end_index); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: end_index); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         p[o] = UInt8(truncatingIfNeeded: target_system)
         o += 1
@@ -1989,31 +1989,31 @@ struct MsgMissionItem: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            param1 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param1 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            param2 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param2 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            param3 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param3 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            param4 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param4 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -2471,15 +2471,15 @@ struct MsgSetGpsGlobalOrigin: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            latitude = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            latitude = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            longitude = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            longitude = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            altitude = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            altitude = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 1 <= d.count {
@@ -2489,7 +2489,7 @@ struct MsgSetGpsGlobalOrigin: Sendable {
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
     }
@@ -2497,11 +2497,11 @@ struct MsgSetGpsGlobalOrigin: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 21)
         var o = 0
-        do { let v = UInt32(truncatingIfNeeded: latitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: latitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: longitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: longitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: altitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: altitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         p[o] = UInt8(truncatingIfNeeded: target_system)
         o += 1
@@ -2528,21 +2528,21 @@ struct MsgGpsGlobalOrigin: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            latitude = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            latitude = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            longitude = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            longitude = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            altitude = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            altitude = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
     }
@@ -2550,11 +2550,11 @@ struct MsgGpsGlobalOrigin: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 20)
         var o = 0
-        do { let v = UInt32(truncatingIfNeeded: latitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: latitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: longitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: longitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: altitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: altitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let v = UInt64(truncatingIfNeeded: time_usec); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF); p[o+4] = UInt8((v >> 32) & 0xFF); p[o+5] = UInt8((v >> 40) & 0xFF); p[o+6] = UInt8((v >> 48) & 0xFF); p[o+7] = UInt8((v >> 56) & 0xFF) }
         o += 8
@@ -2584,23 +2584,23 @@ struct MsgParamMapRc: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            param_value0 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param_value0 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            scale = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            scale = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            param_value_min = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param_value_min = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            param_value_max = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param_value_max = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
-            param_index = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            param_index = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 1 <= d.count {
@@ -2632,7 +2632,7 @@ struct MsgParamMapRc: Sendable {
         o += 4
         do { let b = param_value_max.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt16(truncatingIfNeeded: param_index); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: param_index); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         p[o] = UInt8(truncatingIfNeeded: target_system)
         o += 1
@@ -2722,27 +2722,27 @@ struct MsgSafetySetAllowedArea: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            p1x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            p1x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            p1y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            p1y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            p1z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            p1z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            p2x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            p2x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            p2y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            p2y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            p2z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            p2z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -2804,27 +2804,27 @@ struct MsgSafetyAllowedArea: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            p1x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            p1x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            p1y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            p1y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            p1z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            p1z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            p2x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            p2x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            p2y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            p2y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            p2z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            p2z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -2873,30 +2873,30 @@ struct MsgAttitudeQuaternionCov: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 16 <= d.count {
-            q = (0..<4).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            q = (0..<4).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 16
         if o + 4 <= d.count {
-            rollspeed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            rollspeed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitchspeed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitchspeed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yawspeed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yawspeed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 36 <= d.count {
-            covariance = (0..<9).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            covariance = (0..<9).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 36
@@ -2946,31 +2946,31 @@ struct MsgNavControllerOutput: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            nav_roll = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            nav_roll = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            nav_pitch = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            nav_pitch = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            alt_error = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            alt_error = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            aspd_error = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            aspd_error = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            xtrack_error = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            xtrack_error = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
-            nav_bearing = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            nav_bearing = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            target_bearing = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            target_bearing = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
@@ -2992,9 +2992,9 @@ struct MsgNavControllerOutput: Sendable {
         o += 4
         do { let b = xtrack_error.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt16(truncatingIfNeeded: nav_bearing); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: nav_bearing); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: target_bearing); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: target_bearing); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         do { let v = UInt16(truncatingIfNeeded: wp_dist); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
@@ -3025,40 +3025,40 @@ struct MsgGlobalPositionIntCov: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lon = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lon = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            alt = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            alt = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            relative_alt = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            relative_alt = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            vx = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vx = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vy = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vy = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vz = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vz = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 144 <= d.count {
-            covariance = (0..<36).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            covariance = (0..<36).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 144
@@ -3073,13 +3073,13 @@ struct MsgGlobalPositionIntCov: Sendable {
         var o = 0
         do { let v = UInt64(truncatingIfNeeded: time_usec); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF); p[o+4] = UInt8((v >> 32) & 0xFF); p[o+5] = UInt8((v >> 40) & 0xFF); p[o+6] = UInt8((v >> 48) & 0xFF); p[o+7] = UInt8((v >> 56) & 0xFF) }
         o += 8
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: relative_alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: relative_alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let b = vx.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
@@ -3122,48 +3122,48 @@ struct MsgLocalPositionNedCov: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vx = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vx = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vy = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vy = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vz = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vz = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            ax = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            ax = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            ay = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            ay = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            az = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            az = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 180 <= d.count {
-            covariance = (0..<45).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            covariance = (0..<45).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 180
@@ -3501,19 +3501,19 @@ struct MsgManualControl: Sendable {
         let d = payload
         var o = 0
         if o + 2 <= d.count {
-            x = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            x = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            y = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            y = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            z = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            z = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            r = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            r = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
@@ -3537,42 +3537,42 @@ struct MsgManualControl: Sendable {
         o += 1
         guard o < d.count else { return }
         if o + 2 <= d.count {
-            s = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            s = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         guard o < d.count else { return }
         if o + 2 <= d.count {
-            t = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            t = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         guard o < d.count else { return }
         if o + 2 <= d.count {
-            aux1 = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            aux1 = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         guard o < d.count else { return }
         if o + 2 <= d.count {
-            aux2 = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            aux2 = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         guard o < d.count else { return }
         if o + 2 <= d.count {
-            aux3 = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            aux3 = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         guard o < d.count else { return }
         if o + 2 <= d.count {
-            aux4 = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            aux4 = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         guard o < d.count else { return }
         if o + 2 <= d.count {
-            aux5 = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            aux5 = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         guard o < d.count else { return }
         if o + 2 <= d.count {
-            aux6 = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            aux6 = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
     }
@@ -3580,13 +3580,13 @@ struct MsgManualControl: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 30)
         var o = 0
-        do { let v = UInt16(truncatingIfNeeded: x); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: x); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: y); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: y); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: z); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: z); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: r); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: r); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         do { let v = UInt16(truncatingIfNeeded: buttons); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
@@ -3596,21 +3596,21 @@ struct MsgManualControl: Sendable {
         o += 2
         p[o] = UInt8(truncatingIfNeeded: enabled_extensions)
         o += 1
-        do { let v = UInt16(truncatingIfNeeded: s); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: s); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: t); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: t); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: aux1); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: aux1); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: aux2); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: aux2); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: aux3); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: aux3); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: aux4); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: aux4); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: aux5); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: aux5); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: aux6); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: aux6); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         return p
     }
@@ -3816,31 +3816,31 @@ struct MsgMissionItemInt: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            param1 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param1 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            param2 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param2 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            param3 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param3 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            param4 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param4 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            x = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            x = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            y = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            y = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -3890,9 +3890,9 @@ struct MsgMissionItemInt: Sendable {
         o += 4
         do { let b = param4.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: x); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: x); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: y); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: y); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let b = z.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
@@ -3935,23 +3935,23 @@ struct MsgVfrHud: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            airspeed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            airspeed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            groundspeed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            groundspeed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            alt = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            alt = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            climb = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            climb = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
-            heading = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            heading = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
@@ -3971,7 +3971,7 @@ struct MsgVfrHud: Sendable {
         o += 4
         do { let b = climb.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt16(truncatingIfNeeded: heading); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: heading); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         do { let v = UInt16(truncatingIfNeeded: throttle); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
@@ -4005,31 +4005,31 @@ struct MsgCommandInt: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            param1 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param1 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            param2 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param2 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            param3 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param3 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            param4 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param4 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            x = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            x = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            y = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            y = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -4069,9 +4069,9 @@ struct MsgCommandInt: Sendable {
         o += 4
         do { let b = param4.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: x); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: x); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: y); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: y); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let b = z.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
@@ -4115,31 +4115,31 @@ struct MsgCommandLong: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            param1 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param1 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            param2 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param2 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            param3 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param3 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            param4 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param4 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            param5 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param5 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            param6 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param6 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            param7 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            param7 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -4223,7 +4223,7 @@ struct MsgCommandAck: Sendable {
         o += 1
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            result_param2 = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            result_param2 = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         guard o < d.count else { return }
@@ -4247,7 +4247,7 @@ struct MsgCommandAck: Sendable {
         o += 1
         p[o] = UInt8(truncatingIfNeeded: progress)
         o += 1
-        do { let v = UInt32(truncatingIfNeeded: result_param2); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: result_param2); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         p[o] = UInt8(truncatingIfNeeded: target_system)
         o += 1
@@ -4281,19 +4281,19 @@ struct MsgManualSetpoint: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            roll = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            roll = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitch = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            thrust = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            thrust = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -4353,25 +4353,25 @@ struct MsgSetAttitudeTarget: Sendable {
         }
         o += 4
         if o + 16 <= d.count {
-            q = (0..<4).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            q = (0..<4).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 16
         if o + 4 <= d.count {
-            body_roll_rate = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            body_roll_rate = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            body_pitch_rate = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            body_pitch_rate = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            body_yaw_rate = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            body_yaw_rate = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            thrust = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            thrust = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -4439,25 +4439,25 @@ struct MsgAttitudeTarget: Sendable {
         }
         o += 4
         if o + 16 <= d.count {
-            q = (0..<4).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            q = (0..<4).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 16
         if o + 4 <= d.count {
-            body_roll_rate = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            body_roll_rate = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            body_pitch_rate = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            body_pitch_rate = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            body_yaw_rate = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            body_yaw_rate = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            thrust = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            thrust = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -4522,47 +4522,47 @@ struct MsgSetPositionTargetLocalNed: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vx = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vx = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vy = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vy = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vz = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vz = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            afx = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            afx = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            afy = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            afy = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            afz = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            afz = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw_rate = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw_rate = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -4653,47 +4653,47 @@ struct MsgPositionTargetLocalNed: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vx = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vx = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vy = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vy = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vz = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vz = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            afx = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            afx = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            afy = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            afy = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            afz = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            afz = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw_rate = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw_rate = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -4774,47 +4774,47 @@ struct MsgSetPositionTargetGlobalInt: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            lat_int = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat_int = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lon_int = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lon_int = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            alt = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            alt = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vx = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vx = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vy = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vy = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vz = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vz = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            afx = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            afx = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            afy = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            afy = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            afz = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            afz = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw_rate = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw_rate = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -4840,9 +4840,9 @@ struct MsgSetPositionTargetGlobalInt: Sendable {
         var o = 0
         do { let v = UInt32(truncatingIfNeeded: time_boot_ms); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lat_int); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat_int); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lon_int); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lon_int); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let b = alt.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
@@ -4905,47 +4905,47 @@ struct MsgPositionTargetGlobalInt: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            lat_int = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat_int = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lon_int = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lon_int = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            alt = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            alt = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vx = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vx = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vy = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vy = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vz = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vz = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            afx = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            afx = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            afy = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            afy = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            afz = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            afz = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw_rate = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw_rate = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -4963,9 +4963,9 @@ struct MsgPositionTargetGlobalInt: Sendable {
         var o = 0
         do { let v = UInt32(truncatingIfNeeded: time_boot_ms); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lat_int); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat_int); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lon_int); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lon_int); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let b = alt.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
@@ -5017,27 +5017,27 @@ struct MsgLocalPositionNedSystemGlobalOffset: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            roll = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            roll = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitch = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
     }
@@ -5092,67 +5092,67 @@ struct MsgHilState: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            roll = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            roll = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitch = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            rollspeed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            rollspeed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitchspeed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitchspeed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yawspeed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yawspeed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lon = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lon = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            alt = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            alt = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 2 <= d.count {
-            vx = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            vx = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            vy = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            vy = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            vz = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            vz = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            xacc = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            xacc = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            yacc = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            yacc = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            zacc = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            zacc = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
     }
@@ -5174,23 +5174,23 @@ struct MsgHilState: Sendable {
         o += 4
         do { let b = yawspeed.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt16(truncatingIfNeeded: vx); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: vx); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: vy); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: vy); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: vz); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: vz); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: xacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: xacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: yacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: yacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: zacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: zacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         return p
     }
@@ -5220,39 +5220,39 @@ struct MsgHilControls: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            roll_ailerons = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            roll_ailerons = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitch_elevator = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch_elevator = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw_rudder = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw_rudder = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            throttle = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            throttle = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            aux1 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            aux1 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            aux2 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            aux2 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            aux3 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            aux3 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            aux4 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            aux4 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -5321,7 +5321,7 @@ struct MsgHilRcInputsRaw: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 2 <= d.count {
@@ -5430,16 +5430,16 @@ struct MsgHilActuatorControls: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 8 <= d.count {
-            flags = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            flags = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 64 <= d.count {
-            controls = (0..<16).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            controls = (0..<16).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 64
@@ -5489,27 +5489,27 @@ struct MsgOpticalFlow: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            flow_comp_m_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            flow_comp_m_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            flow_comp_m_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            flow_comp_m_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            ground_distance = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            ground_distance = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
-            flow_x = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            flow_x = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            flow_y = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            flow_y = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 1 <= d.count {
@@ -5523,12 +5523,12 @@ struct MsgOpticalFlow: Sendable {
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            flow_rate_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            flow_rate_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            flow_rate_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            flow_rate_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
     }
@@ -5544,9 +5544,9 @@ struct MsgOpticalFlow: Sendable {
         o += 4
         do { let b = ground_distance.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt16(truncatingIfNeeded: flow_x); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: flow_x); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: flow_y); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: flow_y); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         p[o] = UInt8(truncatingIfNeeded: sensor_id)
         o += 1
@@ -5582,38 +5582,38 @@ struct MsgGlobalVisionPositionEstimate: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            roll = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            roll = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitch = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 84 <= d.count {
-            covariance = (0..<21).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            covariance = (0..<21).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 84
@@ -5673,38 +5673,38 @@ struct MsgVisionPositionEstimate: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            roll = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            roll = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitch = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 84 <= d.count {
-            covariance = (0..<21).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            covariance = (0..<21).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 84
@@ -5761,26 +5761,26 @@ struct MsgVisionSpeedEstimate: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 36 <= d.count {
-            covariance = (0..<9).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            covariance = (0..<9).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 36
@@ -5833,38 +5833,38 @@ struct MsgViconPositionEstimate: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            roll = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            roll = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitch = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 84 <= d.count {
-            covariance = (0..<21).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            covariance = (0..<21).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 84
@@ -5924,59 +5924,59 @@ struct MsgHighresImu: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            xacc = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            xacc = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yacc = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yacc = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            zacc = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            zacc = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            xgyro = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            xgyro = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            ygyro = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            ygyro = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            zgyro = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            zgyro = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            xmag = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            xmag = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            ymag = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            ymag = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            zmag = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            zmag = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            abs_pressure = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            abs_pressure = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            diff_pressure = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            diff_pressure = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pressure_alt = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pressure_alt = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            temperature = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            temperature = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -6055,7 +6055,7 @@ struct MsgOpticalFlowRad: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
@@ -6063,23 +6063,23 @@ struct MsgOpticalFlowRad: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            integrated_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            integrated_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            integrated_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            integrated_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            integrated_xgyro = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            integrated_xgyro = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            integrated_ygyro = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            integrated_ygyro = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            integrated_zgyro = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            integrated_zgyro = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
@@ -6087,11 +6087,11 @@ struct MsgOpticalFlowRad: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            distance = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            distance = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
-            temperature = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            temperature = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 1 <= d.count {
@@ -6125,7 +6125,7 @@ struct MsgOpticalFlowRad: Sendable {
         o += 4
         do { let b = distance.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt16(truncatingIfNeeded: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         p[o] = UInt8(truncatingIfNeeded: sensor_id)
         o += 1
@@ -6164,59 +6164,59 @@ struct MsgHilSensor: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            xacc = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            xacc = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yacc = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yacc = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            zacc = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            zacc = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            xgyro = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            xgyro = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            ygyro = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            ygyro = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            zgyro = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            zgyro = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            xmag = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            xmag = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            ymag = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            ymag = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            zmag = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            zmag = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            abs_pressure = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            abs_pressure = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            diff_pressure = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            diff_pressure = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pressure_alt = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pressure_alt = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            temperature = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            temperature = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
@@ -6306,98 +6306,98 @@ struct MsgSimState: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            q1 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            q1 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            q2 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            q2 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            q3 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            q3 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            q4 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            q4 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            roll = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            roll = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitch = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            xacc = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            xacc = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yacc = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yacc = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            zacc = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            zacc = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            xgyro = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            xgyro = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            ygyro = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            ygyro = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            zgyro = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            zgyro = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            lat = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            lat = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            lon = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            lon = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            alt = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            alt = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            std_dev_horz = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            std_dev_horz = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            std_dev_vert = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            std_dev_vert = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vn = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vn = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            ve = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            ve = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vd = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vd = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            lat_int = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat_int = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            lon_int = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lon_int = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
     }
@@ -6447,9 +6447,9 @@ struct MsgSimState: Sendable {
         o += 4
         do { let b = vd.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lat_int); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat_int); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lon_int); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lon_int); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         return p
     }
@@ -6538,8 +6538,8 @@ struct MsgFileTransferProtocol: Sendable {
 
     init() {}
 
-    init(from payload: Data) {
-        let d = payload
+    init(from _data: Data) {
+        let d = _data
         var o = 0
         if o + 1 <= d.count {
             target_network = d[d.startIndex+o]
@@ -6554,7 +6554,7 @@ struct MsgFileTransferProtocol: Sendable {
         }
         o += 1
         if o + 251 <= d.count {
-            payload = (0..<251).map { i in
+            payload = (0..<251).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -6593,11 +6593,11 @@ struct MsgTimesync: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            tc1 = Int64(d[d.startIndex+o]) | Int64(d[d.startIndex+o+1]) << 8 | Int64(d[d.startIndex+o+2]) << 16 | Int64(d[d.startIndex+o+3]) << 24 | Int64(d[d.startIndex+o+4]) << 32 | Int64(d[d.startIndex+o+5]) << 40 | Int64(d[d.startIndex+o+6]) << 48 | Int64(d[d.startIndex+o+7]) << 56
+            tc1 = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return Int64(bitPattern: lo | hi) }()
         }
         o += 8
         if o + 8 <= d.count {
-            ts1 = Int64(d[d.startIndex+o]) | Int64(d[d.startIndex+o+1]) << 8 | Int64(d[d.startIndex+o+2]) << 16 | Int64(d[d.startIndex+o+3]) << 24 | Int64(d[d.startIndex+o+4]) << 32 | Int64(d[d.startIndex+o+5]) << 40 | Int64(d[d.startIndex+o+6]) << 48 | Int64(d[d.startIndex+o+7]) << 56
+            ts1 = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return Int64(bitPattern: lo | hi) }()
         }
         o += 8
     }
@@ -6605,9 +6605,9 @@ struct MsgTimesync: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 16)
         var o = 0
-        do { let v = UInt64(truncatingIfNeeded: tc1); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF); p[o+4] = UInt8((v >> 32) & 0xFF); p[o+5] = UInt8((v >> 40) & 0xFF); p[o+6] = UInt8((v >> 48) & 0xFF); p[o+7] = UInt8((v >> 56) & 0xFF) }
+        do { let v = UInt64(bitPattern: tc1); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF); p[o+4] = UInt8((v >> 32) & 0xFF); p[o+5] = UInt8((v >> 40) & 0xFF); p[o+6] = UInt8((v >> 48) & 0xFF); p[o+7] = UInt8((v >> 56) & 0xFF) }
         o += 8
-        do { let v = UInt64(truncatingIfNeeded: ts1); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF); p[o+4] = UInt8((v >> 32) & 0xFF); p[o+5] = UInt8((v >> 40) & 0xFF); p[o+6] = UInt8((v >> 48) & 0xFF); p[o+7] = UInt8((v >> 56) & 0xFF) }
+        do { let v = UInt64(bitPattern: ts1); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF); p[o+4] = UInt8((v >> 32) & 0xFF); p[o+5] = UInt8((v >> 40) & 0xFF); p[o+6] = UInt8((v >> 48) & 0xFF); p[o+7] = UInt8((v >> 56) & 0xFF) }
         o += 8
         return p
     }
@@ -6628,7 +6628,7 @@ struct MsgCameraTrigger: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
@@ -6676,19 +6676,19 @@ struct MsgHilGps: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lon = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lon = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            alt = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            alt = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 2 <= d.count {
@@ -6704,15 +6704,15 @@ struct MsgHilGps: Sendable {
         }
         o += 2
         if o + 2 <= d.count {
-            vn = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            vn = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            ve = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            ve = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            vd = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            vd = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
@@ -6745,11 +6745,11 @@ struct MsgHilGps: Sendable {
         var o = 0
         do { let v = UInt64(truncatingIfNeeded: time_usec); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF); p[o+4] = UInt8((v >> 32) & 0xFF); p[o+5] = UInt8((v >> 40) & 0xFF); p[o+6] = UInt8((v >> 48) & 0xFF); p[o+7] = UInt8((v >> 56) & 0xFF) }
         o += 8
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let v = UInt16(truncatingIfNeeded: eph); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
@@ -6757,11 +6757,11 @@ struct MsgHilGps: Sendable {
         o += 2
         do { let v = UInt16(truncatingIfNeeded: vel); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: vn); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: vn); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: ve); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: ve); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: vd); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: vd); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         do { let v = UInt16(truncatingIfNeeded: cog); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
@@ -6802,7 +6802,7 @@ struct MsgHilOpticalFlow: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
@@ -6810,23 +6810,23 @@ struct MsgHilOpticalFlow: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            integrated_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            integrated_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            integrated_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            integrated_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            integrated_xgyro = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            integrated_xgyro = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            integrated_ygyro = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            integrated_ygyro = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            integrated_zgyro = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            integrated_zgyro = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
@@ -6834,11 +6834,11 @@ struct MsgHilOpticalFlow: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            distance = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            distance = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
-            temperature = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            temperature = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 1 <= d.count {
@@ -6872,7 +6872,7 @@ struct MsgHilOpticalFlow: Sendable {
         o += 4
         do { let b = distance.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt16(truncatingIfNeeded: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         p[o] = UInt8(truncatingIfNeeded: sensor_id)
         o += 1
@@ -6911,49 +6911,49 @@ struct MsgHilStateQuaternion: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 16 <= d.count {
-            attitude_quaternion = (0..<4).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            attitude_quaternion = (0..<4).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 16
         if o + 4 <= d.count {
-            rollspeed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            rollspeed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitchspeed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitchspeed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yawspeed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yawspeed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lon = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lon = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            alt = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            alt = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 2 <= d.count {
-            vx = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            vx = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            vy = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            vy = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            vz = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            vz = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
@@ -6965,15 +6965,15 @@ struct MsgHilStateQuaternion: Sendable {
         }
         o += 2
         if o + 2 <= d.count {
-            xacc = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            xacc = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            yacc = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            yacc = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            zacc = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            zacc = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
     }
@@ -6993,27 +6993,27 @@ struct MsgHilStateQuaternion: Sendable {
         o += 4
         do { let b = yawspeed.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt16(truncatingIfNeeded: vx); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: vx); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: vy); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: vy); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: vz); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: vz); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         do { let v = UInt16(truncatingIfNeeded: ind_airspeed); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         do { let v = UInt16(truncatingIfNeeded: true_airspeed); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: xacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: xacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: yacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: yacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: zacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: zacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         return p
     }
@@ -7047,45 +7047,45 @@ struct MsgScaledImu2: Sendable {
         }
         o += 4
         if o + 2 <= d.count {
-            xacc = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            xacc = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            yacc = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            yacc = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            zacc = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            zacc = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            xgyro = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            xgyro = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            ygyro = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            ygyro = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            zgyro = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            zgyro = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            xmag = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            xmag = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            ymag = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            ymag = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            zmag = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            zmag = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 2 <= d.count {
-            temperature = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            temperature = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
     }
@@ -7095,25 +7095,25 @@ struct MsgScaledImu2: Sendable {
         var o = 0
         do { let v = UInt32(truncatingIfNeeded: time_boot_ms); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt16(truncatingIfNeeded: xacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: xacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: yacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: yacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: zacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: zacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: xgyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: xgyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: ygyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: ygyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: zgyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: zgyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: xmag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: xmag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: ymag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: ymag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: zmag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: zmag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         return p
     }
@@ -7309,7 +7309,7 @@ struct MsgLogData: Sendable {
         }
         o += 1
         if o + 90 <= d.count {
-            data = (0..<90).map { i in
+            data = (0..<90).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -7432,7 +7432,7 @@ struct MsgGpsInjectData: Sendable {
         }
         o += 1
         if o + 110 <= d.count {
-            data = (0..<110).map { i in
+            data = (0..<110).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -7487,19 +7487,19 @@ struct MsgGps2Raw: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lon = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lon = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            alt = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            alt = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
@@ -7542,7 +7542,7 @@ struct MsgGps2Raw: Sendable {
         o += 2
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            alt_ellipsoid = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            alt_ellipsoid = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         guard o < d.count else { return }
@@ -7572,11 +7572,11 @@ struct MsgGps2Raw: Sendable {
         var o = 0
         do { let v = UInt64(truncatingIfNeeded: time_usec); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF); p[o+4] = UInt8((v >> 32) & 0xFF); p[o+5] = UInt8((v >> 40) & 0xFF); p[o+6] = UInt8((v >> 48) & 0xFF); p[o+7] = UInt8((v >> 56) & 0xFF) }
         o += 8
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let v = UInt32(truncatingIfNeeded: dgps_age); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
@@ -7596,7 +7596,7 @@ struct MsgGps2Raw: Sendable {
         o += 1
         do { let v = UInt16(truncatingIfNeeded: yaw); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt32(truncatingIfNeeded: alt_ellipsoid); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: alt_ellipsoid); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let v = UInt32(truncatingIfNeeded: h_acc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
@@ -7691,7 +7691,7 @@ struct MsgSerialControl: Sendable {
         }
         o += 1
         if o + 70 <= d.count {
-            data = (0..<70).map { i in
+            data = (0..<70).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -7753,15 +7753,15 @@ struct MsgGpsRtk: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            baseline_a_mm = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            baseline_a_mm = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            baseline_b_mm = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            baseline_b_mm = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            baseline_c_mm = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            baseline_c_mm = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
@@ -7769,7 +7769,7 @@ struct MsgGpsRtk: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            iar_num_hypotheses = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            iar_num_hypotheses = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 2 <= d.count {
@@ -7805,15 +7805,15 @@ struct MsgGpsRtk: Sendable {
         o += 4
         do { let v = UInt32(truncatingIfNeeded: tow); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: baseline_a_mm); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: baseline_a_mm); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: baseline_b_mm); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: baseline_b_mm); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: baseline_c_mm); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: baseline_c_mm); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let v = UInt32(truncatingIfNeeded: accuracy); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: iar_num_hypotheses); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: iar_num_hypotheses); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let v = UInt16(truncatingIfNeeded: wn); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
@@ -7865,15 +7865,15 @@ struct MsgGps2Rtk: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            baseline_a_mm = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            baseline_a_mm = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            baseline_b_mm = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            baseline_b_mm = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            baseline_c_mm = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            baseline_c_mm = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
@@ -7881,7 +7881,7 @@ struct MsgGps2Rtk: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            iar_num_hypotheses = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            iar_num_hypotheses = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 2 <= d.count {
@@ -7917,15 +7917,15 @@ struct MsgGps2Rtk: Sendable {
         o += 4
         do { let v = UInt32(truncatingIfNeeded: tow); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: baseline_a_mm); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: baseline_a_mm); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: baseline_b_mm); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: baseline_b_mm); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: baseline_c_mm); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: baseline_c_mm); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let v = UInt32(truncatingIfNeeded: accuracy); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: iar_num_hypotheses); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: iar_num_hypotheses); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let v = UInt16(truncatingIfNeeded: wn); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
@@ -7971,45 +7971,45 @@ struct MsgScaledImu3: Sendable {
         }
         o += 4
         if o + 2 <= d.count {
-            xacc = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            xacc = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            yacc = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            yacc = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            zacc = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            zacc = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            xgyro = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            xgyro = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            ygyro = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            ygyro = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            zgyro = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            zgyro = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            xmag = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            xmag = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            ymag = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            ymag = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            zmag = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            zmag = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 2 <= d.count {
-            temperature = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            temperature = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
     }
@@ -8019,25 +8019,25 @@ struct MsgScaledImu3: Sendable {
         var o = 0
         do { let v = UInt32(truncatingIfNeeded: time_boot_ms); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt16(truncatingIfNeeded: xacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: xacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: yacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: yacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: zacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: zacc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: xgyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: xgyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: ygyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: ygyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: zgyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: zgyro); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: xmag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: xmag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: ymag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: ymag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: zmag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: zmag); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         return p
     }
@@ -8059,8 +8059,8 @@ struct MsgDataTransmissionHandshake: Sendable {
 
     init() {}
 
-    init(from payload: Data) {
-        let d = payload
+    init(from _data: Data) {
+        let d = _data
         var o = 0
         if o + 4 <= d.count {
             size = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24
@@ -8132,7 +8132,7 @@ struct MsgEncapsulatedData: Sendable {
         }
         o += 2
         if o + 253 <= d.count {
-            data = (0..<253).map { i in
+            data = (0..<253).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -8211,18 +8211,18 @@ struct MsgDistanceSensor: Sendable {
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            horizontal_fov = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            horizontal_fov = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            vertical_fov = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vertical_fov = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         guard o < d.count else { return }
         if o + 16 <= d.count {
-            quaternion = (0..<4).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            quaternion = (0..<4).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 16
@@ -8283,15 +8283,15 @@ struct MsgTerrainRequest: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            mask = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            mask = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lon = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lon = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 2 <= d.count {
@@ -8305,9 +8305,9 @@ struct MsgTerrainRequest: Sendable {
         var o = 0
         do { let v = UInt64(truncatingIfNeeded: mask); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF); p[o+4] = UInt8((v >> 32) & 0xFF); p[o+5] = UInt8((v >> 40) & 0xFF); p[o+6] = UInt8((v >> 48) & 0xFF); p[o+7] = UInt8((v >> 56) & 0xFF) }
         o += 8
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let v = UInt16(truncatingIfNeeded: grid_spacing); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
@@ -8333,11 +8333,11 @@ struct MsgTerrainData: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lon = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lon = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 2 <= d.count {
@@ -8345,8 +8345,8 @@ struct MsgTerrainData: Sendable {
         }
         o += 2
         if o + 32 <= d.count {
-            data = (0..<16).map { i in
-                return Int16(d[d.startIndex+o+i*2]) | Int16(d[d.startIndex+o+i*2+1]) << 8
+            data = (0..<16).map { (i: Int) -> Int16 in
+                return Int16(bitPattern: UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8)
             }
         }
         o += 32
@@ -8359,14 +8359,14 @@ struct MsgTerrainData: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 43)
         var o = 0
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let v = UInt16(truncatingIfNeeded: grid_spacing); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         for i in 0..<16 {
-        do { let v = UInt16(truncatingIfNeeded: data[i]); p[o+i*2] = UInt8(v & 0xFF); p[o+i*2+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: data[i]); p[o+i*2] = UInt8(v & 0xFF); p[o+i*2+1] = UInt8((v >> 8) & 0xFF) }
         }
         o += 32
         p[o] = UInt8(truncatingIfNeeded: gridbit)
@@ -8390,11 +8390,11 @@ struct MsgTerrainCheck: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lon = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lon = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
     }
@@ -8402,9 +8402,9 @@ struct MsgTerrainCheck: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 8)
         var o = 0
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         return p
     }
@@ -8430,19 +8430,19 @@ struct MsgTerrainReport: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lon = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lon = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            terrain_height = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            terrain_height = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            current_height = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            current_height = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -8462,9 +8462,9 @@ struct MsgTerrainReport: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 22)
         var o = 0
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let b = terrain_height.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
@@ -8502,21 +8502,21 @@ struct MsgScaledPressure2: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            press_abs = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            press_abs = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            press_diff = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            press_diff = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
-            temperature = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            temperature = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 2 <= d.count {
-            temperature_press_diff = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            temperature_press_diff = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
     }
@@ -8530,9 +8530,9 @@ struct MsgScaledPressure2: Sendable {
         o += 4
         do { let b = press_diff.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt16(truncatingIfNeeded: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: temperature_press_diff); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: temperature_press_diff); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         return p
     }
@@ -8557,32 +8557,32 @@ struct MsgAttPosMocap: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 16 <= d.count {
-            q = (0..<4).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            q = (0..<4).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 16
         if o + 4 <= d.count {
-            x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 84 <= d.count {
-            covariance = (0..<21).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            covariance = (0..<21).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 84
@@ -8629,12 +8629,12 @@ struct MsgSetActuatorControlTarget: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 32 <= d.count {
-            controls = (0..<8).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            controls = (0..<8).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 32
@@ -8687,12 +8687,12 @@ struct MsgActuatorControlTarget: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 32 <= d.count {
-            controls = (0..<8).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            controls = (0..<8).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 32
@@ -8737,31 +8737,31 @@ struct MsgAltitude: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            altitude_monotonic = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            altitude_monotonic = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            altitude_amsl = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            altitude_amsl = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            altitude_local = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            altitude_local = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            altitude_relative = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            altitude_relative = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            altitude_terrain = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            altitude_terrain = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            bottom_clearance = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            bottom_clearance = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
     }
@@ -8813,7 +8813,7 @@ struct MsgResourceRequest: Sendable {
         }
         o += 1
         if o + 120 <= d.count {
-            uri = (0..<120).map { i in
+            uri = (0..<120).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -8823,7 +8823,7 @@ struct MsgResourceRequest: Sendable {
         }
         o += 1
         if o + 120 <= d.count {
-            storage = (0..<120).map { i in
+            storage = (0..<120).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -8873,21 +8873,21 @@ struct MsgScaledPressure3: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            press_abs = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            press_abs = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            press_diff = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            press_diff = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
-            temperature = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            temperature = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 2 <= d.count {
-            temperature_press_diff = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            temperature_press_diff = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
     }
@@ -8901,9 +8901,9 @@ struct MsgScaledPressure3: Sendable {
         o += 4
         do { let b = press_diff.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt16(truncatingIfNeeded: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: temperature_press_diff); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: temperature_press_diff); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         return p
     }
@@ -8933,52 +8933,52 @@ struct MsgFollowTarget: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            timestamp = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            timestamp = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 8 <= d.count {
-            custom_state = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            custom_state = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lon = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lon = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            alt = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            alt = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 12 <= d.count {
-            vel = (0..<3).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            vel = (0..<3).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 12
         if o + 12 <= d.count {
-            acc = (0..<3).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            acc = (0..<3).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 12
         if o + 16 <= d.count {
-            attitude_q = (0..<4).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            attitude_q = (0..<4).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 16
         if o + 12 <= d.count {
-            rates = (0..<3).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            rates = (0..<3).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 12
         if o + 12 <= d.count {
-            position_cov = (0..<3).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            position_cov = (0..<3).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 12
@@ -8995,9 +8995,9 @@ struct MsgFollowTarget: Sendable {
         o += 8
         do { let v = UInt64(truncatingIfNeeded: custom_state); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF); p[o+4] = UInt8((v >> 32) & 0xFF); p[o+5] = UInt8((v >> 40) & 0xFF); p[o+6] = UInt8((v >> 48) & 0xFF); p[o+7] = UInt8((v >> 56) & 0xFF) }
         o += 8
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let b = alt.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
@@ -9057,77 +9057,77 @@ struct MsgControlSystemState: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            x_acc = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            x_acc = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            y_acc = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            y_acc = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            z_acc = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            z_acc = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            x_vel = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            x_vel = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            y_vel = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            y_vel = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            z_vel = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            z_vel = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            x_pos = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            x_pos = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            y_pos = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            y_pos = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            z_pos = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            z_pos = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            airspeed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            airspeed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 12 <= d.count {
-            vel_variance = (0..<3).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            vel_variance = (0..<3).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 12
         if o + 12 <= d.count {
-            pos_variance = (0..<3).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            pos_variance = (0..<3).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 12
         if o + 16 <= d.count {
-            q = (0..<4).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            q = (0..<4).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 16
         if o + 4 <= d.count {
-            roll_rate = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            roll_rate = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitch_rate = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch_rate = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw_rate = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw_rate = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
     }
@@ -9206,25 +9206,25 @@ struct MsgBatteryStatus: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            current_consumed = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            current_consumed = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            energy_consumed = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            energy_consumed = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 2 <= d.count {
-            temperature = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            temperature = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 20 <= d.count {
-            voltages = (0..<10).map { i in
+            voltages = (0..<10).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 20
         if o + 2 <= d.count {
-            current_battery = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            current_battery = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 1 <= d.count {
@@ -9240,13 +9240,13 @@ struct MsgBatteryStatus: Sendable {
         }
         o += 1
         if o + 1 <= d.count {
-            battery_remaining = d[d.startIndex+o]
+            battery_remaining = Int8(bitPattern: d[d.startIndex+o])
         }
         o += 1
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            time_remaining = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            time_remaining = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         guard o < d.count else { return }
@@ -9256,7 +9256,7 @@ struct MsgBatteryStatus: Sendable {
         o += 1
         guard o < d.count else { return }
         if o + 8 <= d.count {
-            voltages_ext = (0..<4).map { i in
+            voltages_ext = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
@@ -9276,17 +9276,17 @@ struct MsgBatteryStatus: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 54)
         var o = 0
-        do { let v = UInt32(truncatingIfNeeded: current_consumed); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: current_consumed); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: energy_consumed); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: energy_consumed); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt16(truncatingIfNeeded: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         for i in 0..<10 {
         do { let v = UInt16(truncatingIfNeeded: voltages[i]); p[o+i*2] = UInt8(v & 0xFF); p[o+i*2+1] = UInt8((v >> 8) & 0xFF) }
         }
         o += 20
-        do { let v = UInt16(truncatingIfNeeded: current_battery); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: current_battery); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         p[o] = UInt8(truncatingIfNeeded: id)
         o += 1
@@ -9294,9 +9294,9 @@ struct MsgBatteryStatus: Sendable {
         o += 1
         p[o] = UInt8(truncatingIfNeeded: type)
         o += 1
-        p[o] = UInt8(truncatingIfNeeded: battery_remaining)
+        p[o] = UInt8(bitPattern: battery_remaining)
         o += 1
-        do { let v = UInt32(truncatingIfNeeded: time_remaining); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: time_remaining); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         p[o] = UInt8(truncatingIfNeeded: charge_state)
         o += 1
@@ -9337,11 +9337,11 @@ struct MsgAutopilotVersion: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            capabilities = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            capabilities = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 8 <= d.count {
-            uid = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            uid = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
@@ -9369,19 +9369,19 @@ struct MsgAutopilotVersion: Sendable {
         }
         o += 2
         if o + 8 <= d.count {
-            flight_custom_version = (0..<8).map { i in
+            flight_custom_version = (0..<8).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
         o += 8
         if o + 8 <= d.count {
-            middleware_custom_version = (0..<8).map { i in
+            middleware_custom_version = (0..<8).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
         o += 8
         if o + 8 <= d.count {
-            os_custom_version = (0..<8).map { i in
+            os_custom_version = (0..<8).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -9389,7 +9389,7 @@ struct MsgAutopilotVersion: Sendable {
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 18 <= d.count {
-            uid2 = (0..<18).map { i in
+            uid2 = (0..<18).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -9462,27 +9462,27 @@ struct MsgLandingTarget: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            angle_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            angle_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            angle_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            angle_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            distance = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            distance = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            size_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            size_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            size_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            size_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -9496,23 +9496,23 @@ struct MsgLandingTarget: Sendable {
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         guard o < d.count else { return }
         if o + 16 <= d.count {
-            q = (0..<4).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            q = (0..<4).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 16
@@ -9590,51 +9590,51 @@ struct MsgSensorOffsets: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            mag_declination = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            mag_declination = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            raw_press = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            raw_press = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            raw_temp = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            raw_temp = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            gyro_cal_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            gyro_cal_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            gyro_cal_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            gyro_cal_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            gyro_cal_z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            gyro_cal_z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            accel_cal_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            accel_cal_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            accel_cal_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            accel_cal_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            accel_cal_z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            accel_cal_z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
-            mag_ofs_x = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            mag_ofs_x = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            mag_ofs_y = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            mag_ofs_y = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            mag_ofs_z = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            mag_ofs_z = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
     }
@@ -9644,9 +9644,9 @@ struct MsgSensorOffsets: Sendable {
         var o = 0
         do { let b = mag_declination.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: raw_press); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: raw_press); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: raw_temp); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: raw_temp); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let b = gyro_cal_x.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
@@ -9660,11 +9660,11 @@ struct MsgSensorOffsets: Sendable {
         o += 4
         do { let b = accel_cal_z.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt16(truncatingIfNeeded: mag_ofs_x); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: mag_ofs_x); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: mag_ofs_y); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: mag_ofs_y); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: mag_ofs_z); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: mag_ofs_z); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         return p
     }
@@ -9688,15 +9688,15 @@ struct MsgSetMagOffsets: Sendable {
         let d = payload
         var o = 0
         if o + 2 <= d.count {
-            mag_ofs_x = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            mag_ofs_x = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            mag_ofs_y = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            mag_ofs_y = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            mag_ofs_z = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            mag_ofs_z = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 1 <= d.count {
@@ -9712,11 +9712,11 @@ struct MsgSetMagOffsets: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 8)
         var o = 0
-        do { let v = UInt16(truncatingIfNeeded: mag_ofs_x); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: mag_ofs_x); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: mag_ofs_y); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: mag_ofs_y); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: mag_ofs_z); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: mag_ofs_z); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         p[o] = UInt8(truncatingIfNeeded: target_system)
         o += 1
@@ -9857,7 +9857,7 @@ struct MsgDigicamConfigure: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            extra_value = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            extra_value = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -9954,7 +9954,7 @@ struct MsgDigicamControl: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            extra_value = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            extra_value = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -9974,7 +9974,7 @@ struct MsgDigicamControl: Sendable {
         }
         o += 1
         if o + 1 <= d.count {
-            zoom_step = d[d.startIndex+o]
+            zoom_step = Int8(bitPattern: d[d.startIndex+o])
         }
         o += 1
         if o + 1 <= d.count {
@@ -10008,7 +10008,7 @@ struct MsgDigicamControl: Sendable {
         o += 1
         p[o] = UInt8(truncatingIfNeeded: zoom_pos)
         o += 1
-        p[o] = UInt8(truncatingIfNeeded: zoom_step)
+        p[o] = UInt8(bitPattern: zoom_step)
         o += 1
         p[o] = UInt8(truncatingIfNeeded: focus_lock)
         o += 1
@@ -10104,15 +10104,15 @@ struct MsgMountControl: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            input_a = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            input_a = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            input_b = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            input_b = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            input_c = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            input_c = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 1 <= d.count {
@@ -10132,11 +10132,11 @@ struct MsgMountControl: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 15)
         var o = 0
-        do { let v = UInt32(truncatingIfNeeded: input_a); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: input_a); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: input_b); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: input_b); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: input_c); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: input_c); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         p[o] = UInt8(truncatingIfNeeded: target_system)
         o += 1
@@ -10167,15 +10167,15 @@ struct MsgMountStatus: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            pointing_a = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            pointing_a = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            pointing_b = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            pointing_b = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            pointing_c = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            pointing_c = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 1 <= d.count {
@@ -10197,11 +10197,11 @@ struct MsgMountStatus: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 15)
         var o = 0
-        do { let v = UInt32(truncatingIfNeeded: pointing_a); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: pointing_a); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: pointing_b); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: pointing_b); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: pointing_c); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: pointing_c); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         p[o] = UInt8(truncatingIfNeeded: target_system)
         o += 1
@@ -10232,11 +10232,11 @@ struct MsgFencePoint: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            lat = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            lat = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            lng = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            lng = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -10396,31 +10396,31 @@ struct MsgAhrs: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            omegaIx = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            omegaIx = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            omegaIy = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            omegaIy = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            omegaIz = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            omegaIz = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            accel_weight = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            accel_weight = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            renorm_val = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            renorm_val = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            error_rp = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            error_rp = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            error_yaw = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            error_yaw = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
     }
@@ -10470,47 +10470,47 @@ struct MsgSimstate: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            roll = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            roll = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitch = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            xacc = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            xacc = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yacc = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yacc = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            zacc = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            zacc = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            xgyro = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            xgyro = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            ygyro = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            ygyro = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            zgyro = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            zgyro = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lng = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lng = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
     }
@@ -10536,9 +10536,9 @@ struct MsgSimstate: Sendable {
         o += 4
         do { let b = zgyro.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lng); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lng); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         return p
     }
@@ -10749,15 +10749,15 @@ struct MsgWind: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            direction = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            direction = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            speed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            speed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            speed_z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            speed_z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
     }
@@ -10799,7 +10799,7 @@ struct MsgData16: Sendable {
         }
         o += 1
         if o + 16 <= d.count {
-            data = (0..<16).map { i in
+            data = (0..<16).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -10845,7 +10845,7 @@ struct MsgData32: Sendable {
         }
         o += 1
         if o + 32 <= d.count {
-            data = (0..<32).map { i in
+            data = (0..<32).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -10891,7 +10891,7 @@ struct MsgData64: Sendable {
         }
         o += 1
         if o + 64 <= d.count {
-            data = (0..<64).map { i in
+            data = (0..<64).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -10937,7 +10937,7 @@ struct MsgData96: Sendable {
         }
         o += 1
         if o + 96 <= d.count {
-            data = (0..<96).map { i in
+            data = (0..<96).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -10974,11 +10974,11 @@ struct MsgRangefinder: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            distance = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            distance = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            voltage = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            voltage = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
     }
@@ -11019,51 +11019,51 @@ struct MsgAirspeedAutocal: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            vx = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vx = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vy = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vy = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vz = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vz = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            diff_pressure = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            diff_pressure = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            EAS2TAS = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            EAS2TAS = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            ratio = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            ratio = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            state_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            state_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            state_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            state_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            state_z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            state_z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            Pax = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            Pax = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            Pby = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            Pby = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            Pcz = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            Pcz = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
     }
@@ -11122,19 +11122,19 @@ struct MsgRallyPoint: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lng = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lng = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 2 <= d.count {
-            alt = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            alt = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            break_alt = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            break_alt = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
@@ -11166,13 +11166,13 @@ struct MsgRallyPoint: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 19)
         var o = 0
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lng); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lng); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt16(truncatingIfNeeded: alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: break_alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: break_alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         do { let v = UInt16(truncatingIfNeeded: land_dir); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
@@ -11251,19 +11251,19 @@ struct MsgCompassmotStatus: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            current = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            current = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            CompensationX = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            CompensationX = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            CompensationY = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            CompensationY = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            CompensationZ = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            CompensationZ = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -11314,27 +11314,27 @@ struct MsgAhrs2: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            roll = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            roll = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitch = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            altitude = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            altitude = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lng = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lng = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
     }
@@ -11350,9 +11350,9 @@ struct MsgAhrs2: Sendable {
         o += 4
         do { let b = altitude.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lng); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lng); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         return p
     }
@@ -11380,23 +11380,23 @@ struct MsgCameraStatus: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            p1 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            p1 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            p2 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            p2 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            p3 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            p3 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            p4 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            p4 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -11469,39 +11469,39 @@ struct MsgCameraFeedback: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lng = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lng = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            alt_msl = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            alt_msl = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            alt_rel = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            alt_rel = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            roll = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            roll = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitch = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            foc_len = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            foc_len = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -11533,9 +11533,9 @@ struct MsgCameraFeedback: Sendable {
         var o = 0
         do { let v = UInt64(truncatingIfNeeded: time_usec); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF); p[o+4] = UInt8((v >> 32) & 0xFF); p[o+5] = UInt8((v >> 40) & 0xFF); p[o+6] = UInt8((v >> 48) & 0xFF); p[o+7] = UInt8((v >> 56) & 0xFF) }
         o += 8
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lng); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lng); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let b = alt_msl.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
@@ -11582,7 +11582,7 @@ struct MsgBattery2: Sendable {
         }
         o += 2
         if o + 2 <= d.count {
-            current_battery = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            current_battery = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
     }
@@ -11592,7 +11592,7 @@ struct MsgBattery2: Sendable {
         var o = 0
         do { let v = UInt16(truncatingIfNeeded: voltage); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: current_battery); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: current_battery); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         return p
     }
@@ -11621,43 +11621,43 @@ struct MsgAhrs3: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            roll = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            roll = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitch = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            altitude = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            altitude = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lng = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lng = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            v1 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            v1 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            v2 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            v2 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            v3 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            v3 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            v4 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            v4 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
     }
@@ -11673,9 +11673,9 @@ struct MsgAhrs3: Sendable {
         o += 4
         do { let b = altitude.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lng); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lng); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let b = v1.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
@@ -11753,7 +11753,7 @@ struct MsgRemoteLogDataBlock: Sendable {
         }
         o += 1
         if o + 200 <= d.count {
-            data = (0..<200).map { i in
+            data = (0..<200).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -11865,7 +11865,7 @@ struct MsgLedControl: Sendable {
         }
         o += 1
         if o + 24 <= d.count {
-            custom_bytes = (0..<24).map { i in
+            custom_bytes = (0..<24).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -11915,15 +11915,15 @@ struct MsgMagCalProgress: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            direction_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            direction_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            direction_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            direction_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            direction_z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            direction_z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -11947,7 +11947,7 @@ struct MsgMagCalProgress: Sendable {
         }
         o += 1
         if o + 10 <= d.count {
-            completion_mask = (0..<10).map { i in
+            completion_mask = (0..<10).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -12012,43 +12012,43 @@ struct MsgMagCalReport: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            fitness = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            fitness = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            ofs_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            ofs_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            ofs_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            ofs_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            ofs_z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            ofs_z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            diag_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            diag_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            diag_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            diag_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            diag_z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            diag_z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            offdiag_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            offdiag_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            offdiag_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            offdiag_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            offdiag_z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            offdiag_z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -12070,7 +12070,7 @@ struct MsgMagCalReport: Sendable {
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            orientation_confidence = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            orientation_confidence = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         guard o < d.count else { return }
@@ -12085,7 +12085,7 @@ struct MsgMagCalReport: Sendable {
         o += 1
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            scale_factor = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            scale_factor = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
     }
@@ -12153,23 +12153,23 @@ struct MsgEkfStatusReport: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            velocity_variance = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            velocity_variance = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pos_horiz_variance = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pos_horiz_variance = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pos_vert_variance = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pos_vert_variance = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            compass_variance = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            compass_variance = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            terrain_alt_variance = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            terrain_alt_variance = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -12179,7 +12179,7 @@ struct MsgEkfStatusReport: Sendable {
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            airspeed_variance = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            airspeed_variance = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
     }
@@ -12227,27 +12227,27 @@ struct MsgPidTuning: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            desired = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            desired = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            achieved = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            achieved = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            FF = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            FF = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            P = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            P = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            I = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            I = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            D = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            D = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -12257,12 +12257,12 @@ struct MsgPidTuning: Sendable {
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            SRate = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            SRate = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            PDmod = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            PDmod = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
     }
@@ -12315,39 +12315,39 @@ struct MsgDeepstall: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            landing_lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            landing_lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            landing_lon = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            landing_lon = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            path_lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            path_lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            path_lon = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            path_lon = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            arc_entry_lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            arc_entry_lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            arc_entry_lon = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            arc_entry_lon = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            altitude = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            altitude = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            expected_travel_distance = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            expected_travel_distance = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            cross_track_error = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            cross_track_error = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -12359,17 +12359,17 @@ struct MsgDeepstall: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 37)
         var o = 0
-        do { let v = UInt32(truncatingIfNeeded: landing_lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: landing_lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: landing_lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: landing_lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: path_lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: path_lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: path_lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: path_lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: arc_entry_lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: arc_entry_lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: arc_entry_lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: arc_entry_lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let b = altitude.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
@@ -12408,43 +12408,43 @@ struct MsgGimbalReport: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            delta_time = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            delta_time = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            delta_angle_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            delta_angle_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            delta_angle_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            delta_angle_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            delta_angle_z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            delta_angle_z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            delta_velocity_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            delta_velocity_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            delta_velocity_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            delta_velocity_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            delta_velocity_z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            delta_velocity_z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            joint_roll = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            joint_roll = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            joint_el = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            joint_el = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            joint_az = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            joint_az = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -12506,15 +12506,15 @@ struct MsgGimbalControl: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            demanded_rate_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            demanded_rate_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            demanded_rate_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            demanded_rate_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            demanded_rate_z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            demanded_rate_z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -12562,15 +12562,15 @@ struct MsgGimbalTorqueCmdReport: Sendable {
         let d = payload
         var o = 0
         if o + 2 <= d.count {
-            rl_torque_cmd = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            rl_torque_cmd = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            el_torque_cmd = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            el_torque_cmd = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            az_torque_cmd = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            az_torque_cmd = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 1 <= d.count {
@@ -12586,11 +12586,11 @@ struct MsgGimbalTorqueCmdReport: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 8)
         var o = 0
-        do { let v = UInt16(truncatingIfNeeded: rl_torque_cmd); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: rl_torque_cmd); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: el_torque_cmd); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: el_torque_cmd); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: az_torque_cmd); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: az_torque_cmd); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         p[o] = UInt8(truncatingIfNeeded: target_system)
         o += 1
@@ -12708,7 +12708,7 @@ struct MsgGoproGetResponse: Sendable {
         }
         o += 1
         if o + 4 <= d.count {
-            value = (0..<4).map { i in
+            value = (0..<4).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -12759,7 +12759,7 @@ struct MsgGoproSetRequest: Sendable {
         }
         o += 1
         if o + 4 <= d.count {
-            value = (0..<4).map { i in
+            value = (0..<4).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -12850,67 +12850,67 @@ struct MsgEfiStatus: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            ecu_index = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            ecu_index = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            rpm = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            rpm = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            fuel_consumed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            fuel_consumed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            fuel_flow = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            fuel_flow = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            engine_load = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            engine_load = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            throttle_position = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            throttle_position = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            spark_dwell_time = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            spark_dwell_time = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            barometric_pressure = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            barometric_pressure = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            intake_manifold_pressure = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            intake_manifold_pressure = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            intake_manifold_temperature = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            intake_manifold_temperature = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            cylinder_head_temperature = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            cylinder_head_temperature = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            ignition_timing = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            ignition_timing = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            injection_time = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            injection_time = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            exhaust_gas_temperature = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            exhaust_gas_temperature = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            throttle_out = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            throttle_out = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pt_compensation = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pt_compensation = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -12920,12 +12920,12 @@ struct MsgEfiStatus: Sendable {
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            ignition_voltage = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            ignition_voltage = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            fuel_pressure = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            fuel_pressure = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
     }
@@ -12990,11 +12990,11 @@ struct MsgRpm: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            rpm1 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            rpm1 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            rpm2 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            rpm2 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
     }
@@ -13033,39 +13033,39 @@ struct MsgEstimatorStatus: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            vel_ratio = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vel_ratio = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pos_horiz_ratio = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pos_horiz_ratio = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pos_vert_ratio = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pos_vert_ratio = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            mag_ratio = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            mag_ratio = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            hagl_ratio = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            hagl_ratio = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            tas_ratio = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            tas_ratio = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pos_horiz_accuracy = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pos_horiz_accuracy = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pos_vert_accuracy = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pos_vert_accuracy = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -13123,39 +13123,39 @@ struct MsgWindCov: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            wind_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            wind_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            wind_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            wind_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            wind_z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            wind_z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            var_horiz = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            var_horiz = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            var_vert = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            var_vert = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            wind_alt = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            wind_alt = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            horiz_accuracy = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            horiz_accuracy = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vert_accuracy = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vert_accuracy = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
     }
@@ -13217,7 +13217,7 @@ struct MsgGpsInput: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
@@ -13225,47 +13225,47 @@ struct MsgGpsInput: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lon = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lon = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            alt = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            alt = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            hdop = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            hdop = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vdop = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vdop = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vn = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vn = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            ve = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            ve = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vd = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vd = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            speed_accuracy = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            speed_accuracy = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            horiz_accuracy = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            horiz_accuracy = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vert_accuracy = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vert_accuracy = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -13303,9 +13303,9 @@ struct MsgGpsInput: Sendable {
         o += 8
         do { let v = UInt32(truncatingIfNeeded: time_week_ms); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let b = alt.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
@@ -13365,7 +13365,7 @@ struct MsgGpsRtcmData: Sendable {
         }
         o += 1
         if o + 180 <= d.count {
-            data = (0..<180).map { i in
+            data = (0..<180).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -13428,19 +13428,19 @@ struct MsgHighLatency: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            latitude = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            latitude = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            longitude = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            longitude = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 2 <= d.count {
-            roll = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            roll = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            pitch = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            pitch = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
@@ -13448,15 +13448,15 @@ struct MsgHighLatency: Sendable {
         }
         o += 2
         if o + 2 <= d.count {
-            heading_sp = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            heading_sp = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            altitude_amsl = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            altitude_amsl = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            altitude_sp = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            altitude_sp = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
@@ -13472,7 +13472,7 @@ struct MsgHighLatency: Sendable {
         }
         o += 1
         if o + 1 <= d.count {
-            throttle = d[d.startIndex+o]
+            throttle = Int8(bitPattern: d[d.startIndex+o])
         }
         o += 1
         if o + 1 <= d.count {
@@ -13488,7 +13488,7 @@ struct MsgHighLatency: Sendable {
         }
         o += 1
         if o + 1 <= d.count {
-            climb_rate = d[d.startIndex+o]
+            climb_rate = Int8(bitPattern: d[d.startIndex+o])
         }
         o += 1
         if o + 1 <= d.count {
@@ -13504,11 +13504,11 @@ struct MsgHighLatency: Sendable {
         }
         o += 1
         if o + 1 <= d.count {
-            temperature = d[d.startIndex+o]
+            temperature = Int8(bitPattern: d[d.startIndex+o])
         }
         o += 1
         if o + 1 <= d.count {
-            temperature_air = d[d.startIndex+o]
+            temperature_air = Int8(bitPattern: d[d.startIndex+o])
         }
         o += 1
         if o + 1 <= d.count {
@@ -13526,21 +13526,21 @@ struct MsgHighLatency: Sendable {
         var o = 0
         do { let v = UInt32(truncatingIfNeeded: custom_mode); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: latitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: latitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: longitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: longitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt16(truncatingIfNeeded: roll); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: roll); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: pitch); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: pitch); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         do { let v = UInt16(truncatingIfNeeded: heading); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: heading_sp); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: heading_sp); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: altitude_amsl); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: altitude_amsl); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: altitude_sp); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: altitude_sp); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         do { let v = UInt16(truncatingIfNeeded: wp_distance); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
@@ -13548,7 +13548,7 @@ struct MsgHighLatency: Sendable {
         o += 1
         p[o] = UInt8(truncatingIfNeeded: landed_state)
         o += 1
-        p[o] = UInt8(truncatingIfNeeded: throttle)
+        p[o] = UInt8(bitPattern: throttle)
         o += 1
         p[o] = UInt8(truncatingIfNeeded: airspeed)
         o += 1
@@ -13556,7 +13556,7 @@ struct MsgHighLatency: Sendable {
         o += 1
         p[o] = UInt8(truncatingIfNeeded: groundspeed)
         o += 1
-        p[o] = UInt8(truncatingIfNeeded: climb_rate)
+        p[o] = UInt8(bitPattern: climb_rate)
         o += 1
         p[o] = UInt8(truncatingIfNeeded: gps_nsat)
         o += 1
@@ -13564,9 +13564,9 @@ struct MsgHighLatency: Sendable {
         o += 1
         p[o] = UInt8(truncatingIfNeeded: battery_remaining)
         o += 1
-        p[o] = UInt8(truncatingIfNeeded: temperature)
+        p[o] = UInt8(bitPattern: temperature)
         o += 1
-        p[o] = UInt8(truncatingIfNeeded: temperature_air)
+        p[o] = UInt8(bitPattern: temperature_air)
         o += 1
         p[o] = UInt8(truncatingIfNeeded: failsafe)
         o += 1
@@ -13620,11 +13620,11 @@ struct MsgHighLatency2: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            latitude = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            latitude = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            longitude = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            longitude = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 2 <= d.count {
@@ -13632,11 +13632,11 @@ struct MsgHighLatency2: Sendable {
         }
         o += 2
         if o + 2 <= d.count {
-            altitude = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            altitude = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            target_altitude = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            target_altitude = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
@@ -13700,27 +13700,27 @@ struct MsgHighLatency2: Sendable {
         }
         o += 1
         if o + 1 <= d.count {
-            temperature_air = d[d.startIndex+o]
+            temperature_air = Int8(bitPattern: d[d.startIndex+o])
         }
         o += 1
         if o + 1 <= d.count {
-            climb_rate = d[d.startIndex+o]
+            climb_rate = Int8(bitPattern: d[d.startIndex+o])
         }
         o += 1
         if o + 1 <= d.count {
-            battery = d[d.startIndex+o]
+            battery = Int8(bitPattern: d[d.startIndex+o])
         }
         o += 1
         if o + 1 <= d.count {
-            custom0 = d[d.startIndex+o]
+            custom0 = Int8(bitPattern: d[d.startIndex+o])
         }
         o += 1
         if o + 1 <= d.count {
-            custom1 = d[d.startIndex+o]
+            custom1 = Int8(bitPattern: d[d.startIndex+o])
         }
         o += 1
         if o + 1 <= d.count {
-            custom2 = d[d.startIndex+o]
+            custom2 = Int8(bitPattern: d[d.startIndex+o])
         }
         o += 1
     }
@@ -13730,15 +13730,15 @@ struct MsgHighLatency2: Sendable {
         var o = 0
         do { let v = UInt32(truncatingIfNeeded: timestamp); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: latitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: latitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: longitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: longitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let v = UInt16(truncatingIfNeeded: custom_mode); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: altitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: altitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: target_altitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: target_altitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         do { let v = UInt16(truncatingIfNeeded: target_distance); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
@@ -13770,17 +13770,17 @@ struct MsgHighLatency2: Sendable {
         o += 1
         p[o] = UInt8(truncatingIfNeeded: epv)
         o += 1
-        p[o] = UInt8(truncatingIfNeeded: temperature_air)
+        p[o] = UInt8(bitPattern: temperature_air)
         o += 1
-        p[o] = UInt8(truncatingIfNeeded: climb_rate)
+        p[o] = UInt8(bitPattern: climb_rate)
         o += 1
-        p[o] = UInt8(truncatingIfNeeded: battery)
+        p[o] = UInt8(bitPattern: battery)
         o += 1
-        p[o] = UInt8(truncatingIfNeeded: custom0)
+        p[o] = UInt8(bitPattern: custom0)
         o += 1
-        p[o] = UInt8(truncatingIfNeeded: custom1)
+        p[o] = UInt8(bitPattern: custom1)
         o += 1
-        p[o] = UInt8(truncatingIfNeeded: custom2)
+        p[o] = UInt8(bitPattern: custom2)
         o += 1
         return p
     }
@@ -13806,19 +13806,19 @@ struct MsgVibration: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            vibration_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vibration_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vibration_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vibration_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vibration_z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vibration_z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
@@ -13880,51 +13880,51 @@ struct MsgHomePosition: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            latitude = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            latitude = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            longitude = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            longitude = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            altitude = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            altitude = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 16 <= d.count {
-            q = (0..<4).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            q = (0..<4).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 16
         if o + 4 <= d.count {
-            approach_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            approach_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            approach_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            approach_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            approach_z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            approach_z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
     }
@@ -13932,11 +13932,11 @@ struct MsgHomePosition: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 60)
         var o = 0
-        do { let v = UInt32(truncatingIfNeeded: latitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: latitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: longitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: longitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: altitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: altitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let b = x.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
@@ -13985,45 +13985,45 @@ struct MsgSetHomePosition: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            latitude = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            latitude = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            longitude = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            longitude = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            altitude = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            altitude = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 16 <= d.count {
-            q = (0..<4).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            q = (0..<4).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 16
         if o + 4 <= d.count {
-            approach_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            approach_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            approach_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            approach_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            approach_z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            approach_z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -14033,7 +14033,7 @@ struct MsgSetHomePosition: Sendable {
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
     }
@@ -14041,11 +14041,11 @@ struct MsgSetHomePosition: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 61)
         var o = 0
-        do { let v = UInt32(truncatingIfNeeded: latitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: latitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: longitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: longitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: altitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: altitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let b = x.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
@@ -14086,7 +14086,7 @@ struct MsgMessageInterval: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            interval_us = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            interval_us = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 2 <= d.count {
@@ -14098,7 +14098,7 @@ struct MsgMessageInterval: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 6)
         var o = 0
-        do { let v = UInt32(truncatingIfNeeded: interval_us); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: interval_us); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let v = UInt16(truncatingIfNeeded: message_id); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
@@ -14171,15 +14171,15 @@ struct MsgAdsbVehicle: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lon = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lon = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            altitude = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            altitude = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 2 <= d.count {
@@ -14191,7 +14191,7 @@ struct MsgAdsbVehicle: Sendable {
         }
         o += 2
         if o + 2 <= d.count {
-            ver_velocity = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            ver_velocity = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
@@ -14225,17 +14225,17 @@ struct MsgAdsbVehicle: Sendable {
         var o = 0
         do { let v = UInt32(truncatingIfNeeded: ICAO_address); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: altitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: altitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let v = UInt16(truncatingIfNeeded: heading); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         do { let v = UInt16(truncatingIfNeeded: hor_velocity); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: ver_velocity); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: ver_velocity); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         do { let v = UInt16(truncatingIfNeeded: flags); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
@@ -14280,15 +14280,15 @@ struct MsgCollision: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            time_to_minimum_delta = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            time_to_minimum_delta = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            altitude_minimum_delta = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            altitude_minimum_delta = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            horizontal_minimum_delta = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            horizontal_minimum_delta = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -14340,8 +14340,8 @@ struct MsgV2Extension: Sendable {
 
     init() {}
 
-    init(from payload: Data) {
-        let d = payload
+    init(from _data: Data) {
+        let d = _data
         var o = 0
         if o + 2 <= d.count {
             message_type = UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8
@@ -14360,7 +14360,7 @@ struct MsgV2Extension: Sendable {
         }
         o += 1
         if o + 249 <= d.count {
-            payload = (0..<249).map { i in
+            payload = (0..<249).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -14415,8 +14415,8 @@ struct MsgMemoryVect: Sendable {
         }
         o += 1
         if o + 32 <= d.count {
-            value = (0..<32).map { i in
-                return d[d.startIndex+o+i*1]
+            value = (0..<32).map { (i: Int) -> Int8 in
+                return Int8(bitPattern: d[d.startIndex+o+i*1])
             }
         }
         o += 32
@@ -14432,7 +14432,7 @@ struct MsgMemoryVect: Sendable {
         p[o] = UInt8(truncatingIfNeeded: type)
         o += 1
         for i in 0..<32 {
-        p[o+i*1] = UInt8(truncatingIfNeeded: value[i])
+        p[o+i*1] = UInt8(bitPattern: value[i])
         }
         o += 32
         return p
@@ -14457,19 +14457,19 @@ struct MsgDebugVect: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 10 <= d.count {
@@ -14518,7 +14518,7 @@ struct MsgNamedValueFloat: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            value = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            value = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 10 <= d.count {
@@ -14563,7 +14563,7 @@ struct MsgNamedValueInt: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            value = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            value = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 10 <= d.count {
@@ -14577,7 +14577,7 @@ struct MsgNamedValueInt: Sendable {
         var o = 0
         do { let v = UInt32(truncatingIfNeeded: time_boot_ms); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: value); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: value); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do {
             let bytes = Array(name.utf8)
@@ -14663,7 +14663,7 @@ struct MsgDebug: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            value = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            value = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -14702,7 +14702,7 @@ struct MsgSetupSigning: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            initial_timestamp = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            initial_timestamp = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 1 <= d.count {
@@ -14714,7 +14714,7 @@ struct MsgSetupSigning: Sendable {
         }
         o += 1
         if o + 32 <= d.count {
-            secret_key = (0..<32).map { i in
+            secret_key = (0..<32).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -14872,15 +14872,15 @@ struct MsgCameraInformation: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            focal_length = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            focal_length = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            sensor_size_h = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            sensor_size_h = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            sensor_size_v = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            sensor_size_v = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
@@ -14900,13 +14900,13 @@ struct MsgCameraInformation: Sendable {
         }
         o += 2
         if o + 32 <= d.count {
-            vendor_name = (0..<32).map { i in
+            vendor_name = (0..<32).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
         o += 32
         if o + 32 <= d.count {
-            model_name = (0..<32).map { i in
+            model_name = (0..<32).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -14996,12 +14996,12 @@ struct MsgCameraSettings: Sendable {
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            zoomLevel = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            zoomLevel = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            focusLevel = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            focusLevel = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
     }
@@ -15049,23 +15049,23 @@ struct MsgStorageInformation: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            total_capacity = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            total_capacity = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            used_capacity = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            used_capacity = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            available_capacity = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            available_capacity = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            read_speed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            read_speed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            write_speed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            write_speed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -15149,7 +15149,7 @@ struct MsgCameraCaptureStatus: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            image_interval = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            image_interval = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
@@ -15157,7 +15157,7 @@ struct MsgCameraCaptureStatus: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            available_capacity = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            available_capacity = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -15171,7 +15171,7 @@ struct MsgCameraCaptureStatus: Sendable {
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            image_count = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            image_count = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
     }
@@ -15191,7 +15191,7 @@ struct MsgCameraCaptureStatus: Sendable {
         o += 1
         p[o] = UInt8(truncatingIfNeeded: video_status)
         o += 1
-        do { let v = UInt32(truncatingIfNeeded: image_count); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: image_count); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         return p
     }
@@ -15221,7 +15221,7 @@ struct MsgCameraImageCaptured: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_utc = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_utc = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
@@ -15229,29 +15229,29 @@ struct MsgCameraImageCaptured: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lon = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lon = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            alt = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            alt = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            relative_alt = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            relative_alt = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 16 <= d.count {
-            q = (0..<4).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            q = (0..<4).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 16
         if o + 4 <= d.count {
-            image_index = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            image_index = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 1 <= d.count {
@@ -15259,7 +15259,7 @@ struct MsgCameraImageCaptured: Sendable {
         }
         o += 1
         if o + 1 <= d.count {
-            capture_result = d[d.startIndex+o]
+            capture_result = Int8(bitPattern: d[d.startIndex+o])
         }
         o += 1
         if o + 205 <= d.count {
@@ -15275,23 +15275,23 @@ struct MsgCameraImageCaptured: Sendable {
         o += 8
         do { let v = UInt32(truncatingIfNeeded: time_boot_ms); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: relative_alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: relative_alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         for i in 0..<4 {
         do { let b = q[i].bitPattern; p[o+i*4] = UInt8(b & 0xFF); p[o+i*4+1] = UInt8((b >> 8) & 0xFF); p[o+i*4+2] = UInt8((b >> 16) & 0xFF); p[o+i*4+3] = UInt8((b >> 24) & 0xFF) }
         }
         o += 16
-        do { let v = UInt32(truncatingIfNeeded: image_index); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: image_index); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         p[o] = UInt8(truncatingIfNeeded: camera_id)
         o += 1
-        p[o] = UInt8(truncatingIfNeeded: capture_result)
+        p[o] = UInt8(bitPattern: capture_result)
         o += 1
         do {
             let bytes = Array(file_url.utf8)
@@ -15319,15 +15319,15 @@ struct MsgFlightInformation: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            arming_time_utc = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            arming_time_utc = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 8 <= d.count {
-            takeoff_time_utc = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            takeoff_time_utc = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 8 <= d.count {
-            flight_uuid = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            flight_uuid = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
@@ -15373,21 +15373,21 @@ struct MsgMountOrientation: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            roll = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            roll = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitch = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            yaw_absolute = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw_absolute = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
     }
@@ -15448,7 +15448,7 @@ struct MsgLoggingData: Sendable {
         }
         o += 1
         if o + 249 <= d.count {
-            data = (0..<249).map { i in
+            data = (0..<249).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -15515,7 +15515,7 @@ struct MsgLoggingDataAcked: Sendable {
         }
         o += 1
         if o + 249 <= d.count {
-            data = (0..<249).map { i in
+            data = (0..<249).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -15611,7 +15611,7 @@ struct MsgVideoStreamInformation: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            framerate = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            framerate = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
@@ -15726,7 +15726,7 @@ struct MsgVideoStreamStatus: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            framerate = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            framerate = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
@@ -15809,41 +15809,41 @@ struct MsgCameraFovStatus: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            lat_camera = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat_camera = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lon_camera = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lon_camera = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            alt_camera = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            alt_camera = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lat_image = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat_image = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lon_image = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lon_image = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            alt_image = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            alt_image = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 16 <= d.count {
-            q = (0..<4).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            q = (0..<4).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 16
         if o + 4 <= d.count {
-            hfov = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            hfov = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vfov = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vfov = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
     }
@@ -15853,17 +15853,17 @@ struct MsgCameraFovStatus: Sendable {
         var o = 0
         do { let v = UInt32(truncatingIfNeeded: time_boot_ms); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lat_camera); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat_camera); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lon_camera); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lon_camera); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: alt_camera); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: alt_camera); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lat_image); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat_image); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lon_image); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lon_image); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: alt_image); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: alt_image); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         for i in 0..<4 {
         do { let b = q[i].bitPattern; p[o+i*4] = UInt8(b & 0xFF); p[o+i*4+1] = UInt8((b >> 8) & 0xFF); p[o+i*4+2] = UInt8((b >> 16) & 0xFF); p[o+i*4+3] = UInt8((b >> 24) & 0xFF) }
@@ -15900,31 +15900,31 @@ struct MsgCameraTrackingImageStatus: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            point_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            point_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            point_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            point_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            radius = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            radius = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            rec_top_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            rec_top_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            rec_top_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            rec_top_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            rec_bottom_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            rec_bottom_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            rec_bottom_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            rec_bottom_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -15994,51 +15994,51 @@ struct MsgCameraTrackingGeoStatus: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lon = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lon = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            alt = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            alt = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            h_acc = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            h_acc = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            v_acc = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            v_acc = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vel_n = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vel_n = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vel_e = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vel_e = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vel_d = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vel_d = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vel_acc = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vel_acc = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            dist = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            dist = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            hdg = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            hdg = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            hdg_acc = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            hdg_acc = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -16050,9 +16050,9 @@ struct MsgCameraTrackingGeoStatus: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 49)
         var o = 0
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let b = alt.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
@@ -16106,27 +16106,27 @@ struct MsgCameraThermalRange: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            max = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            max = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            max_point_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            max_point_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            max_point_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            max_point_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            min = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            min = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            min_point_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            min_point_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            min_point_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            min_point_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -16194,27 +16194,27 @@ struct MsgGimbalManagerInformation: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            roll_min = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            roll_min = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            roll_max = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            roll_max = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitch_min = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch_min = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitch_max = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch_max = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw_min = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw_min = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw_max = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw_max = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -16343,21 +16343,21 @@ struct MsgGimbalManagerSetAttitude: Sendable {
         }
         o += 4
         if o + 16 <= d.count {
-            q = (0..<4).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            q = (0..<4).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 16
         if o + 4 <= d.count {
-            angular_velocity_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            angular_velocity_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            angular_velocity_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            angular_velocity_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            angular_velocity_z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            angular_velocity_z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -16428,7 +16428,7 @@ struct MsgGimbalDeviceInformation: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            uid = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            uid = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
@@ -16444,27 +16444,27 @@ struct MsgGimbalDeviceInformation: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            roll_min = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            roll_min = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            roll_max = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            roll_max = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitch_min = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch_min = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitch_max = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch_max = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw_min = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw_min = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw_max = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw_max = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -16563,21 +16563,21 @@ struct MsgGimbalDeviceSetAttitude: Sendable {
         let d = payload
         var o = 0
         if o + 16 <= d.count {
-            q = (0..<4).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            q = (0..<4).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 16
         if o + 4 <= d.count {
-            angular_velocity_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            angular_velocity_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            angular_velocity_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            angular_velocity_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            angular_velocity_z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            angular_velocity_z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -16646,21 +16646,21 @@ struct MsgGimbalDeviceAttitudeStatus: Sendable {
         }
         o += 4
         if o + 16 <= d.count {
-            q = (0..<4).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            q = (0..<4).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 16
         if o + 4 <= d.count {
-            angular_velocity_x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            angular_velocity_x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            angular_velocity_y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            angular_velocity_y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            angular_velocity_z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            angular_velocity_z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
@@ -16682,12 +16682,12 @@ struct MsgGimbalDeviceAttitudeStatus: Sendable {
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            delta_yaw = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            delta_yaw = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            delta_yaw_velocity = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            delta_yaw_velocity = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         guard o < d.count else { return }
@@ -16756,12 +16756,12 @@ struct MsgAutopilotStateForGimbalDevice: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_boot_us = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_boot_us = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 16 <= d.count {
-            q = (0..<4).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            q = (0..<4).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 16
@@ -16770,15 +16770,15 @@ struct MsgAutopilotStateForGimbalDevice: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            vx = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vx = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vy = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vy = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vz = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vz = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
@@ -16786,7 +16786,7 @@ struct MsgAutopilotStateForGimbalDevice: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            feed_forward_angular_velocity_z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            feed_forward_angular_velocity_z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -16808,7 +16808,7 @@ struct MsgAutopilotStateForGimbalDevice: Sendable {
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            angular_velocity_z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            angular_velocity_z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
     }
@@ -16873,19 +16873,19 @@ struct MsgGimbalManagerSetPitchyaw: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            pitch = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitch_rate = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch_rate = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw_rate = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw_rate = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -16950,19 +16950,19 @@ struct MsgGimbalManagerSetManualControl: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            pitch = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitch_rate = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch_rate = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw_rate = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw_rate = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -17077,11 +17077,11 @@ struct MsgAisVessel: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lon = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lon = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 2 <= d.count {
@@ -17113,7 +17113,7 @@ struct MsgAisVessel: Sendable {
         }
         o += 2
         if o + 1 <= d.count {
-            turn_rate = d[d.startIndex+o]
+            turn_rate = Int8(bitPattern: d[d.startIndex+o])
         }
         o += 1
         if o + 1 <= d.count {
@@ -17147,9 +17147,9 @@ struct MsgAisVessel: Sendable {
         var o = 0
         do { let v = UInt32(truncatingIfNeeded: MMSI); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let v = UInt16(truncatingIfNeeded: COG); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
@@ -17165,7 +17165,7 @@ struct MsgAisVessel: Sendable {
         o += 2
         do { let v = UInt16(truncatingIfNeeded: flags); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        p[o] = UInt8(truncatingIfNeeded: turn_rate)
+        p[o] = UInt8(bitPattern: turn_rate)
         o += 1
         p[o] = UInt8(truncatingIfNeeded: navigational_status)
         o += 1
@@ -17208,7 +17208,7 @@ struct MsgUavcanNodeStatus: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
@@ -17274,7 +17274,7 @@ struct MsgUavcanNodeInfo: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
@@ -17298,7 +17298,7 @@ struct MsgUavcanNodeInfo: Sendable {
         }
         o += 1
         if o + 16 <= d.count {
-            hw_unique_id = (0..<16).map { i in
+            hw_unique_id = (0..<16).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -17360,7 +17360,7 @@ struct MsgParamExtRequestRead: Sendable {
         let d = payload
         var o = 0
         if o + 2 <= d.count {
-            param_index = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            param_index = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 1 <= d.count {
@@ -17380,7 +17380,7 @@ struct MsgParamExtRequestRead: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 20)
         var o = 0
-        do { let v = UInt16(truncatingIfNeeded: param_index); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: param_index); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         p[o] = UInt8(truncatingIfNeeded: target_system)
         o += 1
@@ -17631,11 +17631,11 @@ struct MsgObstacleDistance: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 144 <= d.count {
-            distances = (0..<72).map { i in
+            distances = (0..<72).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
@@ -17659,12 +17659,12 @@ struct MsgObstacleDistance: Sendable {
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            increment_f = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            increment_f = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         guard o < d.count else { return }
         if o + 4 <= d.count {
-            angle_offset = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            angle_offset = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         guard o < d.count else { return }
@@ -17732,60 +17732,60 @@ struct MsgOdometry: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 16 <= d.count {
-            q = (0..<4).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            q = (0..<4).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 16
         if o + 4 <= d.count {
-            vx = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vx = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vy = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vy = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            vz = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            vz = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            rollspeed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            rollspeed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitchspeed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitchspeed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yawspeed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yawspeed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 84 <= d.count {
-            pose_covariance = (0..<21).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            pose_covariance = (0..<21).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 84
         if o + 84 <= d.count {
-            velocity_covariance = (0..<21).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            velocity_covariance = (0..<21).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 84
@@ -17810,7 +17810,7 @@ struct MsgOdometry: Sendable {
         o += 1
         guard o < d.count else { return }
         if o + 1 <= d.count {
-            quality = d[d.startIndex+o]
+            quality = Int8(bitPattern: d[d.startIndex+o])
         }
         o += 1
     }
@@ -17858,7 +17858,7 @@ struct MsgOdometry: Sendable {
         o += 1
         p[o] = UInt8(truncatingIfNeeded: estimator_type)
         o += 1
-        p[o] = UInt8(truncatingIfNeeded: quality)
+        p[o] = UInt8(bitPattern: quality)
         o += 1
         return p
     }
@@ -17891,77 +17891,77 @@ struct MsgTrajectoryRepresentationWaypoints: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 20 <= d.count {
-            pos_x = (0..<5).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            pos_x = (0..<5).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 20
         if o + 20 <= d.count {
-            pos_y = (0..<5).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            pos_y = (0..<5).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 20
         if o + 20 <= d.count {
-            pos_z = (0..<5).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            pos_z = (0..<5).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 20
         if o + 20 <= d.count {
-            vel_x = (0..<5).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            vel_x = (0..<5).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 20
         if o + 20 <= d.count {
-            vel_y = (0..<5).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            vel_y = (0..<5).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 20
         if o + 20 <= d.count {
-            vel_z = (0..<5).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            vel_z = (0..<5).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 20
         if o + 20 <= d.count {
-            acc_x = (0..<5).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            acc_x = (0..<5).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 20
         if o + 20 <= d.count {
-            acc_y = (0..<5).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            acc_y = (0..<5).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 20
         if o + 20 <= d.count {
-            acc_z = (0..<5).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            acc_z = (0..<5).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 20
         if o + 20 <= d.count {
-            pos_yaw = (0..<5).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            pos_yaw = (0..<5).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 20
         if o + 20 <= d.count {
-            vel_yaw = (0..<5).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            vel_yaw = (0..<5).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 20
         if o + 10 <= d.count {
-            command = (0..<5).map { i in
+            command = (0..<5).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
@@ -18051,36 +18051,36 @@ struct MsgTrajectoryRepresentationBezier: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 20 <= d.count {
-            pos_x = (0..<5).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            pos_x = (0..<5).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 20
         if o + 20 <= d.count {
-            pos_y = (0..<5).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            pos_y = (0..<5).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 20
         if o + 20 <= d.count {
-            pos_z = (0..<5).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            pos_z = (0..<5).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 20
         if o + 20 <= d.count {
-            delta = (0..<5).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            delta = (0..<5).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 20
         if o + 20 <= d.count {
-            pos_yaw = (0..<5).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            pos_yaw = (0..<5).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 20
@@ -18142,11 +18142,11 @@ struct MsgIsbdLinkStatus: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            timestamp = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            timestamp = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 8 <= d.count {
-            last_heartbeat = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            last_heartbeat = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 2 <= d.count {
@@ -18213,7 +18213,7 @@ struct MsgRawRpm: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            frequency = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            frequency = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -18264,47 +18264,47 @@ struct MsgUtmGlobalPosition: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lon = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lon = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            alt = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            alt = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            relative_alt = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            relative_alt = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            next_lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            next_lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            next_lon = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            next_lon = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            next_alt = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            next_alt = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 2 <= d.count {
-            vx = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            vx = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            vy = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            vy = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            vz = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            vz = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
@@ -18324,7 +18324,7 @@ struct MsgUtmGlobalPosition: Sendable {
         }
         o += 2
         if o + 18 <= d.count {
-            uas_id = (0..<18).map { i in
+            uas_id = (0..<18).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -18344,25 +18344,25 @@ struct MsgUtmGlobalPosition: Sendable {
         var o = 0
         do { let v = UInt64(truncatingIfNeeded: time); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF); p[o+4] = UInt8((v >> 32) & 0xFF); p[o+5] = UInt8((v >> 40) & 0xFF); p[o+6] = UInt8((v >> 48) & 0xFF); p[o+7] = UInt8((v >> 56) & 0xFF) }
         o += 8
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: relative_alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: relative_alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: next_lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: next_lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: next_lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: next_lon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: next_alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: next_alt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt16(truncatingIfNeeded: vx); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: vx); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: vy); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: vy); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: vz); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: vz); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         do { let v = UInt16(truncatingIfNeeded: h_acc); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
@@ -18401,7 +18401,7 @@ struct MsgDebugFloatArray: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 2 <= d.count {
@@ -18415,8 +18415,8 @@ struct MsgDebugFloatArray: Sendable {
         // Extension fields (only present in longer payloads)
         guard o < d.count else { return }
         if o + 232 <= d.count {
-            data = (0..<58).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            data = (0..<58).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 232
@@ -18472,11 +18472,11 @@ struct MsgSmartBatteryInfo: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            capacity_full_specification = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            capacity_full_specification = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            capacity_full = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            capacity_full = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 2 <= d.count {
@@ -18550,9 +18550,9 @@ struct MsgSmartBatteryInfo: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 109)
         var o = 0
-        do { let v = UInt32(truncatingIfNeeded: capacity_full_specification); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: capacity_full_specification); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: capacity_full); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: capacity_full); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let v = UInt16(truncatingIfNeeded: cycle_count); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
@@ -18621,27 +18621,27 @@ struct MsgGeneratorStatus: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            status = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            status = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            battery_current = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            battery_current = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            load_current = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            load_current = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            power_generated = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            power_generated = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            bus_voltage = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            bus_voltage = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            bat_current_setpoint = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            bat_current_setpoint = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
@@ -18649,7 +18649,7 @@ struct MsgGeneratorStatus: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            time_until_maintenance = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            time_until_maintenance = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 2 <= d.count {
@@ -18657,11 +18657,11 @@ struct MsgGeneratorStatus: Sendable {
         }
         o += 2
         if o + 2 <= d.count {
-            rectifier_temperature = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            rectifier_temperature = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            generator_temperature = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            generator_temperature = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
     }
@@ -18683,13 +18683,13 @@ struct MsgGeneratorStatus: Sendable {
         o += 4
         do { let v = UInt32(truncatingIfNeeded: runtime); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: time_until_maintenance); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: time_until_maintenance); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let v = UInt16(truncatingIfNeeded: generator_speed); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: rectifier_temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: rectifier_temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: generator_temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: generator_temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         return p
     }
@@ -18711,7 +18711,7 @@ struct MsgActuatorOutputStatus: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
@@ -18719,8 +18719,8 @@ struct MsgActuatorOutputStatus: Sendable {
         }
         o += 4
         if o + 128 <= d.count {
-            actuator = (0..<32).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            actuator = (0..<32).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 128
@@ -18797,8 +18797,8 @@ struct MsgTunnel: Sendable {
 
     init() {}
 
-    init(from payload: Data) {
-        let d = payload
+    init(from _data: Data) {
+        let d = _data
         var o = 0
         if o + 2 <= d.count {
             payload_type = UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8
@@ -18817,7 +18817,7 @@ struct MsgTunnel: Sendable {
         }
         o += 1
         if o + 128 <= d.count {
-            payload = (0..<128).map { i in
+            payload = (0..<128).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -18882,7 +18882,7 @@ struct MsgCanFrame: Sendable {
         }
         o += 1
         if o + 8 <= d.count {
-            data = (0..<8).map { i in
+            data = (0..<8).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -18949,7 +18949,7 @@ struct MsgCanfdFrame: Sendable {
         }
         o += 1
         if o + 64 <= d.count {
-            data = (0..<64).map { i in
+            data = (0..<64).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -18996,7 +18996,7 @@ struct MsgCanFilterModify: Sendable {
         let d = payload
         var o = 0
         if o + 32 <= d.count {
-            ids = (0..<16).map { i in
+            ids = (0..<16).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
@@ -19060,12 +19060,12 @@ struct MsgWheelDistance: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 128 <= d.count {
-            distance = (0..<16).map { i in
-                return Double(bitPattern: UInt64(d[d.startIndex+o+i*8]) | UInt64(d[d.startIndex+o+i*8+1]) << 8 | UInt64(d[d.startIndex+o+i*8+2]) << 16 | UInt64(d[d.startIndex+o+i*8+3]) << 24 | UInt64(d[d.startIndex+o+i*8+4]) << 32 | UInt64(d[d.startIndex+o+i*8+5]) << 40 | UInt64(d[d.startIndex+o+i*8+6]) << 48 | UInt64(d[d.startIndex+o+i*8+7]) << 56)
+            distance = (0..<16).map { (i: Int) -> Double in
+                return { let lo = UInt64(d[d.startIndex+o+i*8]) | UInt64(d[d.startIndex+o+i*8+1]) << 8 | UInt64(d[d.startIndex+o+i*8+2]) << 16 | UInt64(d[d.startIndex+o+i*8+3]) << 24; let hi = UInt64(d[d.startIndex+o+i*8+4]) << 32 | UInt64(d[d.startIndex+o+i*8+5]) << 40 | UInt64(d[d.startIndex+o+i*8+6]) << 48 | UInt64(d[d.startIndex+o+i*8+7]) << 56; return Double(bitPattern: lo | hi) }()
             }
         }
         o += 128
@@ -19111,27 +19111,27 @@ struct MsgWinchStatus: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            line_length = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            line_length = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            speed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            speed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            tension = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            tension = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            voltage = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            voltage = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            current = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            current = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
@@ -19139,7 +19139,7 @@ struct MsgWinchStatus: Sendable {
         }
         o += 4
         if o + 2 <= d.count {
-            temperature = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            temperature = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
     }
@@ -19161,7 +19161,7 @@ struct MsgWinchStatus: Sendable {
         o += 4
         do { let v = UInt32(truncatingIfNeeded: status); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt16(truncatingIfNeeded: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         return p
     }
@@ -19280,19 +19280,19 @@ struct MsgUavionixAdsbOutDynamic: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            gpsLat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            gpsLat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            gpsLon = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            gpsLon = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            gpsAlt = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            gpsAlt = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            baroAltMSL = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            baroAltMSL = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
@@ -19308,15 +19308,15 @@ struct MsgUavionixAdsbOutDynamic: Sendable {
         }
         o += 2
         if o + 2 <= d.count {
-            velVert = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            velVert = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            velNS = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            velNS = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            VelEW = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            VelEW = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
@@ -19346,13 +19346,13 @@ struct MsgUavionixAdsbOutDynamic: Sendable {
         var o = 0
         do { let v = UInt32(truncatingIfNeeded: utcTime); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: gpsLat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: gpsLat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: gpsLon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: gpsLon); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: gpsAlt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: gpsAlt); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: baroAltMSL); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: baroAltMSL); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let v = UInt32(truncatingIfNeeded: accuracyHor); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
@@ -19360,11 +19360,11 @@ struct MsgUavionixAdsbOutDynamic: Sendable {
         o += 2
         do { let v = UInt16(truncatingIfNeeded: accuracyVel); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: velVert); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: velVert); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: velNS); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: velNS); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: VelEW); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: VelEW); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         do { let v = UInt16(truncatingIfNeeded: state); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
@@ -19517,7 +19517,7 @@ struct MsgUavionixAdsbOutControl: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            baroAltMSL = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            baroAltMSL = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 2 <= d.count {
@@ -19545,7 +19545,7 @@ struct MsgUavionixAdsbOutControl: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 17)
         var o = 0
-        do { let v = UInt32(truncatingIfNeeded: baroAltMSL); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: baroAltMSL); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let v = UInt16(truncatingIfNeeded: squawk); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
@@ -19666,27 +19666,27 @@ struct MsgLoweheiserGovEfi: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            volt_batt = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            volt_batt = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            curr_batt = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            curr_batt = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            curr_gen = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            curr_gen = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            curr_rot = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            curr_rot = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            fuel_level = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            fuel_level = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            throttle = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            throttle = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
@@ -19694,55 +19694,55 @@ struct MsgLoweheiserGovEfi: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            until_maintenance = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            until_maintenance = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            rectifier_temp = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            rectifier_temp = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            generator_temp = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            generator_temp = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            efi_batt = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            efi_batt = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            efi_rpm = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            efi_rpm = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            efi_pw = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            efi_pw = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            efi_fuel_flow = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            efi_fuel_flow = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            efi_fuel_consumed = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            efi_fuel_consumed = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            efi_baro = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            efi_baro = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            efi_mat = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            efi_mat = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            efi_clt = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            efi_clt = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            efi_tps = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            efi_tps = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            efi_exhaust_gas_temperature = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            efi_exhaust_gas_temperature = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -19776,7 +19776,7 @@ struct MsgLoweheiserGovEfi: Sendable {
         o += 4
         do { let v = UInt32(truncatingIfNeeded: runtime); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: until_maintenance); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: until_maintenance); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let b = rectifier_temp.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
@@ -19943,7 +19943,7 @@ struct MsgDeviceOpReadReply: Sendable {
         }
         o += 1
         if o + 128 <= d.count {
-            data = (0..<128).map { i in
+            data = (0..<128).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -20037,7 +20037,7 @@ struct MsgDeviceOpWrite: Sendable {
         }
         o += 1
         if o + 128 <= d.count {
-            data = (0..<128).map { i in
+            data = (0..<128).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -20163,7 +20163,7 @@ struct MsgSecureCommand: Sendable {
         }
         o += 1
         if o + 220 <= d.count {
-            data = (0..<220).map { i in
+            data = (0..<220).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -20227,7 +20227,7 @@ struct MsgSecureCommandReply: Sendable {
         }
         o += 1
         if o + 220 <= d.count {
-            data = (0..<220).map { i in
+            data = (0..<220).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -20279,51 +20279,51 @@ struct MsgAdapTuning: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            desired = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            desired = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            achieved = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            achieved = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            error = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            error = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            theta = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            theta = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            omega = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            omega = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            sigma = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            sigma = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            theta_dot = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            theta_dot = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            omega_dot = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            omega_dot = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            sigma_dot = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            sigma_dot = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            f = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            f = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            f_dot = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            f_dot = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            u = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            u = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -20383,27 +20383,27 @@ struct MsgVisionPositionDelta: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 8 <= d.count {
-            time_delta_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_delta_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 12 <= d.count {
-            angle_delta = (0..<3).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            angle_delta = (0..<3).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 12
         if o + 12 <= d.count {
-            position_delta = (0..<3).map { i in
-                return Float(bitPattern: UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24)
+            position_delta = (0..<3).map { (i: Int) -> Float in
+                return { let b = UInt32(d[d.startIndex+o+i*4]) | UInt32(d[d.startIndex+o+i*4+1]) << 8 | UInt32(d[d.startIndex+o+i*4+2]) << 16 | UInt32(d[d.startIndex+o+i*4+3]) << 24; return Float(bitPattern: b) }()
             }
         }
         o += 12
         if o + 4 <= d.count {
-            confidence = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            confidence = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
     }
@@ -20445,15 +20445,15 @@ struct MsgAoaSsa: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            time_usec = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24 | UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56
+            time_usec = { let lo = UInt64(d[d.startIndex+o]) | UInt64(d[d.startIndex+o+1]) << 8 | UInt64(d[d.startIndex+o+2]) << 16 | UInt64(d[d.startIndex+o+3]) << 24; let hi = UInt64(d[d.startIndex+o+4]) << 32 | UInt64(d[d.startIndex+o+5]) << 40 | UInt64(d[d.startIndex+o+6]) << 48 | UInt64(d[d.startIndex+o+7]) << 56; return lo | hi }()
         }
         o += 8
         if o + 4 <= d.count {
-            AOA = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            AOA = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            SSA = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            SSA = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
     }
@@ -20490,37 +20490,37 @@ struct MsgEscTelemetry1To4: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            voltage = (0..<4).map { i in
+            voltage = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            current = (0..<4).map { i in
+            current = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            totalcurrent = (0..<4).map { i in
+            totalcurrent = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            rpm = (0..<4).map { i in
+            rpm = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            count = (0..<4).map { i in
+            count = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 4 <= d.count {
-            temperature = (0..<4).map { i in
+            temperature = (0..<4).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -20577,37 +20577,37 @@ struct MsgEscTelemetry5To8: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            voltage = (0..<4).map { i in
+            voltage = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            current = (0..<4).map { i in
+            current = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            totalcurrent = (0..<4).map { i in
+            totalcurrent = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            rpm = (0..<4).map { i in
+            rpm = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            count = (0..<4).map { i in
+            count = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 4 <= d.count {
-            temperature = (0..<4).map { i in
+            temperature = (0..<4).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -20664,37 +20664,37 @@ struct MsgEscTelemetry9To12: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            voltage = (0..<4).map { i in
+            voltage = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            current = (0..<4).map { i in
+            current = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            totalcurrent = (0..<4).map { i in
+            totalcurrent = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            rpm = (0..<4).map { i in
+            rpm = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            count = (0..<4).map { i in
+            count = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 4 <= d.count {
-            temperature = (0..<4).map { i in
+            temperature = (0..<4).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -20759,15 +20759,15 @@ struct MsgOsdParamConfig: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            min_value = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            min_value = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            max_value = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            max_value = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            increment = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            increment = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -20941,15 +20941,15 @@ struct MsgOsdParamShowConfigReply: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            min_value = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            min_value = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            max_value = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            max_value = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            increment = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            increment = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -21016,23 +21016,23 @@ struct MsgObstacleDistance3d: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            x = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            x = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            y = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            y = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            z = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            z = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            min_distance = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            min_distance = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            max_distance = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            max_distance = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -21102,35 +21102,35 @@ struct MsgWaterDepth: Sendable {
         }
         o += 4
         if o + 4 <= d.count {
-            lat = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lat = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            lng = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            lng = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            alt = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            alt = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            roll = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            roll = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            pitch = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            pitch = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            yaw = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            yaw = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            distance = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            distance = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            temperature = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            temperature = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
@@ -21148,9 +21148,9 @@ struct MsgWaterDepth: Sendable {
         var o = 0
         do { let v = UInt32(truncatingIfNeeded: time_boot_ms); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lat); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: lng); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: lng); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let b = alt.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
@@ -21190,7 +21190,7 @@ struct MsgMcuStatus: Sendable {
         let d = payload
         var o = 0
         if o + 2 <= d.count {
-            MCU_temperature = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            MCU_temperature = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
@@ -21214,7 +21214,7 @@ struct MsgMcuStatus: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 9)
         var o = 0
-        do { let v = UInt16(truncatingIfNeeded: MCU_temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: MCU_temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         do { let v = UInt16(truncatingIfNeeded: MCU_voltage); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
@@ -21247,37 +21247,37 @@ struct MsgEscTelemetry13To16: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            voltage = (0..<4).map { i in
+            voltage = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            current = (0..<4).map { i in
+            current = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            totalcurrent = (0..<4).map { i in
+            totalcurrent = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            rpm = (0..<4).map { i in
+            rpm = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            count = (0..<4).map { i in
+            count = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 4 <= d.count {
-            temperature = (0..<4).map { i in
+            temperature = (0..<4).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -21334,37 +21334,37 @@ struct MsgEscTelemetry17To20: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            voltage = (0..<4).map { i in
+            voltage = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            current = (0..<4).map { i in
+            current = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            totalcurrent = (0..<4).map { i in
+            totalcurrent = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            rpm = (0..<4).map { i in
+            rpm = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            count = (0..<4).map { i in
+            count = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 4 <= d.count {
-            temperature = (0..<4).map { i in
+            temperature = (0..<4).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -21421,37 +21421,37 @@ struct MsgEscTelemetry21To24: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            voltage = (0..<4).map { i in
+            voltage = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            current = (0..<4).map { i in
+            current = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            totalcurrent = (0..<4).map { i in
+            totalcurrent = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            rpm = (0..<4).map { i in
+            rpm = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            count = (0..<4).map { i in
+            count = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 4 <= d.count {
-            temperature = (0..<4).map { i in
+            temperature = (0..<4).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -21508,37 +21508,37 @@ struct MsgEscTelemetry25To28: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            voltage = (0..<4).map { i in
+            voltage = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            current = (0..<4).map { i in
+            current = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            totalcurrent = (0..<4).map { i in
+            totalcurrent = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            rpm = (0..<4).map { i in
+            rpm = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            count = (0..<4).map { i in
+            count = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 4 <= d.count {
-            temperature = (0..<4).map { i in
+            temperature = (0..<4).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -21595,37 +21595,37 @@ struct MsgEscTelemetry29To32: Sendable {
         let d = payload
         var o = 0
         if o + 8 <= d.count {
-            voltage = (0..<4).map { i in
+            voltage = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            current = (0..<4).map { i in
+            current = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            totalcurrent = (0..<4).map { i in
+            totalcurrent = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            rpm = (0..<4).map { i in
+            rpm = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 8 <= d.count {
-            count = (0..<4).map { i in
+            count = (0..<4).map { (i: Int) -> UInt16 in
                 return UInt16(d[d.startIndex+o+i*2]) | UInt16(d[d.startIndex+o+i*2+1]) << 8
             }
         }
         o += 8
         if o + 4 <= d.count {
-            temperature = (0..<4).map { i in
+            temperature = (0..<4).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -21690,7 +21690,7 @@ struct MsgOpenDroneIdBasicId: Sendable {
         }
         o += 1
         if o + 20 <= d.count {
-            id_or_mac = (0..<20).map { i in
+            id_or_mac = (0..<20).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -21704,7 +21704,7 @@ struct MsgOpenDroneIdBasicId: Sendable {
         }
         o += 1
         if o + 20 <= d.count {
-            uas_id = (0..<20).map { i in
+            uas_id = (0..<20).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -21766,27 +21766,27 @@ struct MsgOpenDroneIdLocation: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            latitude = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            latitude = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            longitude = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            longitude = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            altitude_barometric = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            altitude_barometric = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            altitude_geodetic = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            altitude_geodetic = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            height = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            height = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            timestamp = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            timestamp = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 2 <= d.count {
@@ -21798,7 +21798,7 @@ struct MsgOpenDroneIdLocation: Sendable {
         }
         o += 2
         if o + 2 <= d.count {
-            speed_vertical = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            speed_vertical = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 1 <= d.count {
@@ -21810,7 +21810,7 @@ struct MsgOpenDroneIdLocation: Sendable {
         }
         o += 1
         if o + 20 <= d.count {
-            id_or_mac = (0..<20).map { i in
+            id_or_mac = (0..<20).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -21848,9 +21848,9 @@ struct MsgOpenDroneIdLocation: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 59)
         var o = 0
-        do { let v = UInt32(truncatingIfNeeded: latitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: latitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: longitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: longitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let b = altitude_barometric.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
@@ -21864,7 +21864,7 @@ struct MsgOpenDroneIdLocation: Sendable {
         o += 2
         do { let v = UInt16(truncatingIfNeeded: speed_horizontal); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: speed_vertical); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: speed_vertical); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         p[o] = UInt8(truncatingIfNeeded: target_system)
         o += 1
@@ -21926,7 +21926,7 @@ struct MsgOpenDroneIdAuthentication: Sendable {
         }
         o += 1
         if o + 20 <= d.count {
-            id_or_mac = (0..<20).map { i in
+            id_or_mac = (0..<20).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -21948,7 +21948,7 @@ struct MsgOpenDroneIdAuthentication: Sendable {
         }
         o += 1
         if o + 23 <= d.count {
-            authentication_data = (0..<23).map { i in
+            authentication_data = (0..<23).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -22010,7 +22010,7 @@ struct MsgOpenDroneIdSelfId: Sendable {
         }
         o += 1
         if o + 20 <= d.count {
-            id_or_mac = (0..<20).map { i in
+            id_or_mac = (0..<20).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -22075,23 +22075,23 @@ struct MsgOpenDroneIdSystem: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            operator_latitude = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            operator_latitude = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            operator_longitude = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            operator_longitude = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            area_ceiling = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            area_ceiling = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            area_floor = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            area_floor = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            operator_altitude_geo = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            operator_altitude_geo = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
@@ -22115,7 +22115,7 @@ struct MsgOpenDroneIdSystem: Sendable {
         }
         o += 1
         if o + 20 <= d.count {
-            id_or_mac = (0..<20).map { i in
+            id_or_mac = (0..<20).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -22141,9 +22141,9 @@ struct MsgOpenDroneIdSystem: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 54)
         var o = 0
-        do { let v = UInt32(truncatingIfNeeded: operator_latitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: operator_latitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: operator_longitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: operator_longitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let b = area_ceiling.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
@@ -22203,7 +22203,7 @@ struct MsgOpenDroneIdOperatorId: Sendable {
         }
         o += 1
         if o + 20 <= d.count {
-            id_or_mac = (0..<20).map { i in
+            id_or_mac = (0..<20).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -22267,7 +22267,7 @@ struct MsgOpenDroneIdMessagePack: Sendable {
         }
         o += 1
         if o + 20 <= d.count {
-            id_or_mac = (0..<20).map { i in
+            id_or_mac = (0..<20).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -22281,7 +22281,7 @@ struct MsgOpenDroneIdMessagePack: Sendable {
         }
         o += 1
         if o + 225 <= d.count {
-            messages = (0..<225).map { i in
+            messages = (0..<225).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -22368,15 +22368,15 @@ struct MsgOpenDroneIdSystemUpdate: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            operator_latitude = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            operator_latitude = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            operator_longitude = Int32(d[d.startIndex+o]) | Int32(d[d.startIndex+o+1]) << 8 | Int32(d[d.startIndex+o+2]) << 16 | Int32(d[d.startIndex+o+3]) << 24
+            operator_longitude = Int32(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
         }
         o += 4
         if o + 4 <= d.count {
-            operator_altitude_geo = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            operator_altitude_geo = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
@@ -22396,9 +22396,9 @@ struct MsgOpenDroneIdSystemUpdate: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 18)
         var o = 0
-        do { let v = UInt32(truncatingIfNeeded: operator_latitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: operator_latitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt32(truncatingIfNeeded: operator_longitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
+        do { let v = UInt32(bitPattern: operator_longitude); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
         do { let b = operator_altitude_geo.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
@@ -22428,7 +22428,7 @@ struct MsgHygrometerSensor: Sendable {
         let d = payload
         var o = 0
         if o + 2 <= d.count {
-            temperature = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            temperature = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
@@ -22444,7 +22444,7 @@ struct MsgHygrometerSensor: Sendable {
     func encode() -> [UInt8] {
         var p = [UInt8](repeating: 0, count: 5)
         var o = 0
-        do { let v = UInt16(truncatingIfNeeded: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: temperature); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         do { let v = UInt16(truncatingIfNeeded: humidity); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
@@ -22511,47 +22511,47 @@ struct MsgIcarousKinematicBands: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            min1 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            min1 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            max1 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            max1 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            min2 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            min2 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            max2 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            max2 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            min3 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            min3 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            max3 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            max3 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            min4 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            min4 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            max4 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            max4 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            min5 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            min5 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
-            max5 = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            max5 = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 1 <= d.count {
-            numBands = d[d.startIndex+o]
+            numBands = Int8(bitPattern: d[d.startIndex+o])
         }
         o += 1
         if o + 1 <= d.count {
@@ -22599,7 +22599,7 @@ struct MsgIcarousKinematicBands: Sendable {
         o += 4
         do { let b = max5.bitPattern; p[o] = UInt8(b & 0xFF); p[o+1] = UInt8((b >> 8) & 0xFF); p[o+2] = UInt8((b >> 16) & 0xFF); p[o+3] = UInt8((b >> 24) & 0xFF) }
         o += 4
-        p[o] = UInt8(truncatingIfNeeded: numBands)
+        p[o] = UInt8(bitPattern: numBands)
         o += 1
         p[o] = UInt8(truncatingIfNeeded: type1)
         o += 1
@@ -22629,7 +22629,7 @@ struct MsgCubepilotRawRc: Sendable {
         let d = payload
         var o = 0
         if o + 32 <= d.count {
-            rc_raw = (0..<32).map { i in
+            rc_raw = (0..<32).map { (i: Int) -> UInt8 in
                 return d[d.startIndex+o+i*1]
             }
         }
@@ -22668,7 +22668,7 @@ struct MsgHerelinkVideoStreamInformation: Sendable {
         let d = payload
         var o = 0
         if o + 4 <= d.count {
-            framerate = Float(bitPattern: UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24)
+            framerate = { let b = UInt32(d[d.startIndex+o]) | UInt32(d[d.startIndex+o+1]) << 8 | UInt32(d[d.startIndex+o+2]) << 16 | UInt32(d[d.startIndex+o+3]) << 24; return Float(bitPattern: b) }()
         }
         o += 4
         if o + 4 <= d.count {
@@ -22759,15 +22759,15 @@ struct MsgHerelinkTelem: Sendable {
         }
         o += 4
         if o + 2 <= d.count {
-            snr = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            snr = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            cpu_temp = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            cpu_temp = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 2 <= d.count {
-            board_temp = Int16(d[d.startIndex+o]) | Int16(d[d.startIndex+o+1]) << 8
+            board_temp = Int16(bitPattern: UInt16(d[d.startIndex+o]) | UInt16(d[d.startIndex+o+1]) << 8)
         }
         o += 2
         if o + 1 <= d.count {
@@ -22785,11 +22785,11 @@ struct MsgHerelinkTelem: Sendable {
         o += 4
         do { let v = UInt32(truncatingIfNeeded: link_rate); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF); p[o+2] = UInt8((v >> 16) & 0xFF); p[o+3] = UInt8((v >> 24) & 0xFF) }
         o += 4
-        do { let v = UInt16(truncatingIfNeeded: snr); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: snr); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: cpu_temp); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: cpu_temp); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
-        do { let v = UInt16(truncatingIfNeeded: board_temp); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
+        do { let v = UInt16(bitPattern: board_temp); p[o] = UInt8(v & 0xFF); p[o+1] = UInt8((v >> 8) & 0xFF) }
         o += 2
         p[o] = UInt8(truncatingIfNeeded: rssi)
         o += 1
