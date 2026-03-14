@@ -17,6 +17,7 @@ final class MissionService {
     var isMissionUploading = false
     var isMissionDownloading = false
     var downloadedMission: [Waypoint] = []
+    var downloadedFence: [CLLocationCoordinate2D] = []
 
     // MARK: - Drone Reference
 
@@ -31,6 +32,7 @@ final class MissionService {
     func reset() {
         drone = nil
         downloadedMission = []
+        downloadedFence = []
         isMissionUploading = false
         isMissionDownloading = false
         missionUploadStatus = ""
@@ -307,6 +309,67 @@ final class MissionService {
                 self.isMissionDownloading = false
                 statusCallback("Downloaded \(waypoints.count) waypoints")
                 completion(waypoints)
+            }
+        }
+    }
+
+    // MARK: - Fence Download
+
+    func downloadFence(statusCallback: @escaping (String) -> Void) {
+        guard let drone else {
+            statusCallback("No drone connected")
+            return
+        }
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
+
+            drone.drainMissionQueue()
+            drone.sendMissionRequestList(missionType: 1)  // MAV_MISSION_TYPE_FENCE
+
+            // Wait for MISSION_COUNT
+            guard let countFrame = drone.recvMissionMessage(timeout: 5.0),
+                  countFrame.messageID == MsgMissionCount.id else {
+                DispatchQueue.main.async {
+                    statusCallback("No fence on drone")
+                }
+                return
+            }
+
+            let count = Int(MsgMissionCount(from: countFrame.payload).count)
+            if count == 0 {
+                DispatchQueue.main.async {
+                    statusCallback("No fence items")
+                }
+                return
+            }
+
+            var points: [CLLocationCoordinate2D] = []
+
+            for seq in 0..<UInt16(count) {
+                drone.sendMissionRequestInt(seq: seq, missionType: 1)
+
+                guard let itemFrame = drone.recvMissionMessage(timeout: 5.0),
+                      itemFrame.messageID == MsgMissionItemInt.id else {
+                    DispatchQueue.main.async {
+                        statusCallback("Fence download failed at \(seq)")
+                    }
+                    return
+                }
+
+                let item = MsgMissionItemInt(from: itemFrame.payload)
+                let lat = Double(item.x) / 1e7
+                let lon = Double(item.y) / 1e7
+                if lat != 0 || lon != 0 {
+                    points.append(CLLocationCoordinate2D(latitude: lat, longitude: lon))
+                }
+            }
+
+            drone.sendMissionAck(type: 0, missionType: 1)
+
+            DispatchQueue.main.async {
+                self.downloadedFence = points
+                statusCallback("Downloaded \(points.count) fence points")
             }
         }
     }

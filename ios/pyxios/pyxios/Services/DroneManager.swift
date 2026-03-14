@@ -112,7 +112,7 @@ final class DroneManager {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
                     self?.cameraService.startDiscovery()
                 }
-                // Auto-download mission after connection stabilizes
+                // Auto-download mission and fence after connection stabilizes
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
                     guard let self, self.state.connectionState.isConnected else { return }
                     self.missionService.downloadMission(statusCallback: { [weak self] msg in
@@ -120,6 +120,12 @@ final class DroneManager {
                     }) { [weak self] waypoints in
                         if let waypoints, !waypoints.isEmpty {
                             self?.missionService.downloadedMission = waypoints
+                        }
+                        // Download fence after mission completes (shared mission queue)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+                            self?.missionService.downloadFence { [weak self] msg in
+                                self?.statusMessage = msg
+                            }
                         }
                     }
                 }
