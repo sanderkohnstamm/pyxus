@@ -145,7 +145,7 @@ export default function ConnectionModal({ open, onClose, onConnect, connecting }
           <select
             value={connType}
             onChange={(e) => handleTypeChange(e.target.value)}
-            className="bg-gray-800/40 text-gray-400 border border-gray-700/40 rounded-lg px-2.5 py-1.5 text-[11px] font-mono focus:outline-none focus:border-cyan-500/30 transition-colors"
+            className="bg-gray-800/40 text-gray-400 border border-gray-700/40 rounded-lg px-2.5 py-1.5 text-[11px] font-mono focus:outline-none focus:border-gray-500/30 transition-colors"
           >
             <option value="udp">UDP</option>
             <option value="tcp">TCP</option>
@@ -157,7 +157,7 @@ export default function ConnectionModal({ open, onClose, onConnect, connecting }
             value={connString}
             onChange={(e) => setConnString(e.target.value)}
             placeholder="Connection string..."
-            className="bg-gray-800/40 text-gray-300 border border-gray-700/40 rounded-lg px-2.5 py-1.5 text-[11px] font-mono focus:outline-none focus:border-cyan-500/30 transition-colors placeholder:text-gray-600"
+            className="bg-gray-800/40 text-gray-300 border border-gray-700/40 rounded-lg px-2.5 py-1.5 text-[11px] font-mono focus:outline-none focus:border-gray-500/30 transition-colors placeholder:text-gray-600"
           />
 
           <input
@@ -165,13 +165,13 @@ export default function ConnectionModal({ open, onClose, onConnect, connecting }
             value={droneName}
             onChange={(e) => setDroneName(e.target.value)}
             placeholder="Name (optional)..."
-            className="bg-gray-800/40 text-gray-300 border border-gray-700/40 rounded-lg px-2.5 py-1.5 text-[11px] font-mono focus:outline-none focus:border-cyan-500/30 transition-colors placeholder:text-gray-600"
+            className="bg-gray-800/40 text-gray-300 border border-gray-700/40 rounded-lg px-2.5 py-1.5 text-[11px] font-mono focus:outline-none focus:border-gray-500/30 transition-colors placeholder:text-gray-600"
           />
 
           <button
             type="submit"
             disabled={connecting || !connString.trim()}
-            className="mt-1 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-400/80 border border-cyan-500/20 transition-all disabled:opacity-50"
+            className="mt-1 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-gray-500/15 hover:bg-gray-500/25 text-gray-400/80 border border-gray-500/20 transition-all disabled:opacity-50"
           >
             {connecting ? 'Connecting...' : 'Connect'}
           </button>

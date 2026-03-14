@@ -1,9 +1,8 @@
 import React, { useEffect, useCallback, useRef } from 'react';
-import { Map as MapIcon, Plane, Wrench, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import useWebSocket from './hooks/useWebSocket';
 import useDroneStore from './store/droneStore';
 import { INITIAL_TELEMETRY } from './store/droneStore';
-import { droneApi, fetchWithTimeout } from './utils/api';
+import { droneApi, fetchWithTimeout, apiUrl } from './utils/api';
 import { getCommandConfirmation } from './utils/commandSafety';
 
 const RC_CENTER = 1500;
@@ -94,7 +93,6 @@ function executeGamepadAction(action, addAlert) {
     const activeDrone = store.activeDroneId ? store.drones[store.activeDroneId] : null;
     const tel = activeDrone?.telemetry || INITIAL_TELEMETRY;
 
-    // Resolve the actual command for toggle_arm
     let command = action;
     if (action === 'toggle_arm') {
       command = tel.armed ? 'disarm' : 'arm';
@@ -108,18 +106,16 @@ function executeGamepadAction(action, addAlert) {
   }
   executeGamepadActionDirect(action, addAlert);
 }
-import ConnectionBar from './components/ConnectionBar';
+
 import MapView from './components/Map';
-import Telemetry from './components/Telemetry';
-import Controls from './components/Controls';
-import MissionPanel from './components/MissionPanel';
-import ToolsPanel from './components/ToolsPanel';
-import FlyOverlay from './components/FlyOverlay';
-import AttitudeIndicator from './components/AttitudeIndicator';
+import FloatingStatusBar from './components/FloatingStatusBar';
+import DronePopover from './components/DronePopover';
+import MenuPanel from './components/MenuPanel';
+import FloatingActionBar from './components/FloatingActionBar';
+import FloatingPlanBar from './components/FloatingPlanBar';
 import BatteryMonitor from './components/BatteryMonitor';
 import ConnectionMonitor from './components/ConnectionMonitor';
 import ConfirmationDialog from './components/ConfirmationDialog';
-import BatteryChart from './components/BatteryChart';
 import ErrorBoundary from './components/ErrorBoundary';
 
 export default function App() {
@@ -132,13 +128,62 @@ export default function App() {
   const telemetry = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry : INITIAL_TELEMETRY) || INITIAL_TELEMETRY;
   const homePosition = useDroneStore((s) => s.homePosition);
   const setHomePosition = useDroneStore((s) => s.setHomePosition);
-  const isConnected = !!activeDroneId;
+  const heartbeatAge = telemetry.heartbeat_age;
+  const isConnected = !!activeDroneId && heartbeatAge >= 0;
+
+  // UI state
+  const activeTab = useDroneStore((s) => s.activeTab);
+  const menuOpen = useDroneStore((s) => s.menuOpen);
+  const closeMenu = useDroneStore((s) => s.closeMenu);
+  const dronePopoverOpen = useDroneStore((s) => s.dronePopoverOpen);
+  const closeDronePopover = useDroneStore((s) => s.closeDronePopover);
+  const alerts = useDroneStore((s) => s.alerts);
+  const theme = useDroneStore((s) => s.theme);
+  const colorScheme = useDroneStore((s) => s.colorScheme);
+
+  // Video state
+  const videoUrl = useDroneStore((s) => s.videoUrl);
+  const videoActive = useDroneStore((s) => s.videoActive);
+  const streamUrl = videoActive && videoUrl
+    ? apiUrl(`/api/video/stream?url=${encodeURIComponent(videoUrl)}`)
+    : null;
+
+  // Bootstrap: load settings + discover already-connected drones
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const settingsRes = await fetch('/api/settings');
+        const settingsData = await settingsRes.json();
+        if (!cancelled && settingsData.status === 'ok') {
+          const s = settingsData.settings;
+          const store = useDroneStore.getState();
+          if (s.flight) {
+            if (s.flight.default_alt) store.setDefaultAlt(s.flight.default_alt);
+            if (s.flight.default_speed) store.setDefaultSpeed(s.flight.default_speed);
+            if (s.flight.takeoff_alt) store.setTakeoffAlt(s.flight.takeoff_alt);
+          }
+          if (s.video?.url) store.setVideoUrl(s.video.url);
+        }
+      } catch {}
+      try {
+        const res = await fetch('/api/drones');
+        const data = await res.json();
+        if (!cancelled && data.status === 'ok' && data.drones?.length > 0) {
+          const store = useDroneStore.getState();
+          for (const d of data.drones) {
+            store.registerDrone(d.drone_id, d.name, d.connection_string);
+          }
+        }
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // Update home position from vehicle's HOME_POSITION message
   useEffect(() => {
     if (isConnected && telemetry.home_lat && telemetry.home_lon &&
         telemetry.home_lat !== 0 && telemetry.home_lon !== 0) {
-      // Only update if home position actually changed
       if (!homePosition ||
           homePosition.lat !== telemetry.home_lat ||
           homePosition.lon !== telemetry.home_lon) {
@@ -247,6 +292,13 @@ export default function App() {
       // Don't trigger if typing in input
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
 
+      // Escape closes menu
+      if (e.key === 'Escape') {
+        const store = useDroneStore.getState();
+        if (store.menuOpen) { store.closeMenu(); e.preventDefault(); return; }
+        if (store.dronePopoverOpen) { store.closeDronePopover(); e.preventDefault(); return; }
+      }
+
       const key = e.key.toLowerCase();
 
       // Check command hotkeys
@@ -269,7 +321,6 @@ export default function App() {
           actuateServoGroup(group, 'close');
           return;
         }
-        // Legacy single hotkey (toggle)
         if (group.hotkey === key) {
           e.preventDefault();
           const newAction = group.state === 'open' ? 'close' : 'open';
@@ -283,17 +334,16 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isConnected, commandHotkeys, servoGroups, executeCommand, actuateServoGroup]);
 
-  // Gamepad RC override + button handling - runs globally regardless of active tab
+  // Gamepad RC override + button handling
   const gamepadEnabled = useDroneStore((s) => s.gamepadEnabled);
   const updateManualControlRc = useDroneStore((s) => s.updateManualControlRc);
   const gamepadIntervalRef = useRef(null);
   const gamepadConfigRef = useRef(loadGamepadConfig());
   const prevButtonsRef = useRef({});
 
-  // Reload config when gamepad is toggled (user may have changed settings)
   useEffect(() => {
     gamepadConfigRef.current = loadGamepadConfig();
-    prevButtonsRef.current = {}; // Reset button state on config reload
+    prevButtonsRef.current = {};
   }, [gamepadEnabled]);
 
   useEffect(() => {
@@ -307,13 +357,9 @@ export default function App() {
 
     gamepadIntervalRef.current = setInterval(() => {
       const gps = navigator.getGamepads ? navigator.getGamepads() : [];
-      // Find first connected gamepad
       let gp = null;
       for (let i = 0; i < gps.length; i++) {
-        if (gps[i]) {
-          gp = gps[i];
-          break;
-        }
+        if (gps[i]) { gp = gps[i]; break; }
       }
       if (!gp) return;
 
@@ -323,29 +369,21 @@ export default function App() {
       for (let i = 0; i < gp.axes.length; i++) {
         const mapping = config.axisMappings?.[i];
         if (!mapping || mapping.channel === 'none') continue;
-
         let val = gp.axes[i];
         const dz = mapping.deadzone || 0.1;
         if (Math.abs(val) < dz) val = 0;
         if (mapping.inverted) val = -val;
-
         const rc = RC_CENTER + Math.round(val * RC_RANGE);
         channels[mapping.channel] = Math.max(RC_MIN, Math.min(RC_MAX, rc));
       }
 
       const rcChannels = [channels.roll, channels.pitch, channels.throttle, channels.yaw];
 
-      // Only send to drone if connected
       if (isConnected) {
-        sendMessage({
-          type: 'rc_override',
-          channels: rcChannels,
-        });
+        sendMessage({ type: 'rc_override', channels: rcChannels });
       }
-      // Always update visualization
       updateManualControlRc(rcChannels);
 
-      // Button press detection (edge trigger) - only when connected
       if (isConnected && config.buttonMappings) {
         const prev = prevButtonsRef.current;
         for (let i = 0; i < gp.buttons.length; i++) {
@@ -369,108 +407,178 @@ export default function App() {
     };
   }, [gamepadEnabled, isConnected, sendMessage, updateManualControlRc, addAlertStore]);
 
-  const alerts = useDroneStore((s) => s.alerts);
-  const activeTab = useDroneStore((s) => s.activeTab);
-  const setActiveTab = useDroneStore((s) => s.setActiveTab);
-  const theme = useDroneStore((s) => s.theme);
-  const colorScheme = useDroneStore((s) => s.colorScheme);
-  const sidebarCollapsed = useDroneStore((s) => s.sidebarCollapsed);
-  const toggleSidebar = useDroneStore((s) => s.toggleSidebar);
+  // Keyboard RC override — runs globally so it works even when menu is closed
+  const keyboardEnabled = useDroneStore((s) => s.keyboardEnabled);
+  const setKeyPressed = useDroneStore((s) => s.setKeyPressed);
+  const setManualControlActive = useDroneStore((s) => s.setManualControlActive);
+  const keyboardRcRef = useRef(null);
+
+  useEffect(() => {
+    if (!keyboardEnabled) return;
+
+    const TRACKED_KEYS = ['w', 'a', 's', 'd', 'q', 'e', 'r', 'f', ' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
+
+    const handleKeyDown = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+      const key = e.key.toLowerCase();
+      if (TRACKED_KEYS.includes(key)) {
+        e.preventDefault();
+        setKeyPressed(key === ' ' ? 'space' : key, true);
+      }
+    };
+
+    const handleKeyUp = (e) => {
+      const key = e.key.toLowerCase();
+      if (TRACKED_KEYS.includes(key)) {
+        e.preventDefault();
+        setKeyPressed(key === ' ' ? 'space' : key, false);
+
+        if (key === ' ') {
+          const store = useDroneStore.getState();
+          const activeDrone = store.activeDroneId ? store.drones[store.activeDroneId] : null;
+          const tel = activeDrone?.telemetry || INITIAL_TELEMETRY;
+          if (tel.armed) {
+            if (store.confirmDangerousCommands) {
+              const confirmation = getCommandConfirmation('disarm', tel);
+              if (confirmation) {
+                store.showConfirmationDialog({ ...confirmation, onConfirm: () => executeCommandDirect('disarm') });
+                return;
+              }
+            }
+            executeCommandDirect('disarm');
+          } else {
+            store.setShowPreFlightChecklist(true);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [keyboardEnabled, setKeyPressed, executeCommandDirect]);
+
+  // Keyboard RC send loop at 20Hz
+  useEffect(() => {
+    if (!keyboardEnabled) {
+      if (keyboardRcRef.current) {
+        clearInterval(keyboardRcRef.current);
+        keyboardRcRef.current = null;
+      }
+      return;
+    }
+
+    const RC_OFFSET = 300;
+    keyboardRcRef.current = setInterval(() => {
+      const keys = useDroneStore.getState().keysPressed;
+
+      let roll = RC_CENTER, pitch = RC_CENTER, throttle = RC_CENTER, yaw = RC_CENTER;
+      if (keys.w) throttle += RC_OFFSET;
+      if (keys.s) throttle -= RC_OFFSET;
+      if (keys.a) roll -= RC_OFFSET;
+      if (keys.d) roll += RC_OFFSET;
+      if (keys.q) yaw -= RC_OFFSET;
+      if (keys.e) yaw += RC_OFFSET;
+      if (keys.r) throttle += RC_OFFSET;
+      if (keys.f) throttle -= RC_OFFSET;
+      if (keys.arrowup) pitch -= RC_OFFSET;
+      if (keys.arrowdown) pitch += RC_OFFSET;
+      if (keys.arrowleft) yaw -= RC_OFFSET;
+      if (keys.arrowright) yaw += RC_OFFSET;
+
+      roll = Math.max(RC_MIN, Math.min(RC_MAX, roll));
+      pitch = Math.max(RC_MIN, Math.min(RC_MAX, pitch));
+      throttle = Math.max(RC_MIN, Math.min(RC_MAX, throttle));
+      yaw = Math.max(RC_MIN, Math.min(RC_MAX, yaw));
+
+      const channels = [roll, pitch, throttle, yaw];
+      if (isConnected) {
+        sendMessage({ type: 'rc_override', channels });
+      }
+      updateManualControlRc(channels);
+    }, RC_SEND_RATE);
+
+    return () => {
+      if (keyboardRcRef.current) {
+        clearInterval(keyboardRcRef.current);
+        keyboardRcRef.current = null;
+      }
+      setManualControlActive(false);
+    };
+  }, [keyboardEnabled, isConnected, sendMessage, updateManualControlRc, setManualControlActive]);
 
   // Build class string with theme and color scheme
   const themeClass = theme === 'light' ? 'light' : '';
   const schemeClass = colorScheme !== 'cyan' ? `scheme-${colorScheme}` : '';
 
-  return (
-    <div className={`h-full flex flex-col bg-gray-950 text-gray-100 ${themeClass} ${schemeClass}`}>
-      {/* Top bar */}
-      <ConnectionBar />
+  // Determine which floating bar to show based on active view
+  const showCommandBar = (activeTab === 'command' || activeTab === 'video') && isConnected && !menuOpen;
+  const showPlanBar = activeTab === 'plan' && !menuOpen;
 
-      {/* Main content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left: Map */}
-        <div className="flex-1 relative">
+  return (
+    <div className={`h-full relative bg-gray-950 text-gray-100 ${themeClass} ${schemeClass}`}>
+      {/* Full-screen background — map or video */}
+      <div className="absolute inset-0 z-0">
+        {activeTab === 'video' ? (
+          <div className="w-full h-full bg-black flex items-center justify-center">
+            {streamUrl ? (
+              <img src={streamUrl} alt="Video feed" className="w-full h-full object-contain" />
+            ) : (
+              <div className="flex flex-col items-center gap-3 text-gray-600">
+                <span className="text-4xl opacity-20">&#x1F4F9;</span>
+                <span className="text-sm">No video feed</span>
+                <span className="text-xs opacity-50">Configure video URL in Tools</span>
+              </div>
+            )}
+          </div>
+        ) : (
           <ErrorBoundary name="MapView">
             <MapView />
           </ErrorBoundary>
-          {/* Fly controls overlay */}
-          {activeTab === 'flying' && (
-            <ErrorBoundary name="FlyOverlay">
-              <FlyOverlay />
-            </ErrorBoundary>
-          )}
-        </div>
-
-        {/* Sidebar collapse toggle */}
-        <button
-          onClick={toggleSidebar}
-          className="self-center z-10 -mr-px flex items-center justify-center w-5 h-10 bg-gray-950/50 border border-gray-800/15 rounded-l-md text-gray-500 hover:text-gray-400 transition-colors backdrop-blur-xl"
-        >
-          {sidebarCollapsed ? <PanelRightOpen size={12} /> : <PanelRightClose size={12} />}
-        </button>
-
-        {/* Right: Panels */}
-        <div className={`${sidebarCollapsed ? 'w-0 overflow-hidden' : 'w-96'} flex flex-col border-l border-gray-800/10 bg-gray-950/15 backdrop-blur-xl transition-all duration-200`}>
-          {/* Tab bar */}
-          <div className="flex border-b border-gray-800/25 shrink-0">
-            {[
-              { id: 'planning', label: 'Plan', icon: MapIcon },
-              { id: 'flying', label: 'Fly', icon: Plane },
-              { id: 'tools', label: 'Tools', icon: Wrench },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-semibold uppercase tracking-wider transition-colors relative ${
-                  activeTab === tab.id
-                    ? 'text-cyan-400'
-                    : 'text-gray-500 hover:text-gray-300'
-                }`}
-              >
-                <tab.icon size={13} />
-                {tab.label}
-                {activeTab === tab.id && (
-                  <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-cyan-400 rounded-full" />
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Tab content */}
-          <div className="flex-1 overflow-y-auto">
-            <ErrorBoundary name="SidebarPanel">
-              {activeTab === 'planning' ? (
-                <MissionPanel />
-              ) : activeTab === 'flying' ? (
-                <>
-                  <Telemetry />
-                  <BatteryChart />
-                  <div className="px-4 pb-4">
-                    <AttitudeIndicator />
-                  </div>
-                  <Controls sendMessage={sendMessage} />
-                </>
-              ) : (
-                <ToolsPanel sendMessage={sendMessage} />
-              )}
-            </ErrorBoundary>
-          </div>
-        </div>
+        )}
       </div>
 
+      {/* Floating UI layer */}
+      <FloatingStatusBar />
+
+      {/* Drone popover */}
+      {dronePopoverOpen && (
+        <>
+          <div className="fixed inset-0 z-[104]" onClick={closeDronePopover} />
+          <DronePopover />
+        </>
+      )}
+
+      {/* Menu panel with backdrop */}
+      {menuOpen && (
+        <>
+          <div className="fixed inset-0 z-[93]" onClick={closeMenu} />
+          <MenuPanel />
+        </>
+      )}
+
+      {/* Floating action bar — command and video views */}
+      {showCommandBar && <FloatingActionBar />}
+
+      {/* Floating plan bar — plan view */}
+      {showPlanBar && <FloatingPlanBar />}
+
       {/* Alerts overlay */}
-      <div className="fixed top-12 left-4 z-[9999] flex flex-col gap-2 max-w-sm">
+      <div className="fixed top-16 left-[140px] z-[101] flex flex-col gap-2 max-w-sm">
         {alerts.map((alert) => (
           <div
             key={alert.id}
-            className={`px-4 py-2.5 rounded-lg text-sm font-medium shadow-xl backdrop-blur-xl border ${
+            className={`px-4 py-2.5 rounded-xl text-sm font-medium shadow-xl backdrop-blur-xl border ${
               alert.type === 'error'
                 ? 'bg-red-950/50 text-red-200/80 border-red-800/20'
                 : alert.type === 'success'
                 ? 'bg-emerald-950/50 text-emerald-200/80 border-emerald-800/20'
                 : alert.type === 'warning'
                 ? 'bg-amber-950/50 text-amber-200/80 border-amber-800/20'
-                : 'bg-sky-950/50 text-sky-200/80 border-sky-800/20'
+                : 'bg-gray-900/50 text-gray-200/80 border-gray-700/20'
             }`}
           >
             {alert.message}
@@ -482,7 +590,6 @@ export default function App() {
       <BatteryMonitor />
       <ConnectionMonitor />
       <ConfirmationDialog />
-
     </div>
   );
 }

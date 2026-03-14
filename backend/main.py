@@ -262,15 +262,17 @@ async def telemetry_broadcast():
                 # --- Generation counter: cheap check if telemetry changed ---
                 gen = drone.telemetry_generation
                 status_msgs = drone.drain_statustext()
+                cal_events = drone.drain_cal_events()
                 mission_status = mission_mgr.status
                 prev_mission = last_mission_status.get(drone_id)
 
                 gen_changed = gen != last_generation.get(drone_id, -1)
                 mission_changed = mission_status != prev_mission
                 has_statustext = bool(status_msgs)
+                has_cal_events = bool(cal_events)
                 force_full = (now - last_full_sync.get(drone_id, 0)) >= FULL_SYNC_INTERVAL
 
-                if not (gen_changed or mission_changed or has_statustext or force_full):
+                if not (gen_changed or mission_changed or has_statustext or has_cal_events or force_full):
                     continue
 
                 # --- Build the message ---
@@ -294,8 +296,8 @@ async def telemetry_broadcast():
                         message["mission_status"] = mission_status
 
                     # If nothing actually changed in values (generation bumped
-                    # but rounding made values identical), skip unless statustext
-                    if not message and not has_statustext:
+                    # but rounding made values identical), skip unless statustext/cal events
+                    if not message and not has_statustext and not has_cal_events:
                         last_generation[drone_id] = gen
                         continue
 
@@ -308,6 +310,9 @@ async def telemetry_broadcast():
 
                 if has_statustext:
                     message["statustext"] = status_msgs
+
+                if has_cal_events:
+                    message["cal_events"] = cal_events
 
                 await ws_manager.broadcast(message)
 

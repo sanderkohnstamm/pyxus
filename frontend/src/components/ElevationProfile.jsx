@@ -348,7 +348,7 @@ export default function ElevationProfile() {
         <polyline points={groundData.map((d) => `${x(d.dist)},${y(d.ground)}`).join(' ')} fill="none" stroke="rgba(160,120,60,0.6)" strokeWidth="1" />
 
         {/* Waypoint altitude line */}
-        <path d={wpLine} fill="none" stroke="#06b6d4" strokeWidth="1.5" strokeLinejoin="round" />
+        <path d={wpLine} fill="none" stroke="#94a3b8" strokeWidth="1.5" strokeLinejoin="round" />
 
         {/* Waypoint dots + labels (draggable) */}
         {displayWpPoints.map((w) => {
@@ -358,7 +358,7 @@ export default function ElevationProfile() {
               {/* Vertical line from ground to waypoint */}
               <line
                 x1={x(w.dist)} y1={y(w.ground)} x2={x(w.dist)} y2={y(w.altMsl)}
-                stroke={lowClearance ? 'rgba(239,68,68,0.4)' : 'rgba(6,182,212,0.2)'}
+                stroke={lowClearance ? 'rgba(239,68,68,0.4)' : 'rgba(148,163,184,0.2)'}
                 strokeWidth="0.5"
                 strokeDasharray="2 2"
               />
@@ -367,7 +367,7 @@ export default function ElevationProfile() {
                 cx={x(w.dist)}
                 cy={y(w.altMsl)}
                 r={dragging?.index === w.index ? 5 : 4}
-                fill={lowClearance ? '#ef4444' : (dragging?.index === w.index ? '#22d3ee' : '#06b6d4')}
+                fill={lowClearance ? '#ef4444' : (dragging?.index === w.index ? '#cbd5e1' : '#94a3b8')}
                 stroke={dragging?.index === w.index ? '#fff' : 'none'}
                 strokeWidth="1"
                 style={{ cursor: 'ns-resize' }}
@@ -377,14 +377,14 @@ export default function ElevationProfile() {
               <text
                 x={x(w.dist)} y={y(w.altMsl) - 7}
                 textAnchor="middle"
-                fill={lowClearance ? 'rgba(239,68,68,0.9)' : 'rgba(6,182,212,0.8)'}
+                fill={lowClearance ? 'rgba(239,68,68,0.9)' : 'rgba(148,163,184,0.8)'}
                 fontSize="7" fontFamily="monospace"
               >
                 {w.index + 1}
               </text>
               {/* Altitude label (show when dragging) */}
               {dragging?.index === w.index && (
-                <text x={x(w.dist) + 8} y={y(w.altMsl) + 3} textAnchor="start" fill="#22d3ee" fontSize="8" fontFamily="monospace" fontWeight="bold">{w.altRel}m</text>
+                <text x={x(w.dist) + 8} y={y(w.altMsl) + 3} textAnchor="start" fill="#cbd5e1" fontSize="8" fontFamily="monospace" fontWeight="bold">{w.altRel}m</text>
               )}
             </g>
           );
@@ -397,7 +397,7 @@ export default function ElevationProfile() {
       {/* Legend + clearance warning */}
       <div className="flex items-center gap-3 mt-1.5 text-[9px] text-gray-600 flex-wrap">
         <span className="flex items-center gap-1">
-          <span className="w-2.5 h-0.5 bg-cyan-500 rounded-full inline-block" />
+          <span className="w-2.5 h-0.5 bg-gray-500 rounded-full inline-block" />
           Flight (MSL)
         </span>
         <span className="flex items-center gap-1">

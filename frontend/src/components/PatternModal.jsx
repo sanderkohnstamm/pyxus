@@ -275,7 +275,7 @@ export default function PatternModal() {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
           <div className="flex items-center gap-2">
-            <Grid3X3 size={16} className="text-cyan-400" />
+            <Grid3X3 size={16} className="text-gray-400" />
             <span className="text-sm font-semibold text-gray-200">Generate Pattern</span>
           </div>
           <button
@@ -304,7 +304,7 @@ export default function PatternModal() {
                 disabled={isDisabled}
                 className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-[11px] font-medium transition-all
                   ${isActive
-                    ? 'text-cyan-300 border-b-2 border-cyan-400 bg-cyan-500/5'
+                    ? 'text-gray-300 border-b-2 border-gray-400 bg-gray-500/5'
                     : isDisabled
                       ? 'text-gray-600 cursor-not-allowed'
                       : 'text-gray-500 hover:text-gray-300'
@@ -369,7 +369,7 @@ export default function PatternModal() {
                       type="checkbox"
                       checked={lawnmowerUseCustomSize}
                       onChange={(e) => setLawnmowerUseCustomSize(e.target.checked)}
-                      className="w-3 h-3 rounded accent-cyan-500"
+                      className="w-3 h-3 rounded accent-gray-500"
                     />
                     <span className="text-[10px] text-gray-400">Custom size</span>
                   </label>
@@ -382,7 +382,7 @@ export default function PatternModal() {
                             type="number"
                             value={lawnmowerWidth}
                             onChange={(e) => setLawnmowerWidth(Number(e.target.value) || 100)}
-                            className="w-full bg-gray-900/60 text-gray-200 border border-gray-700/50 rounded px-2 py-1 text-[11px] font-mono focus:outline-none focus:border-cyan-500/50"
+                            className="w-full bg-gray-900/60 text-gray-200 border border-gray-700/50 rounded px-2 py-1 text-[11px] font-mono focus:outline-none focus:border-gray-500/50"
                             min={10}
                             max={5000}
                           />
@@ -396,7 +396,7 @@ export default function PatternModal() {
                             type="number"
                             value={lawnmowerHeight}
                             onChange={(e) => setLawnmowerHeight(Number(e.target.value) || 100)}
-                            className="w-full bg-gray-900/60 text-gray-200 border border-gray-700/50 rounded px-2 py-1 text-[11px] font-mono focus:outline-none focus:border-cyan-500/50"
+                            className="w-full bg-gray-900/60 text-gray-200 border border-gray-700/50 rounded px-2 py-1 text-[11px] font-mono focus:outline-none focus:border-gray-500/50"
                             min={10}
                             max={5000}
                           />
@@ -416,7 +416,7 @@ export default function PatternModal() {
                       max={100}
                       value={lawnmowerSpacing}
                       onChange={(e) => setLawnmowerSpacing(Number(e.target.value))}
-                      className="flex-1 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                      className="flex-1 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-gray-500"
                     />
                     <span className="text-xs text-gray-300 w-12 text-right">{lawnmowerSpacing}m</span>
                   </div>
@@ -430,7 +430,7 @@ export default function PatternModal() {
                       max={180}
                       value={lawnmowerAngle}
                       onChange={(e) => setLawnmowerAngle(Number(e.target.value))}
-                      className="flex-1 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                      className="flex-1 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-gray-500"
                     />
                     <span className="text-xs text-gray-300 w-12 text-right">{lawnmowerAngle}°</span>
                   </div>
@@ -444,7 +444,7 @@ export default function PatternModal() {
                       max={50}
                       value={lawnmowerOvershoot}
                       onChange={(e) => setLawnmowerOvershoot(Number(e.target.value))}
-                      className="flex-1 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                      className="flex-1 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-gray-500"
                     />
                     <span className="text-xs text-gray-300 w-12 text-right">{lawnmowerOvershoot}m</span>
                   </div>
@@ -455,7 +455,7 @@ export default function PatternModal() {
                     type="number"
                     value={lawnmowerAlt}
                     onChange={(e) => setLawnmowerAlt(Number(e.target.value))}
-                    className="w-full bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-cyan-500/50"
+                    className="w-full bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-gray-500/50"
                     min={1}
                     max={500}
                   />
@@ -478,7 +478,7 @@ export default function PatternModal() {
                       type="number"
                       value={spiralStartRadius}
                       onChange={(e) => setSpiralStartRadius(Number(e.target.value))}
-                      className="w-full bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-cyan-500/50"
+                      className="w-full bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-gray-500/50"
                       min={1}
                     />
                   </div>
@@ -488,7 +488,7 @@ export default function PatternModal() {
                       type="number"
                       value={spiralEndRadius}
                       onChange={(e) => setSpiralEndRadius(Number(e.target.value))}
-                      className="w-full bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-cyan-500/50"
+                      className="w-full bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-gray-500/50"
                       min={1}
                     />
                   </div>
@@ -502,7 +502,7 @@ export default function PatternModal() {
                       max={50}
                       value={spiralSpacing}
                       onChange={(e) => setSpiralSpacing(Number(e.target.value))}
-                      className="flex-1 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                      className="flex-1 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-gray-500"
                     />
                     <span className="text-xs text-gray-300 w-12 text-right">{spiralSpacing}m</span>
                   </div>
@@ -516,7 +516,7 @@ export default function PatternModal() {
                       max={24}
                       value={spiralPointsPerLoop}
                       onChange={(e) => setSpiralPointsPerLoop(Number(e.target.value))}
-                      className="flex-1 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                      className="flex-1 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-gray-500"
                     />
                     <span className="text-xs text-gray-300 w-12 text-right">{spiralPointsPerLoop}</span>
                   </div>
@@ -527,7 +527,7 @@ export default function PatternModal() {
                     type="number"
                     value={spiralAlt}
                     onChange={(e) => setSpiralAlt(Number(e.target.value))}
-                    className="w-full bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-cyan-500/50"
+                    className="w-full bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-gray-500/50"
                     min={1}
                     max={500}
                   />
@@ -552,7 +552,7 @@ export default function PatternModal() {
                       max={500}
                       value={orbitRadius}
                       onChange={(e) => setOrbitRadius(Number(e.target.value))}
-                      className="flex-1 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                      className="flex-1 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-gray-500"
                     />
                     <span className="text-xs text-gray-300 w-16 text-right">{orbitRadius}m</span>
                   </div>
@@ -566,7 +566,7 @@ export default function PatternModal() {
                       max={24}
                       value={orbitPoints}
                       onChange={(e) => setOrbitPoints(Number(e.target.value))}
-                      className="flex-1 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                      className="flex-1 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-gray-500"
                     />
                     <span className="text-xs text-gray-300 w-12 text-right">{orbitPoints}</span>
                   </div>
@@ -578,7 +578,7 @@ export default function PatternModal() {
                       onClick={() => setOrbitClockwise(true)}
                       className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-all ${
                         orbitClockwise
-                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                          ? 'bg-gray-500/20 text-gray-300 border border-gray-500/30'
                           : 'bg-gray-800/60 text-gray-500 border border-gray-700/50'
                       }`}
                     >
@@ -588,7 +588,7 @@ export default function PatternModal() {
                       onClick={() => setOrbitClockwise(false)}
                       className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-all ${
                         !orbitClockwise
-                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                          ? 'bg-gray-500/20 text-gray-300 border border-gray-500/30'
                           : 'bg-gray-800/60 text-gray-500 border border-gray-700/50'
                       }`}
                     >
@@ -602,7 +602,7 @@ export default function PatternModal() {
                     type="number"
                     value={orbitAlt}
                     onChange={(e) => setOrbitAlt(Number(e.target.value))}
-                    className="w-full bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-cyan-500/50"
+                    className="w-full bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-gray-500/50"
                     min={1}
                     max={500}
                   />
@@ -633,7 +633,7 @@ export default function PatternModal() {
                         max={50}
                         value={perimeterInset}
                         onChange={(e) => setPerimeterInset(Number(e.target.value))}
-                        className="flex-1 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                        className="flex-1 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-gray-500"
                       />
                       <span className="text-xs text-gray-300 w-12 text-right">{perimeterInset}m</span>
                     </div>
@@ -644,7 +644,7 @@ export default function PatternModal() {
                       type="number"
                       value={perimeterAlt}
                       onChange={(e) => setPerimeterAlt(Number(e.target.value))}
-                      className="w-full bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-cyan-500/50"
+                      className="w-full bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-gray-500/50"
                       min={1}
                       max={500}
                     />
@@ -659,7 +659,7 @@ export default function PatternModal() {
             <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-700/30">
               <div className="flex items-center justify-between text-[10px]">
                 <span className="text-gray-500">Preview</span>
-                <span className="text-cyan-300 font-medium">
+                <span className="text-gray-300 font-medium">
                   {patternConfig.preview.length} waypoints
                 </span>
               </div>
@@ -674,7 +674,7 @@ export default function PatternModal() {
                 onClick={() => setReplaceMode(true)}
                 className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${
                   replaceMode
-                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                    ? 'bg-gray-500/20 text-gray-300 border border-gray-500/30'
                     : 'bg-gray-800/60 text-gray-500 border border-gray-700/50'
                 }`}
               >
@@ -684,7 +684,7 @@ export default function PatternModal() {
                 onClick={() => setReplaceMode(false)}
                 className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${
                   !replaceMode
-                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                    ? 'bg-gray-500/20 text-gray-300 border border-gray-500/30'
                     : 'bg-gray-800/60 text-gray-500 border border-gray-700/50'
                 }`}
               >
@@ -705,7 +705,7 @@ export default function PatternModal() {
           <button
             onClick={handleGenerate}
             disabled={patternConfig.preview.length === 0}
-            className="flex-1 px-3 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 rounded-md text-xs font-semibold text-cyan-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            className="flex-1 px-3 py-2 bg-gray-500/20 hover:bg-gray-500/30 border border-gray-500/30 rounded-md text-xs font-semibold text-gray-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
           >
             Generate
           </button>

@@ -83,11 +83,11 @@ final class TelemetryService {
         state.isArdupilot = t.isArdupilot
 
         // Sensor health from SYS_STATUS onboard_control_sensors_health
-        // MAV_SYS_STATUS_SENSOR bits: 3D_GYRO=0x02, 3D_MAG=0x04, 3D_ACCEL=0x10
+        // MAV_SYS_STATUS_SENSOR values: 3D_GYRO=1, 3D_ACCEL=2, 3D_MAG=4
         if t.sensorHealth != 0 {
-            state.isGyrCalOk = (t.sensorHealth & 0x02) != 0
+            state.isGyrCalOk = (t.sensorHealth & 0x01) != 0
+            state.isAccCalOk = (t.sensorHealth & 0x02) != 0
             state.isMagCalOk = (t.sensorHealth & 0x04) != 0
-            state.isAccCalOk = (t.sensorHealth & 0x10) != 0
         }
 
         // Vehicle type

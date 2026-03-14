@@ -74,7 +74,7 @@ export default function MapView() {
   const activeDrone = activeDroneId ? drones[activeDroneId] : null;
   const activeTelemetry = activeDrone?.telemetry || INITIAL_TELEMETRY;
   const hasPosition = activeTelemetry.lat !== 0 && activeTelemetry.lon !== 0;
-  const isPlanning = activeTab === 'planning';
+  const isPlanning = activeTab === 'plan';
   const isConnected = !!activeDroneId;
 
   const initialCenter = hasPosition ? [activeTelemetry.lon, activeTelemetry.lat] : [0, 0];

@@ -131,7 +131,7 @@ function GimbalControl() {
             value={pitch}
             onChange={(e) => handlePitchChange(parseInt(e.target.value))}
             disabled={!isConnected}
-            className="w-full h-1.5 bg-gray-700 rounded-full appearance-none cursor-pointer disabled:opacity-30 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:rounded-full"
+            className="w-full h-1.5 bg-gray-700 rounded-full appearance-none cursor-pointer disabled:opacity-30 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-gray-400 [&::-webkit-slider-thumb]:rounded-full"
           />
         </div>
         <div>
@@ -143,7 +143,7 @@ function GimbalControl() {
             value={yaw}
             onChange={(e) => handleYawChange(parseInt(e.target.value))}
             disabled={!isConnected}
-            className="w-full h-1.5 bg-gray-700 rounded-full appearance-none cursor-pointer disabled:opacity-30 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:rounded-full"
+            className="w-full h-1.5 bg-gray-700 rounded-full appearance-none cursor-pointer disabled:opacity-30 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-gray-400 [&::-webkit-slider-thumb]:rounded-full"
           />
         </div>
       </div>
@@ -225,7 +225,7 @@ function CameraList() {
               {cameras.map((cam, i) => (
                 <div key={cam.component_id || i} className="bg-gray-900/40 rounded-md p-2 border border-gray-800/30">
                   <div className="flex items-center gap-2 mb-1">
-                    <Camera size={10} className="text-cyan-500" />
+                    <Camera size={10} className="text-gray-500" />
                     <span className="text-[10px] font-semibold text-gray-300">
                       {cam.vendor} {cam.model || `Camera ${cam.component_id}`}
                     </span>
@@ -317,7 +317,7 @@ export default function VideoFeed() {
           onChange={(e) => setVideoUrl(e.target.value)}
           placeholder="rtsp://... or http://..."
           disabled={videoActive}
-          className="w-full bg-gray-800/80 text-gray-200 border border-gray-700/50 rounded-md px-3 py-2 text-xs font-mono focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 disabled:opacity-40 transition-colors mb-2"
+          className="w-full bg-gray-800/80 text-gray-200 border border-gray-700/50 rounded-md px-3 py-2 text-xs font-mono focus:outline-none focus:border-gray-500/50 focus:ring-1 focus:ring-gray-500/20 disabled:opacity-40 transition-colors mb-2"
         />
         <div className="flex flex-wrap gap-1.5 mb-3">
           {EXAMPLE_URLS.map((ex) => (
@@ -374,7 +374,7 @@ export default function VideoFeed() {
           onClick={() => setShowTelemetry(!showTelemetry)}
           className={`absolute top-1.5 right-1.5 z-10 p-1 rounded transition-all pointer-events-auto ${
             showTelemetry
-              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+              ? 'bg-gray-500/20 text-gray-300 border border-gray-500/40'
               : 'bg-gray-900/60 text-gray-500 border border-gray-700/30 hover:text-gray-300 hover:bg-gray-800/60'
           }`}
           title={showTelemetry ? 'Hide telemetry overlay' : 'Show telemetry overlay'}

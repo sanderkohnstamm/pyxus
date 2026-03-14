@@ -29,14 +29,14 @@ function ComponentCard({ comp }) {
   };
 
   const getCategoryColor = () => {
-    if (comp.is_target) return 'border-cyan-500/50 bg-cyan-500/10';
+    if (comp.is_target) return 'border-gray-500/50 bg-gray-500/10';
     if (comp.category === 'vehicle') return 'border-emerald-500/30 bg-emerald-500/5';
     if (comp.category === 'peripheral') return 'border-amber-500/30 bg-amber-500/5';
     return 'border-gray-700/50 bg-gray-800/30';
   };
 
   const getTextColor = () => {
-    if (comp.is_target) return 'text-cyan-300';
+    if (comp.is_target) return 'text-gray-300';
     if (comp.category === 'vehicle') return 'text-emerald-300';
     if (comp.category === 'peripheral') return 'text-amber-300';
     return 'text-gray-400';
@@ -53,7 +53,7 @@ function ComponentCard({ comp }) {
                 {comp.type_name}
               </span>
               {comp.is_target && (
-                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 text-[8px] font-semibold">
+                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-300 text-[8px] font-semibold">
                   <Target size={8} /> TARGET
                 </span>
               )}
@@ -100,7 +100,7 @@ function MessageRow({ msg, expanded, onToggle }) {
           )}
         </button>
 
-        <span className="text-[10px] font-mono font-semibold text-cyan-400 w-[140px] truncate">
+        <span className="text-[10px] font-mono font-semibold text-gray-400 w-[140px] truncate">
           {msg.msg_type}
         </span>
 
@@ -260,7 +260,7 @@ export default function MavlinkInspector() {
       <div className="p-3 border-b border-gray-800/50 space-y-2 shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Radio size={12} className="text-cyan-500" />
+            <Radio size={12} className="text-gray-500" />
             <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">
               MAVLink Inspector
             </span>
@@ -270,7 +270,7 @@ export default function MavlinkInspector() {
               onClick={() => setAutoRefresh(!autoRefresh)}
               className={`flex items-center gap-1 px-2 py-1 rounded text-[9px] font-medium transition-all ${
                 autoRefresh
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                  ? 'bg-gray-500/20 text-gray-300 border border-gray-500/30'
                   : 'bg-gray-800/60 text-gray-500 border border-gray-700/50'
               }`}
             >
@@ -293,7 +293,7 @@ export default function MavlinkInspector() {
             onClick={() => setActiveTab('components')}
             className={`flex-1 px-3 py-1.5 rounded text-[10px] font-semibold transition-all ${
               activeTab === 'components'
-                ? 'bg-cyan-500/20 text-cyan-300'
+                ? 'bg-gray-500/20 text-gray-300'
                 : 'text-gray-500 hover:text-gray-300'
             }`}
           >
@@ -303,7 +303,7 @@ export default function MavlinkInspector() {
             onClick={() => setActiveTab('messages')}
             className={`flex-1 px-3 py-1.5 rounded text-[10px] font-semibold transition-all ${
               activeTab === 'messages'
-                ? 'bg-cyan-500/20 text-cyan-300'
+                ? 'bg-gray-500/20 text-gray-300'
                 : 'text-gray-500 hover:text-gray-300'
             }`}
           >
@@ -344,7 +344,7 @@ export default function MavlinkInspector() {
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
                 placeholder="Filter messages..."
-                className="w-full bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-md px-2.5 py-1.5 text-xs placeholder-gray-600 focus:outline-none focus:border-cyan-500/50"
+                className="w-full bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-md px-2.5 py-1.5 text-xs placeholder-gray-600 focus:outline-none focus:border-gray-500/50"
               />
               <div className="flex items-center gap-2 px-2 text-[8px] text-gray-600 uppercase tracking-wider">
                 <span className="w-[14px]" />
@@ -379,7 +379,7 @@ export default function MavlinkInspector() {
                       <span className="text-gray-500">
                         {group.messages.length} types
                       </span>
-                      <span className="text-cyan-400 font-mono">
+                      <span className="text-gray-400 font-mono">
                         {group.totalRate.toFixed(1)} Hz total
                       </span>
                     </div>

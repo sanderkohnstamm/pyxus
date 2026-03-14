@@ -16,7 +16,7 @@ export function DroneMissionMarkers() {
   const autopilot = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry?.autopilot : 'unknown') || 'unknown';
   const coordFormat = useDroneStore((s) => s.coordFormat);
 
-  const isFlying = activeTab === 'flying';
+  const isFlying = activeTab === 'command';
   const droneOpacity = isFlying ? 1 : 0.3;
 
   // Convert mission_seq to 0-based index

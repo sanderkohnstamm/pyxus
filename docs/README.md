@@ -16,9 +16,9 @@ Pyxus is a ground control station (GCS) for MAVLink-based drones, focused on **e
 |----------|-------------|
 | [Architecture](architecture.md) | System architecture, data flow, platform differences |
 | [MAVLink Protocol Guide](mavlink-protocol.md) | MAVLink v2 wire format, protocols, ArduPilot vs PX4 differences |
+| [MAVLink Calibration & Motor/Servo](mavlink-calibration-motor-servo.md) | Sensor calibration, motor test, servo control protocols |
+| [MAVLink Camera Protocol](mavlink-camera-protocol.md) | Camera v2 protocol: discovery, capture, streaming, tracking |
 | [iOS Native Stack](ios-native-stack.md) | Pure Swift MAVLink implementation, code generator, connection layer |
-| [Codebase Review](codebase-review.md) | Thorough review of all components with quality assessment |
-| [Improvement Plan](improvement-plan.md) | Prioritized roadmap for codebase improvements |
 
 ## Quick Start
 

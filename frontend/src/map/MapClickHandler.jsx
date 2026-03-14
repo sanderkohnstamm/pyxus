@@ -39,13 +39,13 @@ export default function MapClickHandler({ mapRef }) {
         addPatternBoundsVertex(lat, lng);
         return;
       }
-      if (activeTab === 'planning' && addWaypointMode) {
+      if (activeTab === 'plan' && addWaypointMode) {
         if (planSubTab === 'fence') {
           addFenceVertex(lat, lng);
         } else {
           addWaypoint(lat, lng);
         }
-      } else if (activeTab === 'flying' && activeDroneId) {
+      } else if (activeTab === 'command' && activeDroneId) {
         setFlyClickTarget({ lat, lon: lng });
       }
     };
@@ -59,7 +59,7 @@ export default function MapClickHandler({ mapRef }) {
   useEffect(() => {
     if (!mapInstance) return;
     const canvas = mapInstance.getCanvas();
-    if (quickMissionMode || measureMode || (addWaypointMode && activeTab === 'planning')) {
+    if (quickMissionMode || measureMode || (addWaypointMode && activeTab === 'plan')) {
       canvas.style.cursor = 'crosshair';
     } else {
       canvas.style.cursor = '';

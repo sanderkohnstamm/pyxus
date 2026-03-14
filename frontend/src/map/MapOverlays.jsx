@@ -16,7 +16,7 @@ export default function MapOverlays({ mapRef }) {
   const clearMeasure = useDroneStore((s) => s.clearMeasure);
   const activeDroneId = useDroneStore((s) => s.activeDroneId);
 
-  const isPlanning = activeTab === 'planning';
+  const isPlanning = activeTab === 'plan';
   const isConnected = !!activeDroneId;
 
   return (
@@ -26,7 +26,7 @@ export default function MapOverlays({ mapRef }) {
         onClick={() => setFollowDrone(!followDrone)}
         className={`absolute top-3 right-3 z-[1000] px-3 py-1.5 rounded-md text-xs font-semibold transition-all border backdrop-blur-md ${
           followDrone
-            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+            ? 'bg-gray-500/20 text-gray-300 border-gray-500/30'
             : 'bg-gray-900/60 text-gray-400 hover:text-gray-200 border-gray-700/40'
         }`}
       >
@@ -39,7 +39,7 @@ export default function MapOverlays({ mapRef }) {
           onClick={toggleAddWaypointMode}
           className={`absolute bottom-3 right-3 z-[1000] px-3 py-1.5 rounded-md text-xs font-semibold transition-all border backdrop-blur-md ${
             addWaypointMode
-              ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30 shadow-lg shadow-cyan-500/10'
+              ? 'bg-gray-500/20 text-gray-300 border-gray-500/30 shadow-lg shadow-gray-500/10'
               : 'bg-gray-900/60 text-gray-400 hover:text-gray-200 border-gray-700/40'
           }`}
         >

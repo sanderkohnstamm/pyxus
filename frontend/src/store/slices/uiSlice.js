@@ -9,13 +9,20 @@ const uiSlice = (set, get) => ({
   // Sound
   soundEnabled: localStorage.getItem('pyxus-sound-enabled') !== 'false', // default true
 
-  // Tabs
-  activeTab: 'planning', // planning | flying
+  // Active view: command | video | plan | tools
+  activeTab: 'command',
 
   // Plan subtab
   planSubTab: 'mission',
 
-  // Sidebar
+  // Menu panel (hamburger)
+  menuOpen: false,
+  menuTab: 'command', // synced with activeTab
+
+  // Drone popover
+  dronePopoverOpen: false,
+
+  // Sidebar (legacy, kept for backwards compat)
   sidebarCollapsed: false,
 
   // Map
@@ -60,7 +67,13 @@ const uiSlice = (set, get) => ({
   mapBounds: null,
 
   // Actions
-  setActiveTab: (tab) => set({ activeTab: tab, addWaypointMode: false }),
+  setActiveTab: (tab) => set({ activeTab: tab, menuTab: tab, addWaypointMode: false }),
+  toggleMenu: () => set((s) => ({ menuOpen: !s.menuOpen })),
+  setMenuTab: (tab) => set({ menuTab: tab, activeTab: tab }),
+  toggleDronePopover: () => set((s) => ({ dronePopoverOpen: !s.dronePopoverOpen })),
+  closeDronePopover: () => set({ dronePopoverOpen: false }),
+  openMenu: () => set({ menuOpen: true }),
+  closeMenu: () => set({ menuOpen: false }),
 
   setTheme: (theme) => {
     localStorage.setItem('pyxus-theme', theme);

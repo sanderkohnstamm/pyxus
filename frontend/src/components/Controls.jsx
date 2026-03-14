@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   Gamepad2,
   Keyboard,
@@ -9,13 +9,8 @@ import {
 import useDroneStore, { INITIAL_TELEMETRY, EMPTY_ARRAY } from '../store/droneStore';
 import { droneApi } from '../utils/api';
 import { formatCoord } from '../utils/formatCoord';
-import { getCommandConfirmation } from '../utils/commandSafety';
 
 const RC_CENTER = 1500;
-const RC_OFFSET = 300;
-const RC_MIN = 1000;
-const RC_MAX = 2000;
-const RC_SEND_RATE = 50; // 20Hz
 
 // Modes that accept manual RC input
 const MANUAL_MODES = [
@@ -33,7 +28,7 @@ const TYPE_LABELS = {
   land: 'LND',
 };
 
-export default function Controls({ sendMessage }) {
+export default function Controls() {
   const activeDroneId = useDroneStore((s) => s.activeDroneId);
   const telemetry = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry : INITIAL_TELEMETRY) || INITIAL_TELEMETRY;
   const keyboardEnabled = useDroneStore((s) => s.keyboardEnabled);
@@ -43,20 +38,14 @@ export default function Controls({ sendMessage }) {
   const droneMission = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.droneMission ?? EMPTY_ARRAY : EMPTY_ARRAY);
   const setDroneMission = useDroneStore((s) => s.setDroneMission);
   const coordFormat = useDroneStore((s) => s.coordFormat);
-  const setShowPreFlightChecklist = useDroneStore((s) => s.setShowPreFlightChecklist);
   const missionSeq = telemetry.mission_seq;
   const autopilot = telemetry.autopilot;
 
   // Convert mission_seq to 0-based index
-  // ArduPilot: seq 0 = home, mission items start at seq 1 -> index = seq - 1
-  // PX4: seq 0 = first mission item -> index = seq
   const isArdupilot = autopilot === 'ardupilot';
   const currentWaypointIndex = missionSeq >= 0 ? (isArdupilot ? missionSeq - 1 : missionSeq) : -1;
-  const updateManualControlRc = useDroneStore((s) => s.updateManualControlRc);
-  const setManualControlActive = useDroneStore((s) => s.setManualControlActive);
   const gamepadEnabled = useDroneStore((s) => s.gamepadEnabled);
 
-  const rcIntervalRef = useRef(null);
   const isConnected = !!activeDroneId;
 
   const apiCall = useCallback(
@@ -94,115 +83,8 @@ export default function Controls({ sendMessage }) {
     }
   }, [setDroneMission, addAlert]);
 
-  // Keyboard event handlers
-  useEffect(() => {
-    if (!keyboardEnabled) return;
-
-    const TRACKED_KEYS = ['w', 'a', 's', 'd', 'q', 'e', 'r', 'f', ' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
-
-    const handleKeyDown = (e) => {
-      const key = e.key.toLowerCase();
-      if (TRACKED_KEYS.includes(key)) {
-        e.preventDefault();
-        setKeyPressed(key === ' ' ? 'space' : key, true);
-      }
-    };
-
-    const handleKeyUp = (e) => {
-      const key = e.key.toLowerCase();
-      if (TRACKED_KEYS.includes(key)) {
-        e.preventDefault();
-        setKeyPressed(key === ' ' ? 'space' : key, false);
-
-        if (key === ' ') {
-          if (telemetry.armed) {
-            const store = useDroneStore.getState();
-            if (store.confirmDangerousCommands) {
-              const confirmation = getCommandConfirmation('disarm', telemetry);
-              if (confirmation) {
-                store.showConfirmationDialog({ ...confirmation, onConfirm: () => apiCall('disarm') });
-                return;
-              }
-            }
-            apiCall('disarm');
-          } else {
-            setShowPreFlightChecklist(true);
-          }
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, [keyboardEnabled, setKeyPressed, telemetry.armed, apiCall, setShowPreFlightChecklist]);
-
-  // Keyboard RC override send loop at 20Hz
-  useEffect(() => {
-    if (!keyboardEnabled) {
-      if (rcIntervalRef.current) {
-        clearInterval(rcIntervalRef.current);
-        rcIntervalRef.current = null;
-      }
-      return;
-    }
-
-    rcIntervalRef.current = setInterval(() => {
-      const keys = useDroneStore.getState().keysPressed;
-
-      let roll = RC_CENTER;
-      let pitch = RC_CENTER;
-      let throttle = RC_CENTER;
-      let yaw = RC_CENTER;
-
-      // WASD controls: W/S = throttle, A/D = roll (strafe)
-      if (keys.w) throttle += RC_OFFSET;
-      if (keys.s) throttle -= RC_OFFSET;
-      if (keys.a) roll -= RC_OFFSET;
-      if (keys.d) roll += RC_OFFSET;
-      if (keys.q) yaw -= RC_OFFSET;
-      if (keys.e) yaw += RC_OFFSET;
-      if (keys.r) throttle += RC_OFFSET;
-      if (keys.f) throttle -= RC_OFFSET;
-
-      // Arrow keys: up/down = pitch, left/right = yaw
-      if (keys.arrowup) pitch -= RC_OFFSET;
-      if (keys.arrowdown) pitch += RC_OFFSET;
-      if (keys.arrowleft) yaw -= RC_OFFSET;
-      if (keys.arrowright) yaw += RC_OFFSET;
-
-      roll = Math.max(RC_MIN, Math.min(RC_MAX, roll));
-      pitch = Math.max(RC_MIN, Math.min(RC_MAX, pitch));
-      throttle = Math.max(RC_MIN, Math.min(RC_MAX, throttle));
-      yaw = Math.max(RC_MIN, Math.min(RC_MAX, yaw));
-
-      const channels = [roll, pitch, throttle, yaw];
-
-      // Only send to drone if connected
-      if (isConnected) {
-        sendMessage({
-          type: 'rc_override',
-          channels,
-        });
-      }
-      // Always update visualization
-      updateManualControlRc(channels);
-    }, RC_SEND_RATE);
-
-    return () => {
-      if (rcIntervalRef.current) {
-        clearInterval(rcIntervalRef.current);
-        rcIntervalRef.current = null;
-      }
-      setManualControlActive(false);
-    };
-  }, [keyboardEnabled, isConnected, sendMessage, updateManualControlRc, setManualControlActive]);
-
-  // Note: Gamepad RC sending is handled globally in App.jsx
+  // Note: Keyboard RC key listeners + send loop are handled globally in App.jsx
+  // Note: Gamepad RC sending is also handled globally in App.jsx
 
   if (!isConnected) {
     return (
@@ -234,7 +116,7 @@ export default function Controls({ sendMessage }) {
           )}
           <button
             onClick={handleDownload}
-            className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold text-cyan-400 hover:text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 transition-all"
+            className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold text-gray-400 hover:text-gray-300 bg-gray-500/10 hover:bg-gray-500/20 border border-gray-500/20 transition-all"
           >
             <Download size={9} /> Download
           </button>
@@ -252,11 +134,11 @@ export default function Controls({ sendMessage }) {
                   key={i}
                   className={`flex items-center gap-2 px-2 py-1 rounded text-[10px] transition-all ${
                     isActive
-                      ? 'bg-cyan-500/20 border border-cyan-500/40'
+                      ? 'bg-gray-500/20 border border-gray-500/40'
                       : 'bg-gray-800/50'
                   }`}
                 >
-                  <span className={`font-bold w-4 text-center ${isActive ? 'text-cyan-400' : 'text-emerald-400'}`}>
+                  <span className={`font-bold w-4 text-center ${isActive ? 'text-gray-400' : 'text-emerald-400'}`}>
                     {i + 1}
                   </span>
                   <span className="text-gray-500 w-6">{TYPE_LABELS[wp.item_type] || 'WP'}</span>
@@ -265,7 +147,7 @@ export default function Controls({ sendMessage }) {
                   </span>
                   <span className={isActive ? 'text-gray-300' : 'text-gray-500'}>{wp.alt}m</span>
                   {isActive && (
-                    <span className="text-cyan-400 text-[8px] font-semibold">ACTIVE</span>
+                    <span className="text-gray-400 text-[8px] font-semibold">ACTIVE</span>
                   )}
                 </div>
               );
@@ -295,7 +177,7 @@ function KeyHint({ k, keyName, label, wide }) {
       <span
         className={`${wide ? 'px-3' : 'w-6'} py-1 rounded text-[10px] font-bold border transition-all ${
           active
-            ? 'bg-cyan-500/30 border-cyan-500/50 text-cyan-300'
+            ? 'bg-gray-500/30 border-gray-500/50 text-gray-300'
             : 'bg-gray-800/60 border-gray-700/50 text-gray-500'
         }`}
       >
@@ -321,7 +203,7 @@ function StickVisualization({ x, y, label, size = 56 }) {
           <div className="absolute h-full w-px bg-gray-700/50" />
         </div>
         <div
-          className="absolute w-3 h-3 bg-cyan-400 rounded-full shadow-lg shadow-cyan-500/30 -translate-x-1/2 -translate-y-1/2 transition-all duration-75"
+          className="absolute w-3 h-3 bg-gray-400 rounded-full shadow-lg shadow-gray-500/30 -translate-x-1/2 -translate-y-1/2 transition-all duration-75"
           style={{ left: dotX, top: dotY }}
         />
       </div>
@@ -330,18 +212,18 @@ function StickVisualization({ x, y, label, size = 56 }) {
   );
 }
 
-function ChannelBar({ value, label, color = 'cyan' }) {
+function ChannelBar({ value, label, color = 'gray' }) {
   const deviation = value - RC_CENTER;
   const deviationPercent = Math.abs(deviation) / 500 * 100;
   const isCenter = Math.abs(deviation) < 20;
 
   const colorClasses = {
-    cyan: { bar: 'bg-cyan-500', text: 'text-cyan-400' },
+    gray: { bar: 'bg-gray-500', text: 'text-gray-400' },
     emerald: { bar: 'bg-emerald-500', text: 'text-emerald-400' },
     amber: { bar: 'bg-amber-500', text: 'text-amber-400' },
     violet: { bar: 'bg-violet-500', text: 'text-violet-400' },
   };
-  const c = colorClasses[color] || colorClasses.cyan;
+  const c = colorClasses[color] || colorClasses.gray;
 
   return (
     <div className="flex items-center gap-1.5">
@@ -403,23 +285,23 @@ function ManualControlSection({ keyboardEnabled, setKeyboardEnabled, gamepadEnab
         <Gamepad2 size={11} className="text-gray-600" />
         <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Manual Control</span>
         {isActive && hasInput && (
-          <Radio size={10} className="text-cyan-400 animate-pulse ml-auto" />
+          <Radio size={10} className="text-gray-400 animate-pulse ml-auto" />
         )}
       </div>
       <div className="text-[9px] text-gray-600 mb-3">Only one input source can be active at a time</div>
 
       {/* Keyboard toggle */}
       <div className={`flex items-center justify-between mb-2 px-2 py-1.5 rounded-md border transition-colors ${
-        keyboardEnabled ? 'bg-cyan-950/30 border-cyan-800/30' : 'bg-gray-900/40 border-gray-800/30'
+        keyboardEnabled ? 'bg-gray-950/30 border-gray-800/30' : 'bg-gray-900/40 border-gray-800/30'
       }`}>
         <div className="flex items-center gap-2">
-          <Keyboard size={12} className={keyboardEnabled ? 'text-cyan-400' : 'text-gray-600'} />
+          <Keyboard size={12} className={keyboardEnabled ? 'text-gray-400' : 'text-gray-600'} />
           <span className={`text-[11px] ${keyboardEnabled ? 'text-gray-300' : 'text-gray-400'}`}>Keyboard</span>
         </div>
         <button
           onClick={() => setKeyboardEnabled(!keyboardEnabled)}
           className={`relative w-9 h-5 rounded-full transition-colors ${
-            keyboardEnabled ? 'bg-cyan-600' : 'bg-gray-700'
+            keyboardEnabled ? 'bg-gray-600' : 'bg-gray-700'
           }`}
         >
           <span
@@ -432,16 +314,16 @@ function ManualControlSection({ keyboardEnabled, setKeyboardEnabled, gamepadEnab
 
       {/* Controller toggle */}
       <div className={`flex items-center justify-between px-2 py-1.5 rounded-md border transition-colors ${
-        gamepadEnabled ? 'bg-cyan-950/30 border-cyan-800/30' : 'bg-gray-900/40 border-gray-800/30'
+        gamepadEnabled ? 'bg-gray-950/30 border-gray-800/30' : 'bg-gray-900/40 border-gray-800/30'
       }`}>
         <div className="flex items-center gap-2">
-          <Gamepad2 size={12} className={gamepadEnabled ? 'text-cyan-400' : 'text-gray-600'} />
+          <Gamepad2 size={12} className={gamepadEnabled ? 'text-gray-400' : 'text-gray-600'} />
           <span className={`text-[11px] ${gamepadEnabled ? 'text-gray-300' : 'text-gray-400'}`}>Controller</span>
         </div>
         <button
           onClick={() => setGamepadEnabled(!gamepadEnabled)}
           className={`relative w-9 h-5 rounded-full transition-colors ${
-            gamepadEnabled ? 'bg-cyan-600' : 'bg-gray-700'
+            gamepadEnabled ? 'bg-gray-600' : 'bg-gray-700'
           }`}
         >
           <span
@@ -472,7 +354,7 @@ function ManualControlSection({ keyboardEnabled, setKeyboardEnabled, gamepadEnab
 
           {/* Channel bars */}
           <div className="space-y-1.5">
-            <ChannelBar value={roll} label="R" color="cyan" />
+            <ChannelBar value={roll} label="R" color="gray" />
             <ChannelBar value={pitch} label="P" color="emerald" />
             <ChannelBar value={throttle} label="T" color="amber" />
             <ChannelBar value={yaw} label="Y" color="violet" />
@@ -484,7 +366,7 @@ function ManualControlSection({ keyboardEnabled, setKeyboardEnabled, gamepadEnab
               {activeKeys.map((key) => (
                 <span
                   key={key}
-                  className="px-1.5 py-0.5 bg-cyan-500/20 text-cyan-300 text-[9px] font-mono font-bold rounded border border-cyan-500/30"
+                  className="px-1.5 py-0.5 bg-gray-500/20 text-gray-300 text-[9px] font-mono font-bold rounded border border-gray-500/30"
                 >
                   {key}
                 </span>

@@ -313,3 +313,178 @@ Flight modes are encoded in `HEARTBEAT.custom_mode` but interpreted completely d
 | HOME_POSITION | 242 | latitude, longitude, altitude | On change |
 | STATUSTEXT | 253 | severity, text | Event-driven |
 | MISSION_CURRENT | 42 | seq, total, mission_state | On change |
+| COMMAND_LONG | 76 | command, param1-7 | Event-driven |
+| COMMAND_ACK | 77 | command, result, progress | Event-driven |
+| MAG_CAL_PROGRESS | 191 | compass_id, completion_pct, cal_mask | ~1 Hz (during cal) |
+| MAG_CAL_REPORT | 192 | compass_id, cal_status, fitness | End of cal |
+
+## Manual Control (MANUAL_CONTROL — msg 69)
+
+Used to send joystick/gamepad inputs directly to the vehicle.
+
+| Field | Range | Purpose |
+|-------|-------|---------|
+| `x` | -1000..1000 | Pitch (forward/back) |
+| `y` | -1000..1000 | Roll (left/right) |
+| `z` | 0..1000 | Throttle (ArduPilot: 0=min, 500=mid, 1000=max) |
+| `r` | -1000..1000 | Yaw (rotation left/right) |
+| `buttons` | bitmask | Joystick button states |
+| `target` | uint8 | Target system ID |
+
+### Throttle Mapping
+
+ArduPilot maps the `z` field differently depending on flight mode:
+- **Copter modes (ALT_HOLD, LOITER, POSHOLD)**: `z=500` = hover/neutral, `z<500` = descend, `z>500` = climb
+- **Copter modes (STABILIZE)**: `z=0` = zero throttle, `z=1000` = full throttle
+- **Guided/Auto**: Throttle is ignored (autopilot controls it)
+
+PX4 uses -1000..1000 for throttle (`z`) with 0 = neutral in altitude-controlled modes.
+
+### Rate
+
+Send at **10 Hz minimum** for responsive control. ArduPilot ignores MANUAL_CONTROL if no GCS heartbeat is active. MANUAL_CONTROL only works when the vehicle is in a mode that accepts manual input.
+
+## SYS_STATUS Sensor Health (msg 1)
+
+`SYS_STATUS` contains three bitmask fields for onboard sensors:
+
+| Field | Purpose |
+|-------|---------|
+| `onboard_control_sensors_present` | Which sensors exist on the vehicle |
+| `onboard_control_sensors_enabled` | Which sensors are active |
+| `onboard_control_sensors_health` | Which sensors are healthy (bit set = OK) |
+
+### MAV_SYS_STATUS_SENSOR Bits
+
+| Bit | Hex | Sensor |
+|-----|-----|--------|
+| 0 | 0x01 | 3D_GYRO (gyroscope) |
+| 1 | 0x02 | 3D_ACCEL (accelerometer) |
+| 2 | 0x04 | 3D_MAG (magnetometer/compass) |
+| 3 | 0x08 | ABSOLUTE_PRESSURE (barometer) |
+| 4 | 0x10 | DIFFERENTIAL_PRESSURE (airspeed) |
+| 5 | 0x20 | GPS |
+| 6 | 0x40 | OPTICAL_FLOW |
+| 7 | 0x80 | VISION_POSITION |
+| 8 | 0x100 | LASER_POSITION (rangefinder) |
+| 10 | 0x400 | 3D_GYRO2 |
+| 11 | 0x800 | 3D_ACCEL2 |
+| 12 | 0x1000 | 3D_MAG2 |
+| 15 | 0x8000 | BATTERY |
+| 21 | 0x200000 | AHRS |
+| 25 | 0x2000000 | LOGGING |
+| 26 | 0x4000000 | PRE_ARM_CHECK |
+
+**Usage**: Check `present & enabled & health` for each bit. Bit set in `health` = sensor OK. Use this to show calibration status (gyro/accel/mag health indicates calibration state).
+
+**Note**: The actual bit assignments differ slightly between firmware versions. The bits above are for the sensors Pyxus currently monitors. Always cross-check with https://mavlink.io/en/messages/common.html#MAV_SYS_STATUS_SENSOR for the full list.
+
+## Vehicle Types (MAV_TYPE)
+
+From `HEARTBEAT.type`:
+
+| Value | Type | Description |
+|-------|------|-------------|
+| 0 | GENERIC | Generic micro air vehicle |
+| 1 | FIXED_WING | Fixed wing aircraft (plane) |
+| 2 | QUADROTOR | Quadrotor |
+| 3 | COAXIAL | Coaxial helicopter |
+| 4 | HELICOPTER | Normal helicopter |
+| 6 | GCS | Ground control station |
+| 10 | GROUND_ROVER | Ground rover |
+| 11 | SURFACE_BOAT | Surface vessel/boat |
+| 12 | SUBMARINE | Submarine |
+| 13 | HEXAROTOR | Hexarotor |
+| 14 | OCTOROTOR | Octorotor |
+| 15 | TRICOPTER | Tricopter |
+| 20 | VTOL_TAILSITTER_DUOROTOR | VTOL tailsitter |
+| 21 | VTOL_TAILSITTER_QUADROTOR | VTOL tiltrotor |
+| 22 | VTOL_TILTROTOR | VTOL tiltrotor |
+| 29 | VTOL_FIXEDROTOR | VTOL fixed rotor |
+
+### Pyxus Vehicle Classification
+
+Pyxus groups MAV_TYPE values into three categories for UI purposes:
+- **Plane**: type == 1
+- **Rover**: type == 10, 11
+- **Copter**: everything else (default)
+
+This affects which flight mode table is used for decoding `custom_mode`.
+
+## System Status (MAV_STATE)
+
+From `HEARTBEAT.system_status`:
+
+| Value | State | Meaning |
+|-------|-------|---------|
+| 0 | UNINIT | Uninitialized, booting |
+| 1 | BOOT | Booting up |
+| 2 | CALIBRATING | Running calibration |
+| 3 | STANDBY | On ground, ready |
+| 4 | ACTIVE | Flying / in motion |
+| 5 | CRITICAL | Critical failure (may RTL) |
+| 6 | EMERGENCY | Emergency (may land) |
+| 8 | FLIGHT_TERMINATION | Terminating flight |
+
+**Landed detection**: A vehicle is considered "on the ground" if `system_status <= 3` (STANDBY or below) OR if not armed.
+
+## Link Loss Detection
+
+### GCS Side
+
+The GCS monitors the time since the last received message from the vehicle:
+- **Healthy**: Messages arriving at expected rates
+- **Link lost**: No messages for > 3-5 seconds (configurable)
+- **Recovery**: First message received after link loss clears the state
+
+### Implementation Pattern
+
+Track `lastMessageTime` on every received frame. A periodic check (e.g., 2 Hz) compares `now - lastMessageTime` against a threshold. If exceeded, set `linkLost = true` which the UI surfaces as a warning banner.
+
+### Vehicle Side
+
+ArduPilot triggers GCS failsafe if no GCS heartbeat for `FS_GCS_TIMEOUT` seconds (default 5). Behavior depends on `FS_GCS_ENABLE`:
+- 0 = Disabled
+- 1 = RTL
+- 2 = Continue mission in Auto, RTL otherwise
+- 3 = SmartRTL or RTL
+- 4 = SmartRTL or Land
+
+## Arm/Disarm Protocol
+
+### Arm
+```
+COMMAND_LONG: MAV_CMD_COMPONENT_ARM_DISARM (400)
+  param1 = 1 (arm)
+  param2 = 0 (normal) or 21196 (force arm, bypasses pre-arm checks)
+```
+
+### Disarm
+```
+COMMAND_LONG: MAV_CMD_COMPONENT_ARM_DISARM (400)
+  param1 = 0 (disarm)
+  param2 = 0 (normal) or 21196 (force disarm, even in flight!)
+```
+
+**Warning**: Force disarm (`param2=21196`) while flying will immediately cut motors. Only use in emergencies.
+
+### Armed State Detection
+
+`HEARTBEAT.base_mode & 0x80` (MAV_MODE_FLAG_SAFETY_ARMED). Bit set = armed.
+
+## Takeoff Protocol
+
+### ArduPilot Copter
+1. Set mode to GUIDED: `MAV_CMD_DO_SET_MODE` with `custom_mode=4`
+2. Arm: `MAV_CMD_COMPONENT_ARM_DISARM` param1=1
+3. Takeoff: `MAV_CMD_NAV_TAKEOFF` param7=altitude_meters
+
+### PX4
+1. Set mode to TAKEOFF: `custom_mode` with main=4, sub=2
+2. Arm
+3. Vehicle takes off automatically in TAKEOFF mode
+
+### Common Issues
+- Takeoff denied if pre-arm checks fail (GPS lock, calibration, etc.)
+- ArduPilot requires GUIDED mode for command-based takeoff
+- Altitude is relative to home position

@@ -18,7 +18,7 @@ const CALIBRATIONS = [
     id: 'gyro',
     label: 'Gyroscope',
     icon: Activity,
-    color: 'cyan',
+    color: 'gray',
     description: 'Keep the vehicle completely still on a flat surface.',
     duration: '~5s',
     hasSteps: false,
@@ -36,7 +36,7 @@ const CALIBRATIONS = [
     id: 'level',
     label: 'Level Horizon',
     icon: ArrowDownToLine,
-    color: 'sky',
+    color: 'gray',
     description: 'Place the vehicle level on a flat surface. Calibrates the level position for the accelerometer.',
     duration: '~5s',
     hasSteps: false,
@@ -62,11 +62,11 @@ const CALIBRATIONS = [
 ];
 
 const COLOR_CLASSES = {
-  cyan: {
-    btn: 'bg-cyan-500/10 hover:bg-cyan-500/20 border-cyan-500/20 hover:border-cyan-500/40 text-cyan-300',
-    active: 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300',
-    icon: 'text-cyan-500',
-    step: 'bg-cyan-500',
+  gray: {
+    btn: 'bg-gray-500/10 hover:bg-gray-500/20 border-gray-500/20 hover:border-gray-500/40 text-gray-300',
+    active: 'bg-gray-500/20 border-gray-500/40 text-gray-300',
+    icon: 'text-gray-500',
+    step: 'bg-gray-500',
   },
   emerald: {
     btn: 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/20 hover:border-emerald-500/40 text-emerald-300',
@@ -74,12 +74,7 @@ const COLOR_CLASSES = {
     icon: 'text-emerald-500',
     step: 'bg-emerald-500',
   },
-  sky: {
-    btn: 'bg-sky-500/10 hover:bg-sky-500/20 border-sky-500/20 hover:border-sky-500/40 text-sky-300',
-    active: 'bg-sky-500/20 border-sky-500/40 text-sky-300',
-    icon: 'text-sky-500',
-    step: 'bg-sky-500',
-  },
+  /* gray already defined above - 'sky' mapped to 'gray' */
   amber: {
     btn: 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/20 hover:border-amber-500/40 text-amber-300',
     active: 'bg-amber-500/20 border-amber-500/40 text-amber-300',
@@ -103,6 +98,22 @@ export default function CalibrationPanel() {
   const isConnected = !!activeDroneId;
 
   const [localRunning, setLocalRunning] = useState(null);
+
+  // Auto-clear on calibration completion event
+  useEffect(() => {
+    if (calibrationStatus.completed !== null) {
+      const success = calibrationStatus.completed;
+      addAlert(
+        success ? `${calibrationStatus.type} calibration successful!` : `${calibrationStatus.type} calibration failed`,
+        success ? 'success' : 'error'
+      );
+      const timer = setTimeout(() => {
+        setLocalRunning(null);
+        clearCalibrationStatus();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [calibrationStatus.completed]);
 
   // Sync local running state with store
   useEffect(() => {
@@ -261,12 +272,45 @@ export default function CalibrationPanel() {
               </div>
             )}
 
-            {/* Running indicator for non-accel calibrations */}
-            {isRunning && cal.id !== 'accel' && (
+            {/* Compass progress bar */}
+            {isRunning && cal.id === 'compass' && (
+              <div className="mb-3 bg-gray-900/50 border border-gray-700/30 rounded-lg p-3">
+                <div className="flex items-center gap-2 text-sm text-gray-300 mb-2">
+                  <Loader2 size={14} className="animate-spin text-amber-400" />
+                  <span>Rotate vehicle around all axes...</span>
+                  <span className="ml-auto text-xs text-amber-400 font-mono">{calibrationStatus.compassPercent}%</span>
+                </div>
+                <div className="w-full bg-gray-700 rounded-full h-1.5">
+                  <div
+                    className="bg-amber-500 h-1.5 rounded-full transition-all"
+                    style={{ width: `${calibrationStatus.compassPercent}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Completion badge */}
+            {isRunning && calibrationStatus.completed !== null && (
+              <div className={`mb-3 rounded-lg p-3 border ${
+                calibrationStatus.completed
+                  ? 'bg-emerald-950/50 border-emerald-500/30'
+                  : 'bg-red-950/50 border-red-500/30'
+              }`}>
+                <div className="flex items-center gap-2 text-sm">
+                  {calibrationStatus.completed
+                    ? <><Check size={14} className="text-emerald-400" /><span className="text-emerald-300">Calibration successful!</span></>
+                    : <><X size={14} className="text-red-400" /><span className="text-red-300">Calibration failed</span></>
+                  }
+                </div>
+              </div>
+            )}
+
+            {/* Running indicator for non-accel/non-compass calibrations */}
+            {isRunning && cal.id !== 'accel' && cal.id !== 'compass' && calibrationStatus.completed === null && (
               <div className="mb-3 bg-gray-900/50 border border-gray-700/30 rounded-lg p-3">
                 <div className="flex items-center gap-2 text-sm text-gray-300">
-                  <Loader2 size={14} className="animate-spin text-cyan-400" />
-                  <span>Calibrating... Follow vehicle LEDs or MAVLink log</span>
+                  <Loader2 size={14} className="animate-spin text-gray-400" />
+                  <span>Calibrating... Keep vehicle still</span>
                 </div>
               </div>
             )}

@@ -19,7 +19,7 @@ export default function FenceLayer() {
   const activeDroneId = useDroneStore((s) => s.activeDroneId);
   const droneVisibility = useDroneStore((s) => s.droneVisibility);
 
-  const isPlanning = activeTab === 'planning';
+  const isPlanning = activeTab === 'plan';
   const plannedOpacity = isPlanning ? 1 : 0.3;
 
   // Planned fence polygon GeoJSON

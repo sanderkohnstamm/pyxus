@@ -123,7 +123,7 @@ function ParamRow({ name, param, meta, onSet, critical }) {
               onChange={(e) => setEditValue(e.target.value)}
               onKeyDown={handleKeyDown}
               autoFocus
-              className="w-24 bg-gray-800 border border-cyan-500/50 rounded px-1.5 py-0.5 text-[11px] font-mono text-gray-200 text-right focus:outline-none"
+              className="w-24 bg-gray-800 border border-gray-500/50 rounded px-1.5 py-0.5 text-[11px] font-mono text-gray-200 text-right focus:outline-none"
             />
             <button onClick={confirmEdit} className="text-emerald-400 hover:text-emerald-300 p-0.5">
               <Check size={12} />
@@ -136,7 +136,7 @@ function ParamRow({ name, param, meta, onSet, critical }) {
           <div className="flex items-center gap-1.5 shrink-0">
             <span
               onClick={startEdit}
-              className="text-[11px] font-mono text-cyan-300 cursor-pointer hover:text-cyan-200 tabular-nums"
+              className="text-[11px] font-mono text-gray-300 cursor-pointer hover:text-gray-200 tabular-nums"
               title="Click to edit"
             >
               {Number.isInteger(param.value) ? param.value : param.value.toFixed(
@@ -155,7 +155,7 @@ function ParamRow({ name, param, meta, onSet, critical }) {
 
       {/* Expanded details */}
       {expanded && (
-        <div className="px-3 pb-2 text-[9px] text-gray-500 space-y-1 border-l-2 border-cyan-500/30 ml-3">
+        <div className="px-3 pb-2 text-[9px] text-gray-500 space-y-1 border-l-2 border-gray-500/30 ml-3">
           {meta?.description ? (
             <div className="text-gray-400">{meta.description}</div>
           ) : (
@@ -167,7 +167,7 @@ function ParamRow({ name, param, meta, onSet, critical }) {
           {meta?.values && (
             <div className="flex flex-wrap gap-x-2 gap-y-0.5">
               {Object.entries(meta.values).map(([k, v]) => (
-                <span key={k} className={String(param.value) === k || param.value == k ? 'text-cyan-400' : ''}>
+                <span key={k} className={String(param.value) === k || param.value == k ? 'text-gray-400' : ''}>
                   {k}={v}
                 </span>
               ))}
@@ -448,7 +448,7 @@ export default function ParamsPanel() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search parameters..."
-            className="w-full bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-md pl-7 pr-3 py-1.5 text-xs focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 transition-colors"
+            className="w-full bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-md pl-7 pr-3 py-1.5 text-xs focus:outline-none focus:border-gray-500/50 focus:ring-1 focus:ring-gray-500/20 transition-colors"
           />
           {search && (
             <button

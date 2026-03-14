@@ -30,7 +30,7 @@ function StickVisualization({ x, y, label, size = 48 }) {
         </div>
         {/* Stick position dot */}
         <div
-          className="absolute w-3 h-3 bg-cyan-400 rounded-full shadow-lg shadow-cyan-500/30 -translate-x-1/2 -translate-y-1/2 transition-all duration-75"
+          className="absolute w-3 h-3 bg-gray-400 rounded-full shadow-lg shadow-gray-500/30 -translate-x-1/2 -translate-y-1/2 transition-all duration-75"
           style={{ left: dotX, top: dotY }}
         />
       </div>
@@ -39,7 +39,7 @@ function StickVisualization({ x, y, label, size = 48 }) {
   );
 }
 
-function ChannelBar({ value, label, color = 'cyan' }) {
+function ChannelBar({ value, label, color = 'gray' }) {
   // value is 1000-2000, center at 1500
   const percent = ((value - RC_MIN) / (RC_MAX - RC_MIN)) * 100;
   const deviation = value - RC_CENTER;
@@ -47,12 +47,12 @@ function ChannelBar({ value, label, color = 'cyan' }) {
   const isCenter = Math.abs(deviation) < 20;
 
   const colorClasses = {
-    cyan: { bar: 'bg-cyan-500', text: 'text-cyan-400' },
+    gray: { bar: 'bg-gray-500', text: 'text-gray-400' },
     emerald: { bar: 'bg-emerald-500', text: 'text-emerald-400' },
     amber: { bar: 'bg-amber-500', text: 'text-amber-400' },
     violet: { bar: 'bg-violet-500', text: 'text-violet-400' },
   };
-  const c = colorClasses[color] || colorClasses.cyan;
+  const c = colorClasses[color] || colorClasses.gray;
 
   return (
     <div className="flex items-center gap-1.5">
@@ -123,24 +123,24 @@ export default function ManualControlOverlay() {
   if (!isConnected || !isActive) return null;
 
   return (
-    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] flex flex-col items-center gap-2">
+    <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[60] flex flex-col items-center gap-2">
       {/* Manual control status badge - always visible */}
       <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border backdrop-blur-md shadow-xl ${
         isSending
-          ? 'bg-cyan-950/70 border-cyan-500/40'
+          ? 'bg-gray-950/70 border-gray-500/40'
           : isActive
           ? 'bg-gray-900/70 border-gray-700/40'
           : 'bg-gray-900/50 border-gray-800/30'
       }`}>
         <div className="flex items-center gap-1.5">
-          {keyboardEnabled && <Keyboard size={12} className={isSending ? 'text-cyan-400' : 'text-gray-500'} />}
-          {gamepadEnabled && <Gamepad2 size={12} className={isSending ? 'text-cyan-400' : 'text-gray-500'} />}
-          <Radio size={10} className={isSending ? 'text-cyan-400 animate-pulse' : 'text-gray-600'} />
+          {keyboardEnabled && <Keyboard size={12} className={isSending ? 'text-gray-400' : 'text-gray-500'} />}
+          {gamepadEnabled && <Gamepad2 size={12} className={isSending ? 'text-gray-400' : 'text-gray-500'} />}
+          <Radio size={10} className={isSending ? 'text-gray-400 animate-pulse' : 'text-gray-600'} />
         </div>
 
         <div className="flex flex-col flex-1">
           <span className={`text-[10px] font-semibold uppercase tracking-wide ${
-            isSending ? 'text-cyan-300' : 'text-gray-400'
+            isSending ? 'text-gray-300' : 'text-gray-400'
           }`}>
             {isSending ? 'Sending RC' : 'Manual Control'}{' '}
             <span className="font-normal normal-case text-[9px] text-gray-500">
@@ -172,7 +172,7 @@ export default function ManualControlOverlay() {
 
           {/* Channel bars */}
           <div className="space-y-1.5 min-w-[140px]">
-            <ChannelBar value={roll} label="R" color="cyan" />
+            <ChannelBar value={roll} label="R" color="gray" />
             <ChannelBar value={pitch} label="P" color="emerald" />
             <ChannelBar value={throttle} label="T" color="amber" />
             <ChannelBar value={yaw} label="Y" color="violet" />
@@ -184,7 +184,7 @@ export default function ManualControlOverlay() {
               {activeKeys.map((key) => (
                 <span
                   key={key}
-                  className="px-1.5 py-0.5 bg-cyan-500/20 text-cyan-300 text-[9px] font-mono font-bold rounded border border-cyan-500/30"
+                  className="px-1.5 py-0.5 bg-gray-500/20 text-gray-300 text-[9px] font-mono font-bold rounded border border-gray-500/30"
                 >
                   {key}
                 </span>

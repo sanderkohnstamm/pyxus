@@ -235,7 +235,7 @@ export default function FenceSubPanel() {
                 type="number"
                 value={geofence.radius}
                 onChange={(e) => setGeofence({ radius: parseFloat(e.target.value) || 200 })}
-                className="w-20 bg-gray-800/80 text-gray-200 border border-gray-700/50 rounded-md px-2 py-1 text-xs font-mono text-right focus:outline-none focus:border-cyan-500/50"
+                className="w-20 bg-gray-800/80 text-gray-200 border border-gray-700/50 rounded-md px-2 py-1 text-xs font-mono text-right focus:outline-none focus:border-gray-500/50"
                 min={50}
                 max={10000}
                 step={50}

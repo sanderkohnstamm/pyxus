@@ -25,7 +25,7 @@ export default function VideoOverlay() {
         onClick={toggleVideoOverlay}
         className={`px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all border backdrop-blur-md ${
           videoOverlayVisible
-            ? 'bg-gray-900/60 text-cyan-400 border-cyan-500/30'
+            ? 'bg-gray-900/60 text-gray-300 border-gray-500/30'
             : 'bg-gray-900/50 text-gray-500 hover:text-gray-300 border-gray-700/30'
         }`}
       >
@@ -39,7 +39,7 @@ export default function VideoOverlay() {
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setIsFullscreen(true)}
-                className="text-gray-600 hover:text-cyan-400 transition-colors p-0.5"
+                className="text-gray-600 hover:text-gray-300 transition-colors p-0.5"
                 title="Fullscreen with HUD"
               >
                 <Maximize2 size={12} />

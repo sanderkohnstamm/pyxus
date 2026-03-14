@@ -49,7 +49,7 @@ import { haversineDistance, validateMissionAgainstFence } from '../utils/geo';
 import { formatCoord } from '../utils/formatCoord';
 
 const ITEM_TYPES = {
-  waypoint: { label: 'Waypoint', icon: MapPin, color: 'sky' },
+  waypoint: { label: 'Waypoint', icon: MapPin, color: 'gray' },
   takeoff: { label: 'Takeoff', icon: ArrowUp, color: 'emerald' },
   loiter_unlim: { label: 'Loiter', icon: Circle, color: 'violet' },
   loiter_turns: { label: 'Loiter Turns', icon: RotateCw, color: 'violet' },
@@ -57,23 +57,22 @@ const ITEM_TYPES = {
   roi: { label: 'ROI', icon: Crosshair, color: 'amber' },
   land: { label: 'Land', icon: ArrowDown, color: 'orange' },
   do_jump: { label: 'Jump To', icon: Repeat, color: 'pink' },
-  do_set_servo: { label: 'Servo', icon: Grip, color: 'cyan' },
+  do_set_servo: { label: 'Servo', icon: Grip, color: 'gray' },
 };
 
 const TYPE_COLORS = {
-  sky: 'text-sky-400 bg-sky-500/10 border-sky-500/20',
+  gray: 'text-gray-400 bg-gray-500/10 border-gray-500/20',
   emerald: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
   violet: 'text-violet-400 bg-violet-500/10 border-violet-500/20',
   amber: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
   orange: 'text-orange-400 bg-orange-500/10 border-orange-500/20',
   pink: 'text-pink-400 bg-pink-500/10 border-pink-500/20',
-  cyan: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
 };
 
 const STATUS_COLORS = {
   idle: 'bg-gray-700/60 text-gray-400',
   uploading: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-  uploaded: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
+  uploaded: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
   running: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
   paused: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
   upload_failed: 'bg-red-500/20 text-red-300 border-red-500/30',
@@ -792,12 +791,12 @@ function MissionSubPanel() {
                 value={nameValue}
                 onChange={(e) => setNameValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleFinishRename()}
-                className="flex-1 bg-gray-900/60 text-gray-200 border border-cyan-500/50 rounded px-2 py-1 text-xs focus:outline-none"
+                className="flex-1 bg-gray-900/60 text-gray-200 border border-gray-500/50 rounded px-2 py-1 text-xs focus:outline-none"
                 autoFocus
               />
               <button
                 onClick={handleFinishRename}
-                className="p-1 text-cyan-400 hover:text-cyan-300"
+                className="p-1 text-gray-400 hover:text-gray-300"
               >
                 <Check size={14} />
               </button>
@@ -810,7 +809,7 @@ function MissionSubPanel() {
                   const id = parseInt(e.target.value);
                   if (id) loadMission(id);
                 }}
-                className="flex-1 bg-gray-900/60 text-gray-200 border border-gray-700/50 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-cyan-500/50 cursor-pointer"
+                className="flex-1 bg-gray-900/60 text-gray-200 border border-gray-700/50 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-gray-500/50 cursor-pointer"
               >
                 <option value="" className="bg-gray-800">
                   {activeMissionId ? activeMissionName : '-- Select or create mission --'}
@@ -845,7 +844,7 @@ function MissionSubPanel() {
             onClick={handleSaveMission}
             disabled={plannedWaypoints.length === 0}
             title={activeMissionId ? 'Update mission' : 'Save as new mission'}
-            className="flex items-center justify-center gap-1 px-2 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 rounded text-[10px] font-medium text-cyan-400 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            className="flex items-center justify-center gap-1 px-2 py-1.5 bg-gray-500/10 hover:bg-gray-500/20 border border-gray-500/20 rounded text-[10px] font-medium text-gray-400 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
           >
             <Save size={11} /> {activeMissionId ? 'Update' : 'Save'}
           </button>
@@ -905,7 +904,7 @@ function MissionSubPanel() {
                 type="number"
                 value={defaultAlt}
                 onChange={(e) => setDefaultAlt(e.target.value)}
-                className="w-full bg-gray-800/80 text-gray-200 border border-gray-700/50 rounded-md px-2 py-1.5 text-xs font-mono text-right focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20"
+                className="w-full bg-gray-800/80 text-gray-200 border border-gray-700/50 rounded-md px-2 py-1.5 text-xs font-mono text-right focus:outline-none focus:border-gray-500/50 focus:ring-1 focus:ring-gray-500/20"
                 min={1}
                 max={500}
                 step={5}
@@ -920,7 +919,7 @@ function MissionSubPanel() {
                 type="number"
                 value={defaultSpeed}
                 onChange={(e) => setDefaultSpeed(e.target.value)}
-                className="w-full bg-gray-800/80 text-gray-200 border border-gray-700/50 rounded-md px-2 py-1.5 text-xs font-mono text-right focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20"
+                className="w-full bg-gray-800/80 text-gray-200 border border-gray-700/50 rounded-md px-2 py-1.5 text-xs font-mono text-right focus:outline-none focus:border-gray-500/50 focus:ring-1 focus:ring-gray-500/20"
                 min={0.5}
                 max={30}
                 step={0.5}
@@ -976,7 +975,7 @@ function MissionSubPanel() {
             onClick={handleUpload}
             disabled={plannedWaypoints.length === 0 || !isConnected}
             title={!isConnected ? 'Connect to drone first' : 'Upload mission to drone'}
-            className="flex items-center justify-center gap-1.5 px-2 py-2.5 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 hover:border-cyan-500/40 rounded-md text-xs font-semibold text-cyan-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-cyan-500/10 disabled:hover:border-cyan-500/20"
+            className="flex items-center justify-center gap-1.5 px-2 py-2.5 bg-gray-500/10 hover:bg-gray-500/20 border border-gray-500/20 hover:border-gray-500/40 rounded-md text-xs font-semibold text-gray-300 transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-gray-500/10 disabled:hover:border-gray-500/20"
           >
             <Upload size={12} /> Upload
           </button>
@@ -1043,7 +1042,7 @@ export default function MissionPanel() {
           onClick={() => setPlanSubTab('mission')}
           className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all ${
             planSubTab === 'mission'
-              ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
+              ? 'bg-gray-500/15 text-gray-300 border border-gray-500/30'
               : 'text-gray-500 hover:text-gray-300 border border-transparent'
           }`}
         >

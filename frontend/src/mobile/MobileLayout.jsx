@@ -34,9 +34,9 @@ export default function MobileLayout({ sendMessage }) {
 
       {/* Bottom sheet */}
       <BottomSheet>
-        {activeTab === 'planning' ? (
+        {activeTab === 'plan' ? (
           <PlanSheet />
-        ) : activeTab === 'flying' ? (
+        ) : activeTab === 'command' ? (
           <FlySheet />
         ) : (
           <ToolsSheet />

@@ -150,8 +150,8 @@ export default function BottomSheet({ children }) {
   const summary = summaryParts.join(' | ') || 'No telemetry';
 
   const tabs = [
-    { id: 'planning', label: 'Plan', icon: MapIcon },
-    { id: 'flying', label: 'Fly', icon: Plane },
+    { id: 'plan', label: 'Plan', icon: MapIcon },
+    { id: 'command', label: 'Fly', icon: Plane },
     { id: 'tools', label: 'Tools', icon: Wrench },
   ];
 

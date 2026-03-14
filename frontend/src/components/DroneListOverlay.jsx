@@ -70,7 +70,7 @@ export default function DroneListOverlay({ droneColorMap }) {
   if (droneIds.length < 2) return null;
 
   return (
-    <div className="absolute top-[80px] left-3 z-[1000] bg-gray-900/80 backdrop-blur-md rounded-lg border border-gray-700/30 shadow-xl overflow-hidden"
+    <div className="absolute top-[140px] left-3 z-[60] bg-gray-950/75 backdrop-blur-xl rounded-xl border border-white/[0.08] shadow-xl overflow-hidden"
          style={{ maxWidth: '240px' }}
     >
       <div className="px-2 py-1 border-b border-gray-700/30 flex items-center gap-1.5">
@@ -87,7 +87,7 @@ export default function DroneListOverlay({ droneColorMap }) {
         ) : (
           <button
             onClick={selectAllDrones}
-            className="text-[9px] font-semibold text-gray-500 hover:text-cyan-400 transition-colors px-1"
+            className="text-[9px] font-semibold text-gray-500 hover:text-gray-400 transition-colors px-1"
             title="Select all for batch operations"
           >
             Select All
@@ -112,7 +112,7 @@ export default function DroneListOverlay({ droneColorMap }) {
                 isActive
                   ? 'bg-gray-800/60'
                   : 'hover:bg-gray-800/40'
-              } ${isSelected ? 'border-l-2 border-l-cyan-400' : 'border-l-2 border-l-transparent'}`}
+              } ${isSelected ? 'border-l-2 border-l-gray-400' : 'border-l-2 border-l-transparent'}`}
               onClick={(e) => {
                 if (e.shiftKey) {
                   // Shift-click toggles batch selection
@@ -132,7 +132,7 @@ export default function DroneListOverlay({ droneColorMap }) {
               >
                 <div className={`w-3 h-3 rounded-sm border transition-colors flex items-center justify-center ${
                   isSelected
-                    ? 'bg-cyan-500 border-cyan-400'
+                    ? 'bg-gray-500 border-gray-400'
                     : 'border-gray-600 hover:border-gray-400'
                 }`}>
                   {isSelected && (
@@ -183,13 +183,13 @@ export default function DroneListOverlay({ droneColorMap }) {
       )}
       {isMultiSelect && (
         <div className="px-2 py-1 border-t border-gray-700/30 flex items-center gap-1.5">
-          <span className="text-[9px] text-cyan-400 font-semibold">
+          <span className="text-[9px] text-gray-400 font-semibold">
             {selectedDroneIds.length} selected
           </span>
           {!allSelected && (
             <button
               onClick={selectAllDrones}
-              className="text-[9px] text-gray-500 hover:text-cyan-400 transition-colors ml-auto"
+              className="text-[9px] text-gray-500 hover:text-gray-400 transition-colors ml-auto"
             >
               All
             </button>

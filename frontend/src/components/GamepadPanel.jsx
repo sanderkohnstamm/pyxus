@@ -320,7 +320,7 @@ export default function GamepadPanel() {
   // Note: RC override sending is handled globally in App.jsx
   // This panel only handles configuration and button actions
 
-  const inputCls = 'w-full bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-md px-2 py-1 text-[10px] focus:outline-none focus:border-cyan-500/50 transition-colors';
+  const inputCls = 'w-full bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded-md px-2 py-1 text-[10px] focus:outline-none focus:border-gray-500/50 transition-colors';
 
   return (
     <div className="p-4 space-y-3">
@@ -334,7 +334,7 @@ export default function GamepadPanel() {
           <button
             onClick={() => setGamepadEnabled(!gamepadEnabled)}
             className={`relative w-10 h-5 rounded-full transition-colors ${
-              gamepadEnabled ? 'bg-cyan-600' : 'bg-gray-700'
+              gamepadEnabled ? 'bg-gray-600' : 'bg-gray-700'
             }`}
           >
             <span
@@ -368,7 +368,7 @@ export default function GamepadPanel() {
                 <span className={`px-1.5 py-0.5 rounded ${
                   gamepads[selectedIndex].type === 'transmitter'
                     ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                    : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
                 }`}>
                   <Radio size={8} className="inline mr-1" />
                   {gamepads[selectedIndex].type === 'transmitter' ? 'Transmitter' : 'Gamepad'}
@@ -388,7 +388,7 @@ export default function GamepadPanel() {
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Sticks</span>
             {gamepadEnabled && isConnected && (
-              <span className="flex items-center gap-1 text-[9px] text-cyan-400">
+              <span className="flex items-center gap-1 text-[9px] text-gray-400">
                 <Radio size={9} className="animate-pulse" />
                 Sending RC
               </span>
@@ -403,7 +403,7 @@ export default function GamepadPanel() {
                   <div className="absolute h-full w-px bg-gray-700/40" />
                 </div>
                 <div
-                  className="absolute w-3 h-3 bg-cyan-400 rounded-full shadow-lg shadow-cyan-500/30 transition-all duration-75"
+                  className="absolute w-3 h-3 bg-gray-400 rounded-full shadow-lg shadow-gray-500/30 transition-all duration-75"
                   style={{
                     left: `${50 + (liveAxes[0] || 0) * 40}%`,
                     top: `${50 + (liveAxes[1] || 0) * 40}%`,
@@ -421,7 +421,7 @@ export default function GamepadPanel() {
                   <div className="absolute h-full w-px bg-gray-700/40" />
                 </div>
                 <div
-                  className="absolute w-3 h-3 bg-cyan-400 rounded-full shadow-lg shadow-cyan-500/30 transition-all duration-75"
+                  className="absolute w-3 h-3 bg-gray-400 rounded-full shadow-lg shadow-gray-500/30 transition-all duration-75"
                   style={{
                     left: `${50 + (liveAxes[2] || 0) * 40}%`,
                     top: `${50 + (liveAxes[3] || 0) * 40}%`,
@@ -442,7 +442,7 @@ export default function GamepadPanel() {
                     <span className="text-[9px] text-gray-500 w-6">Ch{i + 5}</span>
                     <div className="flex-1 h-1.5 bg-gray-800/80 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-cyan-400/70 transition-all"
+                        className="h-full bg-gray-400/70 transition-all"
                         style={{ width: `${((val + 1) / 2) * 100}%` }}
                       />
                     </div>
@@ -466,19 +466,19 @@ export default function GamepadPanel() {
             const isActive = Math.abs(axisValue) > (mapping.deadzone || 0.1);
             return (
               <div key={i} className="flex items-center gap-1.5">
-                <span className={`text-[10px] w-10 shrink-0 font-medium ${isActive ? 'text-cyan-300' : 'text-gray-500'}`}>
+                <span className={`text-[10px] w-10 shrink-0 font-medium ${isActive ? 'text-gray-300' : 'text-gray-500'}`}>
                   {AXIS_NAMES[i] || `Axis ${i}`}
                 </span>
                 <div className="w-8 h-1.5 bg-gray-800/80 rounded-full overflow-hidden shrink-0">
                   <div
-                    className={`h-full transition-all ${isActive ? 'bg-cyan-400' : 'bg-gray-600'}`}
+                    className={`h-full transition-all ${isActive ? 'bg-gray-400' : 'bg-gray-600'}`}
                     style={{ width: `${((axisValue + 1) / 2) * 100}%` }}
                   />
                 </div>
                 <select
                   value={mapping.channel}
                   onChange={(e) => updateAxisMapping(i, 'channel', e.target.value)}
-                  className="flex-1 bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded px-1.5 py-1 text-[10px] focus:outline-none focus:border-cyan-500/50"
+                  className="flex-1 bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded px-1.5 py-1 text-[10px] focus:outline-none focus:border-gray-500/50"
                 >
                   {AXIS_CHANNELS.map((ch) => (
                     <option key={ch.value} value={ch.value}>{ch.label}</option>
@@ -489,7 +489,7 @@ export default function GamepadPanel() {
                     type="checkbox"
                     checked={mapping.inverted}
                     onChange={(e) => updateAxisMapping(i, 'inverted', e.target.checked)}
-                    className="w-3 h-3 rounded border-gray-600 bg-gray-800 text-cyan-500 focus:ring-0 focus:ring-offset-0"
+                    className="w-3 h-3 rounded border-gray-600 bg-gray-800 text-gray-500 focus:ring-0 focus:ring-offset-0"
                   />
                   <span className="text-[9px] text-gray-500">Inv</span>
                 </label>
@@ -502,7 +502,7 @@ export default function GamepadPanel() {
                     step={0.05}
                     value={mapping.deadzone}
                     onChange={(e) => updateAxisMapping(i, 'deadzone', parseFloat(e.target.value))}
-                    className="w-10 h-1 bg-gray-700 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2 [&::-webkit-slider-thumb]:h-2 [&::-webkit-slider-thumb]:bg-cyan-400 [&::-webkit-slider-thumb]:rounded-full"
+                    className="w-10 h-1 bg-gray-700 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2 [&::-webkit-slider-thumb]:h-2 [&::-webkit-slider-thumb]:bg-gray-400 [&::-webkit-slider-thumb]:rounded-full"
                   />
                 </div>
               </div>
@@ -529,20 +529,20 @@ export default function GamepadPanel() {
               <div key={i} className="flex items-center gap-1.5">
                 <span
                   className={`text-[10px] w-10 shrink-0 font-medium ${
-                    isPressed ? 'text-cyan-300' : 'text-gray-500'
+                    isPressed ? 'text-gray-300' : 'text-gray-500'
                   }`}
                 >
                   {name}
                 </span>
                 <div
                   className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                    isPressed ? 'bg-cyan-400' : 'bg-gray-700'
+                    isPressed ? 'bg-gray-400' : 'bg-gray-700'
                   }`}
                 />
                 <select
                   value={action}
                   onChange={(e) => updateButtonMapping(i, e.target.value)}
-                  className="flex-1 bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded px-1.5 py-0.5 text-[10px] focus:outline-none focus:border-cyan-500/50"
+                  className="flex-1 bg-gray-800/60 text-gray-200 border border-gray-700/50 rounded px-1.5 py-0.5 text-[10px] focus:outline-none focus:border-gray-500/50"
                 >
                   {BUTTON_ACTIONS.map((a) => (
                     <option key={a.value} value={a.value}>{a.label}</option>

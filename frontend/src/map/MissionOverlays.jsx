@@ -168,9 +168,9 @@ export function ManipulationOverlay({ mode, onComplete, onCancel }) {
       )}
 
       {/* Mode indicator */}
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] bg-gray-900/90 border border-cyan-500/30 rounded-lg px-4 py-2 backdrop-blur-sm">
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] bg-gray-900/90 border border-gray-500/30 rounded-lg px-4 py-2 backdrop-blur-sm">
         <div className="flex items-center gap-2 text-sm">
-          <span className="text-cyan-300 font-medium">
+          <span className="text-gray-300 font-medium">
             {mode === 'translate' && 'Move Mode'}
             {mode === 'rotate' && 'Rotate Mode'}
             {mode === 'scale' && 'Scale Mode'}

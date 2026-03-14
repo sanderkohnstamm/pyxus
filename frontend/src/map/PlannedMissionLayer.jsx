@@ -20,7 +20,7 @@ export function PlannedWaypointMarkers({ onContextMenu }) {
   const addWaypointMode = useDroneStore((s) => s.addWaypointMode);
   const missionViolations = useDroneStore((s) => s.missionViolations);
 
-  const isPlanning = activeTab === 'planning';
+  const isPlanning = activeTab === 'plan';
   const plannedOpacity = isPlanning ? 1 : 0.3;
 
   const plannedNavPositions = plannedWaypoints
@@ -164,7 +164,7 @@ export function FenceVertexMarkers() {
   const updateFenceVertex = useDroneStore((s) => s.updateFenceVertex);
   const coordFormat = useDroneStore((s) => s.coordFormat);
 
-  const isPlanning = activeTab === 'planning';
+  const isPlanning = activeTab === 'plan';
   const plannedOpacity = isPlanning ? 1 : 0.3;
   const fencePositions = plannedFence.map((v) => [v.lat, v.lon]);
 

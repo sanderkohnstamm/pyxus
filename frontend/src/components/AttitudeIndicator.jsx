@@ -58,7 +58,7 @@ function HorizonIndicator({ roll, pitch }) {
               transform: 'translateX(-50%)',
             }}
           >
-            <div className={`w-8 h-[1px] ${deg > 0 ? 'bg-cyan-400/60' : 'bg-amber-400/60'}`} />
+            <div className={`w-8 h-[1px] ${deg > 0 ? 'bg-gray-400/60' : 'bg-amber-400/60'}`} />
             <span className="absolute -right-6 text-[8px] text-white/50">{deg > 0 ? '+' : ''}{deg}</span>
           </div>
         ))}
@@ -211,7 +211,7 @@ function CompassIndicator({ heading, homeBearing }) {
 
       {/* Fixed heading pointer at top */}
       <div className="absolute top-1 left-1/2 -translate-x-1/2">
-        <div className="w-0 h-0 border-l-[6px] border-r-[6px] border-t-[10px] border-l-transparent border-r-transparent border-t-cyan-400" />
+        <div className="w-0 h-0 border-l-[6px] border-r-[6px] border-t-[10px] border-l-transparent border-r-transparent border-t-gray-400" />
       </div>
 
       {/* Heading readout */}
@@ -251,7 +251,7 @@ export default function AttitudeIndicator() {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-1.5 mb-2">
-        <div className="w-2 h-2 rounded-full bg-cyan-500" />
+        <div className="w-2 h-2 rounded-full bg-gray-500" />
         <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Attitude</span>
       </div>
 

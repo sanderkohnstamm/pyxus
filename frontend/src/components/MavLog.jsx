@@ -9,7 +9,7 @@ const SEVERITY_COLORS = {
   2: 'text-red-300',      // CRITICAL
   3: 'text-red-300',      // ERROR
   4: 'text-amber-300',    // WARNING
-  5: 'text-sky-300',      // NOTICE
+  5: 'text-gray-300',      // NOTICE
   6: 'text-gray-400',     // INFO
   7: 'text-gray-600',     // DEBUG
 };
@@ -37,7 +37,7 @@ export default function MavLog() {
         onClick={toggleMavLog}
         className={`px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all border backdrop-blur-md ${
           mavLogVisible
-            ? 'bg-gray-900/15 text-cyan-400 border-cyan-500/20'
+            ? 'bg-gray-900/15 text-gray-400 border-gray-500/20'
             : 'bg-gray-900/10 text-gray-500 hover:text-gray-300 border-gray-700/15'
         }`}
       >
@@ -82,7 +82,7 @@ export default function MavLog() {
                 return (
                   <div key={msg.id} className={`flex gap-2 py-px ${opacity}`}>
                     <span className="text-gray-700 shrink-0">{time}</span>
-                    <span className={`shrink-0 w-[26px] text-right text-[9px] ${isGcs ? 'text-cyan-600' : 'text-gray-700'}`}>{isGcs ? 'GCS' : 'MAV'}</span>
+                    <span className={`shrink-0 w-[26px] text-right text-[9px] ${isGcs ? 'text-gray-600' : 'text-gray-700'}`}>{isGcs ? 'GCS' : 'MAV'}</span>
                     <span className={`shrink-0 w-[42px] text-right ${sevColor}`}>{sevLabel}</span>
                     <span className="text-gray-300 break-all">{msg.text}</span>
                   </div>

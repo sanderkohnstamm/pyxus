@@ -186,7 +186,7 @@ export default function PreFlightChecklist() {
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
           <div className="flex items-center gap-2">
-            <ShieldCheck size={15} className="text-cyan-400" />
+            <ShieldCheck size={15} className="text-gray-400" />
             <span className="text-[12px] font-bold text-gray-200 tracking-wide">Pre-Flight Checklist</span>
           </div>
           <button

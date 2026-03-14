@@ -59,7 +59,7 @@ export default function useWebSocket() {
           addMavMessages(stMsgs);
         }
 
-        // Route calibration messages
+        // Route calibration messages (STATUSTEXT-based, primarily for PX4)
         const { calibrationStatus, addCalibrationMessage, setCalibrationStep } = store;
         if (calibrationStatus.active && droneId === store.activeDroneId) {
           stMsgs.forEach(msg => {
@@ -75,6 +75,24 @@ export default function useWebSocket() {
                 else if (text.includes('nose up')) setCalibrationStep(4);
                 else if (text.includes('back') || text.includes('belly')) setCalibrationStep(5);
               }
+            }
+          });
+        }
+      }
+
+      // Process structured calibration events from backend
+      const calEvents = data.cal_events;
+      if (calEvents && calEvents.length > 0 && droneId === store.activeDroneId) {
+        const { calibrationStatus: calStatus, setCalibrationStep: setStep,
+                setCompassPercent, setCalibrationCompleted, addCalibrationMessage: addCalMsg } = store;
+        if (calStatus.active) {
+          calEvents.forEach(evt => {
+            if (evt.event === 'accel_position') {
+              setStep(evt.step);
+            } else if (evt.event === 'compass_progress') {
+              setCompassPercent(evt.percent);
+            } else if (evt.event === 'complete') {
+              setCalibrationCompleted(evt.success);
             }
           });
         }

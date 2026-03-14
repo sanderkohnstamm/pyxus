@@ -114,10 +114,10 @@ export default function BatteryChart() {
         <path d={currentPath} fill="none" stroke="#f59e0b" strokeWidth="1" opacity="0.6" />
 
         {/* Voltage line */}
-        <path d={voltagePath} fill="none" stroke="#06b6d4" strokeWidth="1.5" />
+        <path d={voltagePath} fill="none" stroke="#94a3b8" strokeWidth="1.5" />
 
         {/* Latest values */}
-        <text x={W - padR} y={padT + 8} textAnchor="end" fill="#06b6d4" fontSize="8" fontFamily="monospace" fontWeight="bold">
+        <text x={W - padR} y={padT + 8} textAnchor="end" fill="#94a3b8" fontSize="8" fontFamily="monospace" fontWeight="bold">
           {latestV.toFixed(1)}V
         </text>
         <text x={W - padR} y={padT + 18} textAnchor="end" fill="#f59e0b" fontSize="7" fontFamily="monospace" opacity="0.8">
@@ -128,7 +128,7 @@ export default function BatteryChart() {
       {/* Legend */}
       <div className="flex items-center gap-3 mt-1 text-[9px] text-gray-600 flex-wrap">
         <span className="flex items-center gap-1">
-          <span className="w-2.5 h-0.5 bg-cyan-500 rounded-full inline-block" />
+          <span className="w-2.5 h-0.5 bg-gray-500 rounded-full inline-block" />
           Voltage
         </span>
         <span className="flex items-center gap-1">

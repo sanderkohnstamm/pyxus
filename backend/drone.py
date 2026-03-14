@@ -238,6 +238,13 @@ class DroneConnection:
         self._components: dict = {}  # "sys:comp" -> {type, name, last_seen, ...}
         self._components_lock = threading.Lock()
 
+        # Calibration state tracking
+        self._cal_type: Optional[str] = None  # Active calibration type
+        self._compass_results: dict = {}  # compass_id -> success bool
+        self._compass_count: int = 0
+        self._cal_events: deque = deque(maxlen=50)  # Structured calibration events
+        self._cal_lock = threading.Lock()
+
         # Available modes (MAVLink standard modes protocol)
         self._available_modes: list = []
         self._available_modes_count: int = 0
@@ -757,6 +764,29 @@ class DroneConnection:
                     kwargs.get("param6", 0),
                     0,
                 )
+            elif cmd_type == "command_long":
+                # Generic COMMAND_LONG sender for arbitrary commands (e.g., 42424, 42426)
+                self._mav.mav.command_long_send(
+                    self._target_system, self._target_component,
+                    kwargs["command"], 0,
+                    kwargs.get("param1", 0),
+                    kwargs.get("param2", 0),
+                    kwargs.get("param3", 0),
+                    kwargs.get("param4", 0),
+                    kwargs.get("param5", 0),
+                    kwargs.get("param6", 0),
+                    kwargs.get("param7", 0),
+                )
+            elif cmd_type == "accel_confirm":
+                # ArduPilot accel: send COMMAND_ACK with command=0, result=1
+                self._mav.mav.command_ack_send(
+                    0,   # command = 0 (not the actual command ID!)
+                    1,   # result = 1
+                    0,   # progress
+                    0,   # result_param2
+                    self._target_system,
+                    self._target_component,
+                )
             elif cmd_type == "set_param":
                 param_id = kwargs["param_id"]
                 if isinstance(param_id, str):
@@ -891,22 +921,132 @@ class DroneConnection:
 
             # MAV_CMD_PREFLIGHT_CALIBRATION = 241
             if command == 241:
-                result_texts = {
-                    0: ("Calibration accepted", 6),      # MAV_RESULT_ACCEPTED
-                    1: ("Calibration temporarily rejected - try again", 4),  # MAV_RESULT_TEMPORARILY_REJECTED
-                    2: ("Calibration denied", 3),        # MAV_RESULT_DENIED
-                    3: ("Calibration unsupported", 4),   # MAV_RESULT_UNSUPPORTED
-                    4: ("Calibration failed", 3),        # MAV_RESULT_FAILED
-                    5: ("Calibration in progress", 6),   # MAV_RESULT_IN_PROGRESS
-                    6: ("Calibration cancelled", 4),     # MAV_RESULT_CANCELLED
-                }
-                text, severity = result_texts.get(result, (f"Calibration result: {result}", 4))
+                # For ArduPilot simple cals (gyro/level/baro): result=0 means COMPLETE
+                if result == 0 and self._is_ardupilot and self._cal_type in ("gyro", "level", "pressure"):
+                    text, severity = "Calibration successful!", 6
+                    self._emit_cal_event("complete", success=True)
+                elif result == 0:
+                    text, severity = "Calibration accepted", 6
+                elif result == 5:
+                    text, severity = "Calibration in progress", 6
+                elif result == 4:
+                    text, severity = "Calibration failed", 3
+                    self._emit_cal_event("complete", success=False)
+                elif result == 2:
+                    text, severity = "Calibration denied - disarm vehicle first", 3
+                    self._emit_cal_event("complete", success=False)
+                elif result == 1:
+                    text, severity = "Calibration temporarily rejected - try again", 4
+                    self._emit_cal_event("complete", success=False)
+                elif result == 3:
+                    text, severity = "Calibration unsupported", 4
+                    self._emit_cal_event("complete", success=False)
+                else:
+                    text, severity = f"Calibration result: {result}", 4
+
                 with self._statustext_lock:
                     self._statustext_queue.append({
                         'severity': severity,
                         'text': text,
                         'time': now,
                     })
+            return
+
+        # Handle COMMAND_LONG from vehicle — ArduPilot accel position prompts (42003)
+        if msg_type == "COMMAND_LONG":
+            command = msg.command
+            if command == 42003:  # MAV_CMD_ACCELCAL_VEHICLE_POS
+                pos_value = int(msg.param1)
+                now = time.time()
+                accel_positions = {
+                    1: "Level", 2: "Left Side", 3: "Right Side",
+                    4: "Nose Down", 5: "Nose Up", 6: "On Back",
+                }
+                if 1 <= pos_value <= 6:
+                    pos_name = accel_positions[pos_value]
+                    self._emit_cal_event("accel_position", step=pos_value - 1, name=pos_name)
+                    with self._statustext_lock:
+                        self._statustext_queue.append({
+                            'severity': 6,
+                            'text': f"Place vehicle: {pos_name} (position {pos_value}/6)",
+                            'time': now,
+                        })
+                elif pos_value == 7:  # SUCCESS
+                    self._emit_cal_event("complete", success=True)
+                    with self._statustext_lock:
+                        self._statustext_queue.append({
+                            'severity': 6,
+                            'text': "Accel calibration successful!",
+                            'time': now,
+                        })
+                elif pos_value == 8:  # FAILED
+                    self._emit_cal_event("complete", success=False)
+                    with self._statustext_lock:
+                        self._statustext_queue.append({
+                            'severity': 3,
+                            'text': "Accel calibration failed",
+                            'time': now,
+                        })
+            return
+
+        # Handle MAG_CAL_PROGRESS (msg 191) — ArduPilot compass calibration progress
+        if msg_type == "MAG_CAL_PROGRESS":
+            compass_id = msg.compass_id
+            percent = msg.completion_pct
+            cal_mask = msg.cal_mask
+
+            # Derive compass count from bitmask
+            with self._cal_lock:
+                if self._compass_count == 0 and cal_mask > 0:
+                    self._compass_count = bin(cal_mask).count('1')
+
+            self._emit_cal_event("compass_progress", percent=percent, compass_id=compass_id)
+            return
+
+        # Handle MAG_CAL_REPORT (msg 192) — ArduPilot compass calibration result
+        if msg_type == "MAG_CAL_REPORT":
+            compass_id = msg.compass_id
+            cal_status = msg.cal_status
+            fitness = getattr(msg, 'fitness', 0)
+            success = (cal_status == 3)  # MAG_CAL_STATUS_SUCCESS = 3
+            now = time.time()
+
+            with self._cal_lock:
+                self._compass_results[compass_id] = success
+                expected = max(self._compass_count, 1)
+                all_reported = len(self._compass_results) >= expected
+
+            reasons = {3: "Success", 4: "Failed", 5: "Bad orientation", 6: "Bad radius"}
+            reason = reasons.get(cal_status, f"Status {cal_status}")
+
+            with self._statustext_lock:
+                self._statustext_queue.append({
+                    'severity': 6 if success else 3,
+                    'text': f"Compass {compass_id}: {reason} (fitness: {fitness:.1f})",
+                    'time': now,
+                })
+
+            if all_reported:
+                with self._cal_lock:
+                    all_success = all(self._compass_results.values())
+                if all_success:
+                    self._emit_cal_event("complete", success=True)
+                    # Post-calibration: set COMPASS_LEARN=0
+                    self._enqueue_cmd("set_param", param_id="COMPASS_LEARN", value=0.0)
+                    with self._statustext_lock:
+                        self._statustext_queue.append({
+                            'severity': 6,
+                            'text': "All compasses calibrated successfully!",
+                            'time': now,
+                        })
+                else:
+                    self._emit_cal_event("complete", success=False)
+                    with self._statustext_lock:
+                        self._statustext_queue.append({
+                            'severity': 3,
+                            'text': "Compass calibration failed",
+                            'time': now,
+                        })
             return
 
         # Handle AVAILABLE_MODES (standard modes protocol, msg ID 435)
@@ -1136,18 +1276,49 @@ class DroneConnection:
 
     def calibrate(self, cal_type: str):
         """Start a sensor calibration. Types: gyro, accel, level, compass, pressure, cancel, next_step."""
-        cal_map = {
-            "gyro":     {"param1": 1},
-            "compass":  {"param2": 1},
-            "pressure": {"param3": 1},
-            "accel":    {"param5": 1},
-            "level":    {"param5": 2},
-            "cancel":   {"param1": 0, "param2": 0, "param3": 0, "param4": 0, "param5": 0, "param6": 0},  # All zeros = cancel
-            "next_step": {"param5": 4},  # Simple accel cal accept (next position)
-        }
-        params = cal_map.get(cal_type, {})
-        if params:
-            self._enqueue_cmd("preflight_calibration", **params)
+        if cal_type == "cancel":
+            if self._cal_type == "compass" and self._is_ardupilot:
+                # ArduPilot: MAV_CMD_DO_CANCEL_MAG_CAL (42426)
+                self._enqueue_cmd("command_long", command=42426)
+            else:
+                self._enqueue_cmd("preflight_calibration", param1=0, param2=0, param3=0, param4=0, param5=0, param6=0)
+            with self._cal_lock:
+                self._cal_type = None
+                self._compass_results = {}
+                self._compass_count = 0
+            return
+
+        if cal_type == "next_step":
+            if self._is_ardupilot:
+                # ArduPilot accel 6-position: send COMMAND_ACK(cmd=0, result=1) to confirm position
+                self._enqueue_cmd("accel_confirm")
+            else:
+                # PX4: simple accel accept
+                self._enqueue_cmd("preflight_calibration", param5=4)
+            return
+
+        # Track active calibration
+        with self._cal_lock:
+            self._cal_type = cal_type
+            self._compass_results = {}
+            self._compass_count = 0
+
+        if cal_type == "compass" and self._is_ardupilot:
+            # ArduPilot compass: set COMPASS_CAL_FITNESS=100, then MAV_CMD_DO_START_MAG_CAL (42424)
+            self._enqueue_cmd("set_param", param_id="COMPASS_CAL_FITNESS", value=100.0)
+            self._enqueue_cmd("command_long", command=42424,
+                              param1=0, param2=0, param3=1, param4=0, param5=0)
+        else:
+            cal_map = {
+                "gyro":     {"param1": 1},
+                "compass":  {"param2": 1},  # PX4 only
+                "pressure": {"param3": 1},
+                "accel":    {"param5": 1},
+                "level":    {"param5": 2},
+            }
+            params = cal_map.get(cal_type, {})
+            if params:
+                self._enqueue_cmd("preflight_calibration", **params)
 
     def request_available_modes(self):
         """Request AVAILABLE_MODES from the vehicle (standard modes protocol)."""
@@ -1401,12 +1572,30 @@ class DroneConnection:
             ))
             return result
 
+    def _emit_cal_event(self, event_type: str, **kwargs):
+        """Emit a structured calibration event."""
+        with self._cal_lock:
+            self._cal_events.append({
+                'event': event_type,
+                'time': time.time(),
+                **kwargs,
+            })
+            if event_type == "complete":
+                self._cal_type = None
+
     def drain_statustext(self) -> list:
         """Return and clear pending STATUSTEXT messages."""
         with self._statustext_lock:
             msgs = list(self._statustext_queue)
             self._statustext_queue.clear()
             return msgs
+
+    def drain_cal_events(self) -> list:
+        """Return and clear pending calibration events."""
+        with self._cal_lock:
+            events = list(self._cal_events)
+            self._cal_events.clear()
+            return events
 
     def get_params(self) -> tuple[dict, int]:
         with self._params_lock:

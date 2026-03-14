@@ -69,7 +69,7 @@ export default function MapView() {
   const hasHome = homePosition && homePosition.lat !== 0 && homePosition.lon !== 0;
   const hasGcs = gcsPosition && gcsPosition.lat !== 0 && gcsPosition.lon !== 0;
 
-  const isPlanning = activeTab === 'planning';
+  const isPlanning = activeTab === 'plan';
   const isConnected = !!activeDroneId;
 
   const center = hasPosition ? [activeTelemetry.lat, activeTelemetry.lon] : [0, 0];
@@ -308,52 +308,42 @@ export default function MapView() {
       {/* Multi-drone list overlay (top-left, below zoom controls) */}
       <DroneListOverlay droneColorMap={droneColorMap} />
 
-      {/* Follow button */}
-      <button
-        onClick={() => setFollowDrone(!followDrone)}
-        className={`absolute top-3 right-3 z-[1000] px-3 py-1.5 rounded-md text-xs font-semibold transition-all border backdrop-blur-md ${
-          followDrone
-            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
-            : 'bg-gray-900/60 text-gray-400 hover:text-gray-200 border-gray-700/40'
-        }`}
-      >
-        {followDrone ? 'Following' : 'Follow'}
-      </button>
-
-      {/* Add waypoints toggle button */}
-      {isPlanning && (
+      {/* Map tool buttons (below zoom controls) */}
+      <div className="absolute top-[130px] left-2.5 z-[60] flex flex-col gap-1.5">
+        {/* Follow button */}
         <button
-          onClick={toggleAddWaypointMode}
-          className={`absolute bottom-3 right-3 z-[1000] px-3 py-1.5 rounded-md text-xs font-semibold transition-all border backdrop-blur-md ${
-            addWaypointMode
-              ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30 shadow-lg shadow-cyan-500/10'
-              : 'bg-gray-900/60 text-gray-400 hover:text-gray-200 border-gray-700/40'
+          onClick={() => setFollowDrone(!followDrone)}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border backdrop-blur-xl shadow-lg ${
+            followDrone
+              ? 'bg-gray-950/70 text-emerald-300 border-emerald-500/30'
+              : 'bg-gray-950/70 text-gray-400 hover:text-gray-200 border-white/[0.08]'
           }`}
         >
-          {addWaypointMode
-            ? (planSubTab === 'fence' ? 'Adding Fence Vertices...' : 'Adding Waypoints...')
-            : (planSubTab === 'fence' ? 'Add Fence Vertices' : 'Add Waypoints')
-          }
+          {followDrone ? 'Following' : 'Follow'}
         </button>
-      )}
 
-      {/* Bottom-left overlays */}
-      <div className="absolute bottom-3 left-3 z-[1000] flex items-end gap-1.5">
-        {isConnected && <MavLog />}
+        {/* Ruler button */}
         <button
           onClick={() => {
             if (measureMode) clearMeasure();
             else setMeasureMode(true);
           }}
-          className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all border backdrop-blur-md ${
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border backdrop-blur-xl shadow-lg ${
             measureMode
-              ? 'bg-orange-500/20 text-orange-300 border-orange-500/30 shadow-lg shadow-orange-500/10'
-              : 'bg-gray-900/60 text-gray-400 hover:text-gray-200 border-gray-700/40'
+              ? 'bg-gray-950/70 text-orange-300 border-orange-500/30'
+              : 'bg-gray-950/70 text-gray-400 hover:text-gray-200 border-white/[0.08]'
           }`}
           title="Measure distance & bearing"
         >
           <Ruler size={14} />
         </button>
+      </div>
+
+      {/* Add waypoints button removed — now in FloatingPlanBar */}
+
+      {/* Bottom-left overlays */}
+      <div className="absolute bottom-3 left-3 z-[60] flex items-end gap-1.5">
+        {isConnected && <MavLog />}
         {isConnected && <VideoOverlay />}
       </div>
 

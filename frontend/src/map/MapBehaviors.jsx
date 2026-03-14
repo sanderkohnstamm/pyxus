@@ -115,7 +115,7 @@ export function MapClickHandler() {
         return;
       }
       // Planning mode works offline
-      if (activeTab === 'planning' && addWaypointMode) {
+      if (activeTab === 'plan' && addWaypointMode) {
         if (planSubTab === 'fence') {
           addFenceVertex(e.latlng.lat, e.latlng.lng);
         } else {
@@ -123,7 +123,7 @@ export function MapClickHandler() {
         }
       }
       // Flying mode requires connection
-      else if (activeTab === 'flying' && activeDroneId) {
+      else if (activeTab === 'command' && activeDroneId) {
         setFlyClickTarget({ lat: e.latlng.lat, lon: e.latlng.lng });
       }
     },
@@ -163,7 +163,7 @@ export function AddModeCursor() {
 
   useEffect(() => {
     const container = map.getContainer();
-    if (quickMissionMode || measureMode || (addWaypointMode && activeTab === 'planning')) {
+    if (quickMissionMode || measureMode || (addWaypointMode && activeTab === 'plan')) {
       container.style.cursor = 'crosshair';
     } else {
       container.style.cursor = '';

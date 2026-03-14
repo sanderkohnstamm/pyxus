@@ -17,7 +17,7 @@ export default function PlannedWaypointLayer({ onContextMenu }) {
   const setSidebarCollapsed = useDroneStore((s) => s.setSidebarCollapsed);
   const missionViolations = useDroneStore((s) => s.missionViolations);
 
-  const isPlanning = activeTab === 'planning';
+  const isPlanning = activeTab === 'plan';
   const plannedOpacity = isPlanning ? 1 : 0.3;
 
   const violatingIndices = useMemo(
