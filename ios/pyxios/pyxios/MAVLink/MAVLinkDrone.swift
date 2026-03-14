@@ -145,6 +145,7 @@ final class MAVLinkDrone {
     var onStatusText: ((UInt8, String) -> Void)?  // (severity, text)
     var onParamValue: ((String, Float, UInt8, UInt16, UInt16) -> Void)?  // (name, value, type, index, count)
     var onCommandAck: ((UInt16, UInt8) -> Void)?  // (command, result)
+    var onCameraMessage: ((UInt32, Data) -> Void)?  // (messageID, payload)
     var onConnectionStateChanged: ((MAVLinkConnection.State) -> Void)?
 
     // Telemetry state — only accessed from network queue
@@ -663,6 +664,20 @@ final class MAVLinkDrone {
                 self?.onStatusText?(st.severity, st.text)
             }
             return
+        }
+
+        // Route camera messages
+        switch msgID {
+        case MsgCameraInformation.id, MsgCameraSettings.id,
+             MsgVideoStreamInformation.id, MsgCameraCaptureStatus.id,
+             MsgCameraImageCaptured.id:
+            let payload = frame.payload
+            DispatchQueue.main.async { [weak self] in
+                self?.onCameraMessage?(msgID, payload)
+            }
+            return
+        default:
+            break
         }
 
         // Route COMMAND_ACK

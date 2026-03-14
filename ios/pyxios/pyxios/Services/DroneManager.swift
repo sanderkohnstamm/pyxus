@@ -59,6 +59,7 @@ final class DroneManager {
     let paramService = ParameterService()
     let telemetryService = TelemetryService()
     let alertService = TelemetryAlertService()
+    let cameraService = CameraService()
 
     // MARK: - Published State
 
@@ -99,6 +100,7 @@ final class DroneManager {
         drone = mav
         missionService.update(drone: mav)
         paramService.update(drone: mav)
+        cameraService.update(drone: mav)
 
         mav.onConnectionStateChanged = { [weak self] connState in
             guard let self else { return }
@@ -106,6 +108,10 @@ final class DroneManager {
             case .ready:
                 self.state.connectionState = .connected
                 self.statusMessage = "Connected"
+                // Auto-discover camera after connection stabilizes
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                    self?.cameraService.startDiscovery()
+                }
                 // Auto-download mission after connection stabilizes
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
                     guard let self, self.state.connectionState.isConnected else { return }
@@ -147,6 +153,18 @@ final class DroneManager {
 
         mav.onCommandAck = { [weak self] command, result in
             self?.handleCommandAck(command: command, result: result)
+        }
+
+        mav.onCameraMessage = { [weak self] msgID, payload in
+            guard let self else { return }
+            switch msgID {
+            case 259: self.cameraService.handleCameraInformation(payload)
+            case 260: self.cameraService.handleCameraSettings(payload)
+            case 262: self.cameraService.handleCameraCaptureStatus(payload)
+            case 263: self.cameraService.handleCameraImageCaptured(payload)
+            case 269: self.cameraService.handleVideoStreamInformation(payload)
+            default: break
+            }
         }
 
         // Parse URI: "udp://0.0.0.0:14550" (listen), "udp://host:port" (connect), "tcp://host:port"
@@ -255,6 +273,7 @@ final class DroneManager {
         paramService.reset()
         telemetryService.reset()
         alertService.reset()
+        cameraService.reset()
     }
 
     // MARK: - Flight Actions
@@ -271,7 +290,8 @@ final class DroneManager {
         HapticManager.shared.trigger(style: "success")
     }
 
-    func takeoff(altitude: Float = 2.5) {
+    func takeoff(altitude: Float? = nil) {
+        let altitude = altitude ?? AppSettings.shared.defaultTakeoffAltitude
         guard let drone else { return }
         statusMessage = "Preparing takeoff..."
 

@@ -127,17 +127,14 @@ struct CommandView: View {
                         }
                         .padding(.bottom, 8)
                     } else {
-                        // No joysticks: action buttons bottom-right
-                        HStack(alignment: .bottom) {
-                            Spacer()
-                            VStack(spacing: 10) {
-                                actionButtons
-                                if let status = missionUploadProgress {
-                                    uploadStatusPill(status)
-                                }
+                        // No joysticks: action buttons centered at bottom
+                        VStack(spacing: 10) {
+                            actionButtons
+                            if let status = missionUploadProgress {
+                                uploadStatusPill(status)
                             }
                         }
-                        .padding(.horizontal, 16)
+                        .frame(maxWidth: .infinity)
                         .padding(.bottom, 16)
                     }
                 }

@@ -10,6 +10,14 @@ import CoreLocation
 
 enum VehicleType: String, CaseIterable {
     case copter, plane, rover
+
+    var description: String {
+        switch self {
+        case .copter: return "Copter"
+        case .plane: return "Plane"
+        case .rover: return "Rover"
+        }
+    }
 }
 
 enum ConnectionState: Equatable {

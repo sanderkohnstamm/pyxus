@@ -11,51 +11,72 @@ struct ToolsView: View {
     let droneManager: DroneManager
     var switchTab: ((AppTab) -> Void)?
 
+    private var isConnected: Bool { droneManager.state.connectionState.isConnected }
+
     var body: some View {
         NavigationStack {
             List {
-                Section("Vehicle") {
-                    NavigationLink {
+                // Status summary card
+                Section {
+                    HStack(spacing: 12) {
+                        Image(systemName: isConnected ? "checkmark.circle.fill" : "circle.dashed")
+                            .font(.title2)
+                            .foregroundStyle(isConnected ? .green : .secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(isConnected ? "Connected" : "Not Connected")
+                                .font(.subheadline.weight(.semibold))
+                            if isConnected {
+                                Text("\(droneManager.state.flightMode.isEmpty ? "—" : droneManager.state.flightMode) · \(droneManager.state.vehicleType.description)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer()
+                        if isConnected {
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("\(Int(droneManager.state.batteryPercent))%")
+                                    .font(.system(.caption, design: .monospaced))
+                                    .foregroundStyle(droneManager.state.batteryPercent > 20 ? .green : .red)
+                                Text(String(format: "%.1fV", droneManager.state.batteryVoltage))
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                Section {
+                    toolRow("Parameters", icon: "slider.horizontal.3", color: .blue) {
                         ParamsView(droneManager: droneManager)
-                    } label: {
-                        Label("Parameters", systemImage: "slider.horizontal.3")
                     }
-
-                    NavigationLink {
+                    toolRow("Calibration", icon: "gyroscope", color: .orange) {
                         CalibrationView(droneManager: droneManager)
-                    } label: {
-                        Label("Calibration", systemImage: "gyroscope")
                     }
+                } header: {
+                    Label("Vehicle", systemImage: "airplane")
                 }
 
-                Section("Debug") {
-                    NavigationLink {
+                Section {
+                    toolRow("MAVLink Inspector", icon: "antenna.radiowaves.left.and.right", color: .purple) {
                         InspectorView(droneManager: droneManager)
-                    } label: {
-                        Label("MAVLink Inspector", systemImage: "antenna.radiowaves.left.and.right")
                     }
-
-                    NavigationLink {
+                    toolRow("Motor Test", icon: "gear.badge", color: .red) {
                         MotorTestView(droneManager: droneManager)
-                    } label: {
-                        Label("Motor Test", systemImage: "gear.badge")
                     }
-                }
-
-                Section("Data") {
-                    NavigationLink {
+                    toolRow("Logs", icon: "doc.text", color: .gray) {
                         LogsView(droneManager: droneManager)
-                    } label: {
-                        Label("Logs", systemImage: "doc.text")
                     }
+                } header: {
+                    Label("Debug", systemImage: "ladybug")
                 }
 
-                Section("App") {
-                    NavigationLink {
+                Section {
+                    toolRow("Settings", icon: "gearshape", color: .gray) {
                         SettingsView()
-                    } label: {
-                        Label("Settings", systemImage: "gearshape")
                     }
+                } header: {
+                    Label("App", systemImage: "app.badge")
                 }
             }
             .navigationTitle("Tools")
@@ -93,6 +114,21 @@ struct ToolsView: View {
                         Image(systemName: "line.3.horizontal")
                     }
                 }
+            }
+        }
+    }
+
+    private func toolRow<Destination: View>(_ title: String, icon: String, color: Color, @ViewBuilder destination: @escaping () -> Destination) -> some View {
+        NavigationLink {
+            destination()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.body)
+                    .foregroundStyle(.white)
+                    .frame(width: 30, height: 30)
+                    .background(color.gradient, in: RoundedRectangle(cornerRadius: 7))
+                Text(title)
             }
         }
     }

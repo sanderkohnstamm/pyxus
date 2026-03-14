@@ -17,6 +17,7 @@ enum GeofenceType: String, CaseIterable {
 struct PlanView: View {
     let droneManager: DroneManager
     var switchTab: ((AppTab) -> Void)?
+    private let settings = AppSettings.shared
     @State private var flightPlan = FlightPlan()
     @State private var selectedWaypointID: UUID?
     @State private var showWaypointList = false
@@ -322,7 +323,13 @@ struct PlanView: View {
                     }
                 }
             }
-            .mapStyle(.imagery(elevation: .flat))
+            .mapStyle({
+                switch settings.mapType {
+                case .satellite: return MapStyle.imagery(elevation: .flat)
+                case .standard: return MapStyle.standard(elevation: .flat)
+                case .hybrid: return MapStyle.hybrid(elevation: .flat)
+                }
+            }())
             .mapControls { }
             .cachedTileOverlay()
             .onTapGesture { screenPoint in

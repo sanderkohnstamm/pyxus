@@ -27,7 +27,16 @@ struct DroneMapView: View {
     @State private var droneOffScreen = false
     @State private var offScreenAngle: Angle = .zero
 
+    private let settings = AppSettings.shared
     private var state: VehicleState { droneManager.state }
+
+    private var mapStyle: MapStyle {
+        switch settings.mapType {
+        case .satellite: return .imagery(elevation: .flat)
+        case .standard: return .standard(elevation: .flat)
+        case .hybrid: return .hybrid(elevation: .flat)
+        }
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -41,7 +50,7 @@ struct DroneMapView: View {
                             }
 
                             // Flight trail
-                            if trail.count >= 2 {
+                            if settings.showTrail && trail.count >= 2 {
                                 MapPolyline(coordinates: trail)
                                     .stroke(.cyan.opacity(0.5), lineWidth: 2)
                             }
@@ -87,7 +96,7 @@ struct DroneMapView: View {
                             }
                         }
                     }
-                    .mapStyle(.imagery(elevation: .flat))
+                    .mapStyle(mapStyle)
                     .mapControls { }
                     .cachedTileOverlay()
                     .onTapGesture { screenPoint in

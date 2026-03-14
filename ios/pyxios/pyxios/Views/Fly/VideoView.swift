@@ -109,12 +109,9 @@ struct VideoView: View {
                         }
                         .padding(.bottom, 8)
                     } else {
-                        HStack(alignment: .bottom) {
-                            Spacer()
-                            actionButtons
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 16)
+                        actionButtons
+                            .frame(maxWidth: .infinity)
+                            .padding(.bottom, 16)
                     }
                 }
             }
@@ -144,6 +141,11 @@ struct VideoView: View {
                     }
                     Spacer()
                 }
+            }
+
+            // Camera controls — left side
+            if isConnected && droneManager.cameraService.isDiscovered {
+                CameraControlsOverlay(cameraService: droneManager.cameraService)
             }
         }
         .onChange(of: droneManager.state.flightMode) { _, newMode in
@@ -389,6 +391,110 @@ struct MiniVideoView: View {
                 .stroke(Color.white.opacity(0.2), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.5), radius: 8, y: 4)
+    }
+}
+
+// MARK: - Camera Controls Overlay
+
+struct CameraControlsOverlay: View {
+    let cameraService: CameraService
+
+    var body: some View {
+        VStack {
+            Spacer()
+            HStack {
+                VStack(spacing: 12) {
+                    // Stream info badge
+                    if let stream = cameraService.streams.first {
+                        Text("\(stream.resolution) \(stream.encodingName) \(Int(stream.framerate))fps")
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.6))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Capsule())
+                    }
+
+                    HStack(spacing: 16) {
+                        // Photo capture
+                        if cameraService.cameraInfo?.capabilities.contains(.captureImage) ?? false {
+                            Button {
+                                cameraService.startImageCapture()
+                            } label: {
+                                ZStack {
+                                    Circle()
+                                        .strokeBorder(.white, lineWidth: 2.5)
+                                        .frame(width: 52, height: 52)
+                                    Circle()
+                                        .fill(.white)
+                                        .frame(width: 44, height: 44)
+                                }
+                            }
+                        }
+
+                        // Video record
+                        if cameraService.cameraInfo?.capabilities.contains(.captureVideo) ?? false {
+                            Button {
+                                if cameraService.captureStatus.isRecordingVideo {
+                                    cameraService.stopVideoCapture()
+                                } else {
+                                    cameraService.startVideoCapture()
+                                }
+                            } label: {
+                                ZStack {
+                                    Circle()
+                                        .strokeBorder(.white, lineWidth: 2.5)
+                                        .frame(width: 52, height: 52)
+                                    if cameraService.captureStatus.isRecordingVideo {
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .fill(.red)
+                                            .frame(width: 20, height: 20)
+                                    } else {
+                                        Circle()
+                                            .fill(.red)
+                                            .frame(width: 44, height: 44)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Capture counter
+                    if cameraService.imagesCaptured > 0 {
+                        Text("\(cameraService.imagesCaptured) photos")
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+
+                    // Recording time
+                    if cameraService.captureStatus.isRecordingVideo {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(.red)
+                                .frame(width: 6, height: 6)
+                            Text(formatRecordingTime(cameraService.captureStatus.recordingTimeMs))
+                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                .foregroundStyle(.red)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Capsule())
+                    }
+                }
+                .padding(.leading, 16)
+                .padding(.bottom, 20)
+
+                Spacer()
+            }
+        }
+    }
+
+    private func formatRecordingTime(_ ms: UInt32) -> String {
+        let seconds = Int(ms / 1000)
+        let mins = seconds / 60
+        let secs = seconds % 60
+        return String(format: "%02d:%02d", mins, secs)
     }
 }
 
