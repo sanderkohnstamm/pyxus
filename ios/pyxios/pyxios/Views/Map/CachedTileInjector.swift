@@ -25,6 +25,16 @@ struct CachedTileInjectorView: UIViewRepresentable {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             guard let mapView = uiView.findMKMapView() else { return }
             // Only add once
+            // Hide the "Legal" attribution label
+            mapView.showsUserLocation = false
+            for subview in mapView.subviews {
+                for child in subview.subviews {
+                    if let label = child as? UILabel, label.text?.contains("Legal") == true {
+                        label.isHidden = true
+                    }
+                }
+            }
+
             let alreadyAdded = mapView.overlays.contains(where: { $0 is CachedTileOverlay })
             if !alreadyAdded {
                 let overlay = CachedTileOverlay()

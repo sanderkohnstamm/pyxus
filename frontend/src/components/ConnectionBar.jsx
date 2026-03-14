@@ -341,6 +341,13 @@ export default function ConnectionBar() {
   );
 }
 
+function isListenAddress(connString) {
+  if (!connString) return false;
+  const s = connString.replace(/^udp:\/\//, '');
+  // "0.0.0.0:port", ":port", or bare port number = listen mode
+  return /^(0\.0\.0\.0[:/]|:|^\d+$)/.test(s);
+}
+
 function LinkLostBanner({ drones, onDisconnect, onConnect }) {
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -366,7 +373,7 @@ function LinkLostBanner({ drones, onDisconnect, onConnect }) {
             <span className="text-[11px] text-red-200/80 font-medium">
               {d.name} ({elapsed}s)
             </span>
-            {d.connectionString && (
+            {d.connectionString && !isListenAddress(d.connectionString) && (
               <button
                 onClick={() => handleReconnect(d)}
                 className="px-2 py-0.5 rounded text-[10px] font-semibold bg-red-500/20 hover:bg-red-500/40 text-red-200 border border-red-500/30 transition-colors"

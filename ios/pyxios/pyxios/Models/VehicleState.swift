@@ -64,7 +64,37 @@ struct VehicleState {
     var flightMode: String = ""
     var landed: Bool = true
     var vehicleType: VehicleType = .copter
+    var mavType: UInt8 = 0
     var isArdupilot: Bool = true
+
+    /// Specific platform name from MAV_TYPE (e.g. "Quadrotor", "Hexarotor", "Boat")
+    var platformName: String {
+        switch mavType {
+        case 0: return "Generic"
+        case 1: return "Fixed Wing"
+        case 2: return "Quadrotor"
+        case 3: return "Coaxial"
+        case 4: return "Helicopter"
+        case 10: return "Rover"
+        case 11: return "Boat"
+        case 12: return "Submarine"
+        case 13: return "Hexarotor"
+        case 14: return "Octorotor"
+        case 15: return "Tricopter"
+        case 19: return "VTOL Duorotor"
+        case 20: return "VTOL Quadrotor"
+        case 21: return "VTOL Tiltrotor"
+        case 22: return "VTOL Fixedrotor"
+        case 23: return "VTOL Tailsitter"
+        case 24: return "VTOL Tiltwing"
+        case 25: return "VTOL Reserved"
+        case 26: return "Gimbal"
+        case 27: return "ADSB"
+        case 29: return "Dodecarotor"
+        case 35: return "Helicopter (Coax)"
+        default: return "Type \(mavType)"
+        }
+    }
     var missionSeq: Int = -1
 
     // Home

@@ -83,6 +83,7 @@ final class TelemetryService {
         state.isArdupilot = t.isArdupilot
 
         // Vehicle type
+        state.mavType = t.mavType
         switch t.mavType {
         case 1: state.vehicleType = .plane
         case 10, 11: state.vehicleType = .rover

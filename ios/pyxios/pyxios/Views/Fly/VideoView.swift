@@ -53,6 +53,13 @@ struct VideoView: View {
                     LinkLostBanner(since: since)
                 }
 
+                // Thin param loading bar
+                if droneManager.paramService.isLoadingParams {
+                    ProgressView(value: droneManager.paramService.paramLoadProgress)
+                        .tint(.cyan)
+                        .scaleEffect(y: 0.5)
+                }
+
                 if isConnected {
                     HStack(alignment: .center, spacing: 8) {
                         FlightHUD(state: droneManager.state, connectionOk: isConnected)
@@ -98,14 +105,14 @@ struct VideoView: View {
                     Spacer()
 
                     if showJoysticks {
-                        VStack(spacing: 12) {
+                        VStack(spacing: 8) {
                             JoystickOverlay(droneManager: droneManager)
 
-                            HStack(spacing: 10) {
+                            HStack {
                                 Spacer()
                                 actionButtons
-                                Spacer()
                             }
+                            .padding(.horizontal, 16)
                         }
                         .padding(.bottom, 8)
                     } else {
@@ -129,17 +136,11 @@ struct VideoView: View {
                 }
             }
 
-            // Mini map PiP — tap to switch to command view
+            // Mini map PiP — draggable, tap to switch to command view
             if showMiniMap {
-                VStack {
-                    HStack {
-                        Spacer()
-                        MiniMapView(droneManager: droneManager)
-                            .onTapGesture { switchTab?(.command) }
-                            .padding(.top, 100)
-                            .padding(.trailing, 12)
-                    }
-                    Spacer()
+                DraggablePiP {
+                    MiniMapView(droneManager: droneManager)
+                        .onTapGesture { switchTab?(.command) }
                 }
             }
 
@@ -330,18 +331,42 @@ struct VideoView: View {
                     }
                 }
             } else {
+                let mode = s.flightMode.uppercased()
+                let inRTL = mode == "RTL" || mode == "AUTO_RTL"
+                let inLand = mode == "LAND" || mode == "AUTO_LAND"
+
                 if isRover {
                     actionButton("Hold", icon: "pause.circle.fill", tint: .orange) {
                         droneManager.hold()
                     }
+                } else if inRTL {
+                    actionButton("Land", icon: "arrow.down.circle.fill", tint: .yellow) {
+                        droneManager.land()
+                    }
+                    brakeButton
+                } else if inLand {
+                    actionButton("RTL", icon: "house.fill", tint: .red) {
+                        droneManager.returnToLaunch()
+                    }
+                    brakeButton
                 } else {
                     actionButton("Land", icon: "arrow.down.circle.fill", tint: .yellow) {
                         droneManager.land()
                     }
+                    actionButton("RTL", icon: "house.fill", tint: .red) {
+                        droneManager.returnToLaunch()
+                    }
                 }
-                actionButton("RTL", icon: "house.fill", tint: .red) {
-                    droneManager.returnToLaunch()
-                }
+            }
+        }
+    }
+
+    private var brakeButton: some View {
+        actionButton("Brake", icon: "pause.circle.fill", tint: .orange) {
+            if droneManager.state.isArdupilot {
+                droneManager.setFlightMode("BRAKE")
+            } else {
+                droneManager.setFlightMode("POSCTL")
             }
         }
     }
@@ -518,5 +543,41 @@ struct MiniMapView: View {
                 .stroke(Color.white.opacity(0.2), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.5), radius: 8, y: 4)
+    }
+}
+
+// MARK: - Draggable PiP Container
+
+struct DraggablePiP<Content: View>: View {
+    @ViewBuilder let content: Content
+    private let settings = AppSettings.shared
+    @State private var dragOffset: CGSize = .zero
+
+    var body: some View {
+        GeometryReader { geo in
+            let defaultX = geo.size.width - 102
+            let defaultY: CGFloat = 100
+
+            content
+                .position(
+                    x: clamp(defaultX + settings.pipOffsetX + dragOffset.width, min: 90, max: geo.size.width - 90),
+                    y: clamp(defaultY + settings.pipOffsetY + dragOffset.height, min: 60, max: geo.size.height - 60)
+                )
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            dragOffset = value.translation
+                        }
+                        .onEnded { value in
+                            settings.pipOffsetX += value.translation.width
+                            settings.pipOffsetY += value.translation.height
+                            dragOffset = .zero
+                        }
+                )
+        }
+    }
+
+    private func clamp(_ value: CGFloat, min lo: CGFloat, max hi: CGFloat) -> CGFloat {
+        Swift.min(Swift.max(value, lo), hi)
     }
 }

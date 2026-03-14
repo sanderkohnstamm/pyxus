@@ -6,6 +6,7 @@
 //  Sends ManualControl input at 10Hz via DroneManager.
 //  Mode 2 (default): Left = throttle/yaw, Right = pitch/roll.
 //  Mode 1: Left = pitch/yaw, Right = throttle/roll.
+//  When a Bluetooth gamepad is connected, thumbs mirror controller input.
 //
 
 import SwiftUI
@@ -13,6 +14,7 @@ import SwiftUI
 struct JoystickOverlay: View {
     let droneManager: DroneManager
     private let settings = AppSettings.shared
+    private let gamepad = GamepadManager.shared
 
     private var isMode2: Bool { settings.joystickMode == .mode2 }
 
@@ -21,14 +23,15 @@ struct JoystickOverlay: View {
             // Left stick
             SingleJoystick(
                 label: isMode2 ? "THR" : "PIT",
-                springBack: .both
+                externalX: CGFloat(gamepad.isConnected ? gamepad.leftX : 0),
+                externalY: CGFloat(gamepad.isConnected ? gamepad.leftY : 0)
             ) { x, y in
+                // Only apply touch input when no gamepad (gamepad writes directly to droneManager)
+                guard !gamepad.isConnected else { return }
                 if isMode2 {
-                    // Left: throttle (Y) + yaw (X)
-                    droneManager.manualZ = Float((y + 1) / 2) // map -1..1 → 0..1
+                    droneManager.manualZ = settings.throttleCenter.mapThrottle(Float(y))
                     droneManager.manualR = Float(x)
                 } else {
-                    // Mode 1 left: pitch (Y) + yaw (X)
                     droneManager.manualX = Float(y)
                     droneManager.manualR = Float(x)
                 }
@@ -39,21 +42,32 @@ struct JoystickOverlay: View {
             // Right stick
             SingleJoystick(
                 label: isMode2 ? "PIT" : "THR",
-                springBack: .both
+                externalX: CGFloat(gamepad.isConnected ? gamepad.rightX : 0),
+                externalY: CGFloat(gamepad.isConnected ? gamepad.rightY : 0)
             ) { x, y in
+                guard !gamepad.isConnected else { return }
                 if isMode2 {
-                    // Right: pitch (Y) + roll (X)
                     droneManager.manualX = Float(y)
                     droneManager.manualY = Float(x)
                 } else {
-                    // Mode 1 right: throttle (Y) + roll (X)
-                    droneManager.manualZ = Float((y + 1) / 2)
+                    droneManager.manualZ = settings.throttleCenter.mapThrottle(Float(y))
                     droneManager.manualY = Float(x)
                 }
             }
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 8)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if gamepad.isConnected {
+                Text(gamepad.controllerName)
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.cyan.opacity(0.6))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .padding(.bottom, 4)
+            }
+        }
     }
 }
 
@@ -61,24 +75,38 @@ struct JoystickOverlay: View {
 
 struct SingleJoystick: View {
     let label: String
-    let springBack: SpringBackAxis
+    /// External normalized input from gamepad (-1..1). Moves thumb visually.
+    var externalX: CGFloat = 0
+    var externalY: CGFloat = 0
     var onChange: (CGFloat, CGFloat) -> Void
 
-    enum SpringBackAxis {
-        case both       // springs back to center on both axes
-    }
-
-    @State private var position: CGSize = .zero
+    @State private var touchPosition: CGSize = .zero
     @State private var isDragging = false
 
     private let outerRadius: CGFloat = 75
     private let innerRadius: CGFloat = 28
 
+    /// The displayed thumb offset — touch takes priority, otherwise external input.
+    private var displayPosition: CGSize {
+        if isDragging {
+            return touchPosition
+        }
+        let maxR = outerRadius - innerRadius
+        return CGSize(
+            width: externalX * maxR,
+            height: -externalY * maxR  // screen Y is inverted
+        )
+    }
+
+    private var isActive: Bool {
+        isDragging || externalX != 0 || externalY != 0
+    }
+
     var body: some View {
         ZStack {
             // Outer ring
             Circle()
-                .stroke(Color.white.opacity(isDragging ? 0.35 : 0.15), lineWidth: 1.5)
+                .stroke(Color.white.opacity(isActive ? 0.35 : 0.15), lineWidth: 1.5)
                 .frame(width: outerRadius * 2, height: outerRadius * 2)
 
             // Cross hairs
@@ -97,10 +125,12 @@ struct SingleJoystick: View {
 
             // Thumb
             Circle()
-                .fill(Color.white.opacity(isDragging ? 0.4 : 0.2))
+                .fill(Color.white.opacity(isActive ? 0.4 : 0.2))
                 .frame(width: innerRadius * 2, height: innerRadius * 2)
-                .shadow(color: .cyan.opacity(isDragging ? 0.5 : 0), radius: 8)
-                .offset(position)
+                .shadow(color: .cyan.opacity(isActive ? 0.5 : 0), radius: 8)
+                .offset(displayPosition)
+                .animation(isDragging ? nil : .easeOut(duration: 0.08), value: displayPosition.width)
+                .animation(isDragging ? nil : .easeOut(duration: 0.08), value: displayPosition.height)
         }
         .frame(width: outerRadius * 2, height: outerRadius * 2)
         .contentShape(Rectangle())
@@ -114,18 +144,18 @@ struct SingleJoystick: View {
                     let maxDist = outerRadius - innerRadius
                     if dist > maxDist {
                         let scale = maxDist / dist
-                        position = CGSize(width: dx * scale, height: dy * scale)
+                        touchPosition = CGSize(width: dx * scale, height: dy * scale)
                     } else {
-                        position = CGSize(width: dx, height: dy)
+                        touchPosition = CGSize(width: dx, height: dy)
                     }
                     let maxR = outerRadius - innerRadius
-                    let normX = position.width / maxR    // -1 to 1
-                    let normY = -position.height / maxR  // -1 to 1 (up = positive)
+                    let normX = touchPosition.width / maxR
+                    let normY = -touchPosition.height / maxR
                     onChange(normX, normY)
                 }
                 .onEnded { _ in
                     isDragging = false
-                    position = .zero
+                    touchPosition = .zero
                     onChange(0, 0)
                 }
         )

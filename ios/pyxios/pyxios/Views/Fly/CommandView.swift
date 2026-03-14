@@ -66,6 +66,13 @@ struct CommandView: View {
                     LinkLostBanner(since: since)
                 }
 
+                // Thin param loading bar
+                if droneManager.paramService.isLoadingParams {
+                    ProgressView(value: droneManager.paramService.paramLoadProgress)
+                        .tint(.cyan)
+                        .scaleEffect(y: 0.5)
+                }
+
                 if showHUD {
                     HStack(alignment: .center, spacing: 8) {
                         FlightHUD(state: droneManager.state, connectionOk: isConnected)
@@ -112,18 +119,17 @@ struct CommandView: View {
                     Spacer()
 
                     if showJoysticks {
-                        // Joysticks higher, action buttons below
-                        VStack(spacing: 12) {
+                        VStack(spacing: 8) {
                             JoystickOverlay(droneManager: droneManager)
 
-                            HStack(spacing: 10) {
-                                Spacer()
-                                actionButtons
+                            HStack {
                                 if let status = missionUploadProgress {
                                     uploadStatusPill(status)
                                 }
                                 Spacer()
+                                actionButtons
                             }
+                            .padding(.horizontal, 16)
                         }
                         .padding(.bottom, 8)
                     } else {
@@ -172,17 +178,11 @@ struct CommandView: View {
                 }
             }
 
-            // Mini video PiP — tap to switch to video view
+            // Mini video PiP — draggable, tap to switch to video view
             if showMiniVideo {
-                VStack {
-                    HStack {
-                        Spacer()
-                        MiniVideoView(videoManager: videoManager)
-                            .onTapGesture { switchTab?(.video) }
-                            .padding(.top, 100)
-                            .padding(.trailing, 12)
-                    }
-                    Spacer()
+                DraggablePiP {
+                    MiniVideoView(videoManager: videoManager)
+                        .onTapGesture { switchTab?(.video) }
                 }
             }
         }
@@ -463,18 +463,45 @@ struct CommandView: View {
                     }
                 }
             } else {
+                let mode = s.flightMode.uppercased()
+                let inRTL = mode == "RTL" || mode == "AUTO_RTL"
+                let inLand = mode == "LAND" || mode == "AUTO_LAND"
+
                 if isRover {
                     actionButton("Hold", icon: "pause.circle.fill", tint: .orange) {
                         droneManager.hold()
                     }
+                } else if inRTL {
+                    // In RTL: offer Land + Brake
+                    actionButton("Land", icon: "arrow.down.circle.fill", tint: .yellow) {
+                        droneManager.land()
+                    }
+                    brakeButton
+                } else if inLand {
+                    // In Land: offer RTL + Brake
+                    actionButton("RTL", icon: "house.fill", tint: .red) {
+                        droneManager.returnToLaunch()
+                    }
+                    brakeButton
                 } else {
                     actionButton("Land", icon: "arrow.down.circle.fill", tint: .yellow) {
                         droneManager.land()
                     }
+                    actionButton("RTL", icon: "house.fill", tint: .red) {
+                        droneManager.returnToLaunch()
+                    }
                 }
-                actionButton("RTL", icon: "house.fill", tint: .red) {
-                    droneManager.returnToLaunch()
-                }
+            }
+        }
+    }
+
+    /// Brake/hold button — ArduPilot uses BRAKE, PX4 uses POSCTL
+    private var brakeButton: some View {
+        actionButton("Brake", icon: "pause.circle.fill", tint: .orange) {
+            if droneManager.state.isArdupilot {
+                droneManager.setFlightMode("BRAKE")
+            } else {
+                droneManager.setFlightMode("POSCTL")
             }
         }
     }

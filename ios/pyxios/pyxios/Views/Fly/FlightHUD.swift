@@ -72,7 +72,7 @@ struct FlightHUD: View {
             VStack(alignment: .leading, spacing: 3) {
                 topRow
                 HStack(spacing: 8) {
-                    Text("\(state.vehicleType.description) · \(state.isArdupilot ? "ArduPilot" : "PX4")")
+                    Text("\(state.platformName) · \(state.isArdupilot ? "ArduPilot" : "PX4")")
                         .font(.system(size: 9, weight: .medium, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.45))
                 }
@@ -164,6 +164,10 @@ struct FlightHUD: View {
                         .background(.white.opacity(0.15))
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
+
+                Text("\(state.platformName) / \(state.isArdupilot ? "AP" : "PX4")")
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.35))
             }
 
             Spacer()

@@ -145,6 +145,9 @@ final class MAVLinkDrone {
     var onStatusText: ((UInt8, String) -> Void)?  // (severity, text)
     var onParamValue: ((String, Float, UInt8, UInt16, UInt16) -> Void)?  // (name, value, type, index, count)
     var onCommandAck: ((UInt16, UInt8) -> Void)?  // (command, result)
+    var onCommandLongReceived: ((UInt16, Float) -> Void)?  // (command, param1) — for ArduPilot accel cal prompts
+    var onMagCalProgress: ((UInt8, UInt8, UInt8) -> Void)?  // (compassId, percent, status)
+    var onMagCalReport: ((UInt8, UInt8, Float) -> Void)?    // (compassId, status, fitness)
     var onCameraMessage: ((UInt32, Data) -> Void)?  // (messageID, payload)
     var onConnectionStateChanged: ((MAVLinkConnection.State) -> Void)?
 
@@ -355,6 +358,74 @@ final class MAVLinkDrone {
         msg.lon_int = Int32(lon * 1e7)
         msg.alt = alt
         connection.sendMessage(id: MsgSetPositionTargetGlobalInt.id, payload: msg.encode())
+    }
+
+    // MARK: - Motor & Servo Test
+
+    /// MAV_CMD_DO_MOTOR_TEST (209)
+    /// motor: 1-indexed motor instance
+    /// throttlePercent: 0-100
+    /// duration: seconds
+    func motorTest(motor: Int, throttlePercent: Float, duration: Float) {
+        if isArdupilot {
+            sendCommandLong(
+                command: 209,
+                param1: Float(motor),       // motor instance (1-indexed)
+                param2: 0,                  // throttle type: percent
+                param3: throttlePercent,    // throttle value
+                param4: duration,           // timeout
+                param5: 1,                  // motor count (1 = single)
+                param6: 0                   // test order
+            )
+        } else {
+            // PX4: MAV_CMD_ACTUATOR_TEST (310)
+            sendCommandLong(
+                command: 310,
+                param1: throttlePercent / 100.0,   // normalized 0-1
+                param2: duration,
+                param5: Float(100 + motor)          // actuator function: Motor1=101
+            )
+        }
+    }
+
+    /// Test all motors at once (ArduPilot only)
+    func motorTestAll(throttlePercent: Float, duration: Float) {
+        sendCommandLong(
+            command: 209,
+            param1: 1,
+            param2: 0,
+            param3: throttlePercent,
+            param4: duration,
+            param5: 0,       // motor count 0 = all
+            param6: 0
+        )
+    }
+
+    /// MAV_CMD_DO_SET_SERVO (183)
+    func servoSet(servo: Int, pwm: UInt16) {
+        sendCommandLong(
+            command: 183,
+            param1: Float(servo),
+            param2: Float(pwm)
+        )
+    }
+
+    // MARK: - Calibration
+
+    /// MAV_CMD_PREFLIGHT_CALIBRATION (241)
+    func calibrate(gyro: Bool = false, compass: Bool = false, baro: Bool = false, accel: Int = 0, level: Bool = false) {
+        sendCommandLong(
+            command: 241,
+            param1: gyro ? 1 : 0,
+            param2: compass ? 1 : 0,
+            param3: baro ? 1 : 0,
+            param5: level ? 2 : Float(accel)   // 1=full accel, 4=simple/next, 2=level
+        )
+    }
+
+    /// Cancel any active calibration
+    func cancelCalibration() {
+        sendCommandLong(command: 241)  // all zeros = cancel
     }
 
     // MARK: - Manual Control
@@ -688,6 +759,33 @@ final class MAVLinkDrone {
             let ack = MsgCommandAck(from: frame.payload)
             DispatchQueue.main.async { [weak self] in
                 self?.onCommandAck?(ack.command, ack.result)
+            }
+            return
+        }
+
+        // Route incoming COMMAND_LONG (ArduPilot accel cal sends vehicle position prompts)
+        if msgID == MsgCommandLong.id {
+            let cmd = MsgCommandLong(from: frame.payload)
+            DispatchQueue.main.async { [weak self] in
+                self?.onCommandLongReceived?(cmd.command, cmd.param1)
+            }
+            return
+        }
+
+        // Route MAG_CAL_PROGRESS
+        if msgID == MsgMagCalProgress.id {
+            let prog = MsgMagCalProgress(from: frame.payload)
+            DispatchQueue.main.async { [weak self] in
+                self?.onMagCalProgress?(prog.compass_id, prog.completion_pct, prog.cal_status)
+            }
+            return
+        }
+
+        // Route MAG_CAL_REPORT
+        if msgID == MsgMagCalReport.id {
+            let report = MsgMagCalReport(from: frame.payload)
+            DispatchQueue.main.async { [weak self] in
+                self?.onMagCalReport?(report.compass_id, report.cal_status, report.fitness)
             }
             return
         }

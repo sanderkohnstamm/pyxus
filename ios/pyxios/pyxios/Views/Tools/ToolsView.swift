@@ -61,7 +61,7 @@ struct ToolsView: View {
                     toolRow("MAVLink Inspector", icon: "antenna.radiowaves.left.and.right", color: .purple) {
                         InspectorView(droneManager: droneManager)
                     }
-                    toolRow("Motor Test", icon: "gear.badge", color: .red) {
+                    toolRow("Motor & Servo", icon: "gear.badge", color: .red) {
                         MotorTestView(droneManager: droneManager)
                     }
                     toolRow("Logs", icon: "doc.text", color: .gray) {
@@ -150,6 +150,19 @@ struct SettingsView: View {
                     }
                 }
 
+                Picker("Throttle Neutral", selection: Binding(
+                    get: { settings.throttleCenter },
+                    set: { settings.throttleCenter = $0 }
+                )) {
+                    ForEach(ThrottleCenter.allCases, id: \.self) { mode in
+                        Text(mode.description).tag(mode)
+                    }
+                }
+
+                Text(settings.throttleCenter.detail)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
                 HStack {
                     Label("Takeoff Altitude", systemImage: "arrow.up.circle")
                     Spacer()
@@ -164,6 +177,24 @@ struct SettingsView: View {
                         }
                     Text("m")
                         .foregroundStyle(.secondary)
+                }
+                NavigationLink {
+                    GamepadSettingsView()
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "gamecontroller.fill")
+                            .font(.body)
+                            .foregroundStyle(.white)
+                            .frame(width: 30, height: 30)
+                            .background(Color.cyan.gradient, in: RoundedRectangle(cornerRadius: 7))
+                        Text("Controller")
+                        Spacer()
+                        if GamepadManager.shared.isConnected {
+                            Text(GamepadManager.shared.controllerName)
+                                .font(.caption)
+                                .foregroundStyle(.cyan)
+                        }
+                    }
                 }
             } header: {
                 Label("Flight", systemImage: "airplane")

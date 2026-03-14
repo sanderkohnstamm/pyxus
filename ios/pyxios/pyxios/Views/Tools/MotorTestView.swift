@@ -2,26 +2,33 @@
 //  MotorTestView.swift
 //  pyxios
 //
-//  Motor test controls. Uses MAVSDK Shell plugin to send MAV_CMD_DO_MOTOR_TEST.
+//  Motor and servo test controls via MAVLink.
 //
 
 import SwiftUI
 
 struct MotorTestView: View {
     let droneManager: DroneManager
+
+    // Motor test state
     @State private var selectedMotor: Int = 1
     @State private var throttlePercent: Double = 5
     @State private var durationSeconds: Double = 1
 
+    // Servo test state
+    @State private var selectedServo: Int = 1
+    @State private var servoPWM: Double = 1500
+
     var body: some View {
         List {
+            // Motor Test Section
             Section {
                 Text("Test individual motors by spinning them briefly. Use low throttle values.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            Section("Motor") {
+            Section(header: Text("Motor Test"), footer: Text("WARNING: Remove propellers before testing. Vehicle should be disarmed.").foregroundStyle(.red)) {
                 Stepper("Motor \(selectedMotor)", value: $selectedMotor, in: 1...8)
 
                 VStack(alignment: .leading) {
@@ -35,23 +42,73 @@ struct MotorTestView: View {
                     Slider(value: $durationSeconds, in: 0.5...5, step: 0.5)
                         .tint(.cyan)
                 }
+
+                motorTestButtons
             }
 
-            Section {
+            // Servo Test Section
+            Section(header: Text("Servo Test"), footer: Text("Sets servo output to specified PWM. Use 1000-2000 for standard servos.")) {
+                Stepper("Servo \(selectedServo)", value: $selectedServo, in: 1...16)
+
+                VStack(alignment: .leading) {
+                    Text("PWM: \(Int(servoPWM)) µs")
+                    Slider(value: $servoPWM, in: 800...2200, step: 10)
+                        .tint(.blue)
+                }
+
+                servoQuickButtons
+
                 Button {
-                    droneManager.statusMessage = "Motor test not yet available via MAVSDK-Swift"
-                    HapticManager.shared.trigger(style: "warning")
+                    droneManager.servoSet(servo: selectedServo, pwm: UInt16(servoPWM))
                 } label: {
-                    Label("Test Motor \(selectedMotor)", systemImage: "gear.badge")
+                    Label("Set Servo \(selectedServo)", systemImage: "arrow.left.and.right")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.orange)
-            } footer: {
-                Text("WARNING: Remove propellers before testing motors. Motor test requires the vehicle to be disarmed.")
-                    .foregroundStyle(.red)
+                .tint(.blue)
             }
         }
-        .navigationTitle("Motor Test")
+        .navigationTitle("Motor & Servo Test")
+    }
+
+    private var servoQuickButtons: some View {
+        HStack(spacing: 10) {
+            Button("Min") { servoPWM = 1000 }
+                .buttonStyle(.bordered)
+            Button("Mid") { servoPWM = 1500 }
+                .buttonStyle(.bordered)
+            Button("Max") { servoPWM = 2000 }
+                .buttonStyle(.bordered)
+            Spacer()
+        }
+    }
+
+    private var motorTestButtons: some View {
+        HStack(spacing: 10) {
+            Button {
+                droneManager.motorTest(
+                    motor: selectedMotor,
+                    throttlePercent: Float(throttlePercent),
+                    duration: Float(durationSeconds)
+                )
+            } label: {
+                Label("Test Motor \(selectedMotor)", systemImage: "gear.badge")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.orange)
+
+            Button {
+                droneManager.motorTestAll(
+                    throttlePercent: Float(throttlePercent),
+                    duration: Float(durationSeconds)
+                )
+            } label: {
+                Label("Test All", systemImage: "gearshape.2.fill")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.orange.opacity(0.7))
+        }
     }
 }

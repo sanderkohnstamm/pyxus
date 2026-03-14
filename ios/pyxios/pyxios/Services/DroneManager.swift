@@ -59,6 +59,7 @@ final class DroneManager {
     let paramService = ParameterService()
     let telemetryService = TelemetryService()
     let alertService = TelemetryAlertService()
+    let calibrationService = CalibrationService()
     let cameraService = CameraService()
 
     // MARK: - Published State
@@ -100,6 +101,7 @@ final class DroneManager {
         drone = mav
         missionService.update(drone: mav)
         paramService.update(drone: mav)
+        calibrationService.update(drone: mav)
         cameraService.update(drone: mav)
 
         mav.onConnectionStateChanged = { [weak self] connState in
@@ -108,6 +110,11 @@ final class DroneManager {
             case .ready:
                 self.state.connectionState = .connected
                 self.statusMessage = "Connected"
+                // Auto-load params after connection stabilizes
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+                    guard let self, self.state.connectionState.isConnected else { return }
+                    self.fetchAllParams()
+                }
                 // Auto-discover camera after connection stabilizes
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
                     self?.cameraService.startDiscovery()
@@ -149,6 +156,7 @@ final class DroneManager {
 
         mav.onStatusText = { [weak self] severity, text in
             self?.handleStatusText(severity: severity, text: text)
+            self?.calibrationService.handleStatusText(text: text)
         }
 
         mav.onParamValue = { [weak self] name, value, type, index, count in
@@ -159,6 +167,19 @@ final class DroneManager {
 
         mav.onCommandAck = { [weak self] command, result in
             self?.handleCommandAck(command: command, result: result)
+            self?.calibrationService.handleCommandAck(command: command, result: result)
+        }
+
+        mav.onCommandLongReceived = { [weak self] command, param1 in
+            self?.calibrationService.handleCommandLong(command: command, param1: param1)
+        }
+
+        mav.onMagCalProgress = { [weak self] compassId, percent, status in
+            self?.calibrationService.handleMagCalProgress(compassId: compassId, percent: percent, status: status)
+        }
+
+        mav.onMagCalReport = { [weak self] compassId, status, fitness in
+            self?.calibrationService.handleMagCalReport(compassId: compassId, status: status, fitness: fitness)
         }
 
         mav.onCameraMessage = { [weak self] msgID, payload in
@@ -279,6 +300,7 @@ final class DroneManager {
         paramService.reset()
         telemetryService.reset()
         alertService.reset()
+        calibrationService.reset()
         cameraService.reset()
     }
 
@@ -356,8 +378,12 @@ final class DroneManager {
     func startManualControl() {
         guard !manualControlActive else { return }
         manualControlActive = true
-        manualX = 0; manualY = 0; manualZ = 0.5; manualR = 0
+        let neutralZ = AppSettings.shared.throttleCenter.neutralZ
+        manualX = 0; manualY = 0; manualZ = neutralZ; manualR = 0
         statusMessage = "Manual control active"
+
+        // Start gamepad polling if a controller is connected
+        GamepadManager.shared.start(droneManager: self)
 
         manualControlTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             self?.sendManualControlInput()
@@ -366,7 +392,10 @@ final class DroneManager {
 
     func stopManualControl() {
         manualControlActive = false
-        manualX = 0; manualY = 0; manualZ = 0.5; manualR = 0
+        let neutralZ = AppSettings.shared.throttleCenter.neutralZ
+        manualX = 0; manualY = 0; manualZ = neutralZ; manualR = 0
+
+        GamepadManager.shared.stop()
 
         var remaining = 10
         manualControlTimer?.invalidate()
@@ -508,5 +537,40 @@ final class DroneManager {
         paramService.setParam(name: name, value: value) { [weak self] msg in
             self?.statusMessage = msg
         }
+    }
+
+    // MARK: - Motor & Servo Test
+
+    func motorTest(motor: Int, throttlePercent: Float, duration: Float) {
+        drone?.motorTest(motor: motor, throttlePercent: throttlePercent, duration: duration)
+        statusMessage = "Testing motor \(motor)"
+        HapticManager.shared.trigger(style: "warning")
+    }
+
+    func motorTestAll(throttlePercent: Float, duration: Float) {
+        drone?.motorTestAll(throttlePercent: throttlePercent, duration: duration)
+        statusMessage = "Testing all motors"
+        HapticManager.shared.trigger(style: "warning")
+    }
+
+    func servoSet(servo: Int, pwm: UInt16) {
+        drone?.servoSet(servo: servo, pwm: pwm)
+        statusMessage = "Servo \(servo) → \(pwm) µs"
+    }
+
+    // MARK: - Calibration
+
+    func startCalibration(_ type: CalibrationType) {
+        calibrationService.startCalibration(type)
+        statusMessage = "Starting \(type.label) calibration..."
+    }
+
+    func cancelCalibration() {
+        calibrationService.cancelCalibration()
+        statusMessage = "Calibration cancelled"
+    }
+
+    func confirmAccelPosition() {
+        calibrationService.confirmAccelPosition()
     }
 }

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CoreGraphics
 
 enum JoystickMode: Int, CaseIterable {
     case mode1 = 1  // Left: pitch/yaw, Right: throttle/roll
@@ -15,6 +16,49 @@ enum JoystickMode: Int, CaseIterable {
         switch self {
         case .mode1: return "Mode 1"
         case .mode2: return "Mode 2"
+        }
+    }
+}
+
+enum ThrottleCenter: String, CaseIterable {
+    case mid           // Center stick = 50% throttle (copters: hover)
+    case bottom        // Center stick = 0%, up = forward (boats/rovers: stop)
+    case bidirectional // Center = 0%, up = forward, down = reverse (boats/rovers)
+
+    var description: String {
+        switch self {
+        case .mid: return "Center (50%)"
+        case .bottom: return "Bottom (0%)"
+        case .bidirectional: return "Bidirectional"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .mid: return "Stick center = mid throttle. For copters."
+        case .bottom: return "Stick center = no throttle, up = forward."
+        case .bidirectional: return "Center = stop, up = forward, down = reverse."
+        }
+    }
+
+    /// Map raw joystick Y (-1..1) to MAVLink throttle value.
+    /// MAVLink MANUAL_CONTROL z: 0..1000 for mid/bottom, -1000..1000 for bidirectional.
+    /// We normalize to 0..1 for mid/bottom (DroneManager scales to 0..1000),
+    /// and -1..1 for bidirectional (needs special handling in send).
+    func mapThrottle(_ y: Float) -> Float {
+        switch self {
+        case .mid: return (y + 1) / 2       // -1→0, 0→0.5, 1→1
+        case .bottom: return max(0, y)       // -1→0, 0→0, 1→1
+        case .bidirectional: return y        // -1→-1, 0→0, 1→1 (full range)
+        }
+    }
+
+    /// Neutral throttle value when sticks are released
+    var neutralZ: Float {
+        switch self {
+        case .mid: return 0.5
+        case .bottom: return 0
+        case .bidirectional: return 0
         }
     }
 }
@@ -86,8 +130,20 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(showTrail, forKey: "showTrail") }
     }
 
+    var throttleCenter: ThrottleCenter {
+        didSet { UserDefaults.standard.set(throttleCenter.rawValue, forKey: "throttleCenter") }
+    }
+
     var autoConnectOnLaunch: Bool {
         didSet { UserDefaults.standard.set(autoConnectOnLaunch, forKey: "autoConnectOnLaunch") }
+    }
+
+    /// Shared PiP (mini map / mini video) offset from default position (top-right).
+    var pipOffsetX: CGFloat {
+        didSet { UserDefaults.standard.set(Double(pipOffsetX), forKey: "pipOffsetX") }
+    }
+    var pipOffsetY: CGFloat {
+        didSet { UserDefaults.standard.set(Double(pipOffsetY), forKey: "pipOffsetY") }
     }
 
     private init() {
@@ -111,7 +167,13 @@ final class AppSettings {
 
         showTrail = UserDefaults.standard.object(forKey: "showTrail") == nil ? true : UserDefaults.standard.bool(forKey: "showTrail")
 
+        let throttleRaw = UserDefaults.standard.string(forKey: "throttleCenter") ?? "mid"
+        throttleCenter = ThrottleCenter(rawValue: throttleRaw) ?? .mid
+
         autoConnectOnLaunch = UserDefaults.standard.bool(forKey: "autoConnectOnLaunch")
+
+        pipOffsetX = CGFloat(UserDefaults.standard.double(forKey: "pipOffsetX"))
+        pipOffsetY = CGFloat(UserDefaults.standard.double(forKey: "pipOffsetY"))
     }
 
     func addToHistory(_ address: String) {

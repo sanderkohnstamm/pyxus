@@ -14,6 +14,8 @@ final class ParameterService {
 
     var params: [DroneParam] = []
     var isLoadingParams = false
+    /// 0..1 progress of param loading (paramBuffer.count / paramCount)
+    var paramLoadProgress: Float = 0
 
     // MARK: - Private
 
@@ -33,6 +35,7 @@ final class ParameterService {
         paramBuffer = [:]
         paramCount = 0
         isLoadingParams = false
+        paramLoadProgress = 0
     }
 
     // MARK: - Actions
@@ -76,10 +79,16 @@ final class ParameterService {
         let param = DroneParam(name: name, value: displayValue, floatValue: floatVal, intValue: intVal, isFloat: isFloat)
         paramBuffer[name] = param
 
+        // Update progress
+        if count > 0 {
+            paramLoadProgress = Float(paramBuffer.count) / Float(count)
+        }
+
         // Check if we have all params
         if paramBuffer.count >= Int(count) {
             params = paramBuffer.values.sorted { $0.name < $1.name }
             isLoadingParams = false
+            paramLoadProgress = 1
             statusCallback("Loaded \(params.count) parameters")
         }
     }
