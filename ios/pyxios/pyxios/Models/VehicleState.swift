@@ -45,6 +45,7 @@ struct VehicleState {
     // Battery
     var batteryPercent: Float = -1   // 0-100, -1 = unknown
     var batteryVoltage: Float = 0
+    var batteryCurrent: Float = 0    // amps
 
     // GPS
     var satellites: Int = 0

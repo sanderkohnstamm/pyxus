@@ -1,23 +1,22 @@
 //
-//  FlyView.swift
+//  CommandView.swift
 //  pyxios
 //
-//  Main flight view: map, HUD, action buttons, mode selector.
-//  Shows connect button when no drone is connected.
+//  Command view: map, HUD, action buttons, hamburger menu.
+//  Unified layout for portrait and landscape.
 //
 
 import SwiftUI
 import CoreLocation
 
-struct FlyView: View {
+struct CommandView: View {
     let droneManager: DroneManager
-    @State private var showVideo = false
+    var switchTab: ((AppTab) -> Void)?
+    @Binding var showJoysticks: Bool
     @State private var showConnectSheet = false
     @State private var wasConnected = false
-    @State private var showJoysticks = false
     @State private var showConsole = false
     @State private var isLandscape = false
-    @State private var showMissionPicker = false
     @State private var savedMissions: [SavedMission] = []
     @State private var missionUploadProgress: String?
     @State private var followMode = true
@@ -26,69 +25,57 @@ struct FlyView: View {
     @State private var showGotoConfirm = false
     @State private var continueFromSeq: Int?
     @State private var showContinueConfirm = false
+    @State private var pendingTab: AppTab?
+    @State private var showManualWarning = false
+    @State private var showMiniVideo = false
     private let videoManager = VideoPlayerManager.shared
 
+    private static let manualModes: Set<String> = [
+        "STABILIZE", "ALT_HOLD", "POSHOLD", "ACRO",
+        "MANUAL", "QSTABILIZE", "QHOVER", "QLOITER"
+    ]
+
     private var isConnected: Bool { droneManager.state.connectionState.isConnected }
-
-    private var connectionLost: Bool {
-        wasConnected && !isConnected
-    }
-
-    private var showHUD: Bool {
-        isConnected || connectionLost
-    }
+    private var connectionLost: Bool { wasConnected && !isConnected }
+    private var showHUD: Bool { isConnected || connectionLost }
+    private var isManualMode: Bool { Self.manualModes.contains(droneManager.state.flightMode) }
 
     var body: some View {
         ZStack {
-            // Map or video as primary view
-            if showVideo && videoManager.isPlaying {
-                VideoFeedView()
-                    .ignoresSafeArea()
-            } else {
-                DroneMapView(
-                    droneManager: droneManager,
-                    followMode: $followMode,
-                    missionWaypoints: activeMission,
-                    activeMissionSeq: droneManager.state.missionSeq,
-                    onMapTap: { coordinate in
-                        guard droneManager.state.armed && !droneManager.state.landed else { return }
-                        gotoTarget = coordinate
-                        showGotoConfirm = true
-                    },
-                    onWaypointTap: { index in
-                        continueFromSeq = index + 1  // mission seq is 1-based (0 = home)
-                        showContinueConfirm = true
-                    }
-                )
-                .ignoresSafeArea(edges: .top)
-            }
+            // Map
+            DroneMapView(
+                droneManager: droneManager,
+                followMode: $followMode,
+                missionWaypoints: activeMission,
+                activeMissionSeq: droneManager.state.missionSeq,
+                onMapTap: { coordinate in
+                    guard droneManager.state.armed && !droneManager.state.landed else { return }
+                    gotoTarget = coordinate
+                    showGotoConfirm = true
+                },
+                onWaypointTap: { index in
+                    continueFromSeq = index + 1
+                    showContinueConfirm = true
+                }
+            )
+            .ignoresSafeArea(edges: .top)
 
-            // HUD + controls overlay
+            // Top: link-lost banner + HUD + hamburger + alerts
             VStack(spacing: 0) {
-                // Link lost banner
                 if let since = droneManager.state.linkLostSince {
                     LinkLostBanner(since: since)
                 }
 
                 if showHUD {
-                    HStack(alignment: .top, spacing: 8) {
-                        if isConnected {
-                            Button {
-                                droneManager.disconnect()
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.title3)
-                                    .foregroundStyle(.white.opacity(0.7))
-                            }
-                            .padding(.top, 10)
-                        }
-
+                    HStack(alignment: .center, spacing: 8) {
                         FlightHUD(state: droneManager.state, connectionOk: isConnected)
+                            .frame(maxWidth: .infinity)
+                        hamburgerMenu
+                            .fixedSize()
                     }
                     .padding(.horizontal, 12)
                     .padding(.top, 8)
 
-                    // Telemetry alerts
                     if !droneManager.alertService.activeAlerts.isEmpty {
                         VStack(spacing: 4) {
                             ForEach(droneManager.alertService.activeAlerts) { alert in
@@ -106,30 +93,57 @@ struct FlyView: View {
                         }
                         .padding(.top, 4)
                     }
+                } else {
+                    // No HUD — just hamburger top-right
+                    HStack {
+                        Spacer()
+                        disconnectedMenu
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
                 }
 
                 Spacer()
+            }
 
-                // Bottom controls
-                if isConnected {
-                    if showJoysticks && isLandscape {
-                        JoystickOverlay(droneManager: droneManager)
-                    }
+            // Bottom controls
+            if isConnected {
+                VStack {
+                    Spacer()
 
-                    HStack(alignment: .bottom) {
-                        Spacer()
+                    if showJoysticks {
+                        // Joysticks higher, action buttons below
                         VStack(spacing: 12) {
-                            controlToggles
-                            modeSelector
-                            actionButtons
+                            JoystickOverlay(droneManager: droneManager)
+
+                            HStack(spacing: 10) {
+                                Spacer()
+                                actionButtons
+                                if let status = missionUploadProgress {
+                                    uploadStatusPill(status)
+                                }
+                                Spacer()
+                            }
                         }
+                        .padding(.bottom, 8)
+                    } else {
+                        // No joysticks: action buttons bottom-right
+                        HStack(alignment: .bottom) {
+                            Spacer()
+                            VStack(spacing: 10) {
+                                actionButtons
+                                if let status = missionUploadProgress {
+                                    uploadStatusPill(status)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 16)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 16)
                 }
             }
 
-            // Console overlay (bottom-left)
+            // Console overlay
             if showConsole && isConnected {
                 VStack {
                     Spacer()
@@ -138,7 +152,7 @@ struct FlyView: View {
                         Spacer()
                     }
                     .padding(.leading, 12)
-                    .padding(.bottom, 90)
+                    .padding(.bottom, showJoysticks ? 140 : 90)
                 }
             }
 
@@ -161,36 +175,15 @@ struct FlyView: View {
                 }
             }
 
-            // Video PiP
-            if !showVideo && videoManager.isPlaying {
+            // Mini video PiP — tap to switch to video view
+            if showMiniVideo {
                 VStack {
                     HStack {
                         Spacer()
-                        VideoPlayerPiP()
+                        MiniVideoView(videoManager: videoManager)
+                            .onTapGesture { switchTab?(.video) }
                             .padding(.top, 100)
                             .padding(.trailing, 12)
-                    }
-                    Spacer()
-                }
-            }
-
-            // Map/Video toggle
-            if videoManager.isPlaying {
-                VStack {
-                    HStack {
-                        Spacer()
-                        Button {
-                            showVideo.toggle()
-                        } label: {
-                            Image(systemName: showVideo ? "map" : "video")
-                                .font(.title3)
-                                .foregroundStyle(.white)
-                                .padding(10)
-                                .background(.ultraThinMaterial)
-                                .clipShape(Circle())
-                        }
-                        .padding(.top, 56)
-                        .padding(.trailing, 12)
                     }
                     Spacer()
                 }
@@ -235,7 +228,10 @@ struct FlyView: View {
             if connected {
                 wasConnected = true
             } else {
-                showJoysticks = false
+                if showJoysticks {
+                    showJoysticks = false
+                    droneManager.stopManualControl()
+                }
             }
         }
         .onChange(of: droneManager.missionService.downloadedMission) { _, newMission in
@@ -243,82 +239,103 @@ struct FlyView: View {
                 activeMission = newMission
             }
         }
+        .onChange(of: droneManager.state.flightMode) { _, newMode in
+            if Self.manualModes.contains(newMode) && !showJoysticks {
+                showJoysticks = true
+                droneManager.startManualControl()
+            }
+        }
+        .alert("Manual Control Active", isPresented: $showManualWarning) {
+            Button("Leave (drone will fall!)", role: .destructive) {
+                showJoysticks = false
+                droneManager.stopManualControl()
+                if let tab = pendingTab {
+                    switchTab?(tab)
+                    pendingTab = nil
+                }
+            }
+            Button("Cancel", role: .cancel) { pendingTab = nil }
+        } message: {
+            Text("You are sending manual control input. Leaving this view will stop stick input and the drone may fall out of the sky.")
+        }
         .onGeometryChange(for: Bool.self) { proxy in
             proxy.size.width > proxy.size.height
         } action: { newIsLandscape in
             isLandscape = newIsLandscape
-        }
-        .onChange(of: isLandscape) { _, landscape in
-            if !landscape && showJoysticks {
-                showJoysticks = false
-                droneManager.stopManualControl()
-            }
         }
         .onAppear {
             savedMissions = FlightPlan.savedMissions()
         }
     }
 
-    // MARK: - Control Toggles
+    // MARK: - Hamburger Menu
 
-    private var controlToggles: some View {
-        HStack(spacing: 8) {
-            // Follow toggle
+    private var hamburgerMenu: some View {
+        Menu {
+            // Tab navigation — always first
+            Button {
+                navigateToTab(.video)
+            } label: {
+                Label("Video", systemImage: "video")
+            }
+            Button {
+                navigateToTab(.plan)
+            } label: {
+                Label("Plan", systemImage: "map")
+            }
+            Button {
+                navigateToTab(.tools)
+            } label: {
+                Label("Tools", systemImage: "wrench.and.screwdriver")
+            }
+
+            Divider()
+
+            // Toggles
             Button {
                 followMode.toggle()
             } label: {
-                Image(systemName: followMode ? "location.fill" : "location")
-                    .font(.body)
-                    .foregroundStyle(followMode ? .cyan : .white.opacity(0.7))
-                    .padding(8)
-                    .background(followMode ? Color.cyan.opacity(0.2) : Color.clear)
-                    .background(.ultraThinMaterial)
-                    .clipShape(Circle())
+                Label(followMode ? "Following" : "Follow Drone",
+                      systemImage: followMode ? "location.fill" : "location")
             }
 
-            // Joystick toggle (landscape only)
-            if isLandscape {
-                Button {
-                    showJoysticks.toggle()
-                    if showJoysticks {
-                        droneManager.startManualControl()
-                    } else {
-                        droneManager.stopManualControl()
-                    }
-                } label: {
-                    Image(systemName: showJoysticks ? "gamecontroller.fill" : "gamecontroller")
-                        .font(.body)
-                        .foregroundStyle(showJoysticks ? .cyan : .white.opacity(0.7))
-                        .padding(8)
-                        .background(showJoysticks ? Color.cyan.opacity(0.2) : Color.clear)
-                        .background(.ultraThinMaterial)
-                        .clipShape(Circle())
+            Button {
+                showJoysticks.toggle()
+                if showJoysticks {
+                    droneManager.startManualControl()
+                } else {
+                    droneManager.stopManualControl()
                 }
+            } label: {
+                Label(showJoysticks ? "Joysticks On" : "Joysticks",
+                      systemImage: showJoysticks ? "gamecontroller.fill" : "gamecontroller")
             }
 
-            // Console toggle
             Button {
                 showConsole.toggle()
             } label: {
-                Image(systemName: showConsole ? "text.bubble.fill" : "text.bubble")
-                    .font(.body)
-                    .foregroundStyle(showConsole ? .cyan : .white.opacity(0.7))
-                    .padding(8)
-                    .background(showConsole ? Color.cyan.opacity(0.2) : Color.clear)
-                    .background(.ultraThinMaterial)
-                    .clipShape(Circle())
+                Label(showConsole ? "Console On" : "Console",
+                      systemImage: showConsole ? "text.bubble.fill" : "text.bubble")
             }
-        }
-    }
 
-    // MARK: - Mode Selector
+            Button {
+                showMiniVideo.toggle()
+            } label: {
+                Label(showMiniVideo ? "Mini Video On" : "Mini Video",
+                      systemImage: showMiniVideo ? "pip.fill" : "pip")
+            }
 
-    private var modeSelector: some View {
-        HStack(spacing: 8) {
+            Divider()
+
+            // Mode selection
             Menu {
-                ForEach(availableModes, id: \.self) { mode in
+                ForEach(droneManager.availableModes, id: \.self) { mode in
                     Button {
                         droneManager.setFlightMode(mode)
+                        if Self.manualModes.contains(mode) && !showJoysticks {
+                            showJoysticks = true
+                            droneManager.startManualControl()
+                        }
                     } label: {
                         if mode == droneManager.state.flightMode {
                             Label(mode, systemImage: "checkmark")
@@ -328,26 +345,13 @@ struct FlyView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "airplane.circle")
-                        .font(.body)
-                    Text(droneManager.state.flightMode.isEmpty ? "Mode" : droneManager.state.flightMode)
-                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.caption2)
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(.ultraThinMaterial)
-                .clipShape(Capsule())
+                Label(droneManager.state.flightMode.isEmpty ? "Mode" : droneManager.state.flightMode,
+                      systemImage: "airplane.circle")
             }
 
-            // Mission menu
+            // Mission
             Menu {
-                if savedMissions.isEmpty {
-                    Text("No saved missions")
-                } else {
+                if !savedMissions.isEmpty {
                     ForEach(savedMissions) { mission in
                         Button {
                             uploadMission(mission)
@@ -356,8 +360,8 @@ struct FlyView: View {
                                   systemImage: "arrow.up.doc")
                         }
                     }
+                    Divider()
                 }
-                Divider()
                 Button {
                     droneManager.downloadMission { waypoints in
                         activeMission = waypoints ?? []
@@ -365,7 +369,6 @@ struct FlyView: View {
                 } label: {
                     Label("Download Mission", systemImage: "arrow.down.doc")
                 }
-                Divider()
                 if droneManager.state.flightMode == "Auto" {
                     Button {
                         droneManager.pauseMission()
@@ -385,31 +388,52 @@ struct FlyView: View {
                     Label("Clear Mission", systemImage: "trash")
                 }
             } label: {
-                Image(systemName: "map.circle")
-                    .font(.body)
-                    .foregroundStyle(.white.opacity(0.7))
-                    .padding(8)
-                    .background(.ultraThinMaterial)
-                    .clipShape(Circle())
+                Label("Mission", systemImage: "map.circle")
             }
 
-            Spacer()
-
-            // Mission upload status
-            if let status = missionUploadProgress {
-                Text(status)
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.cyan)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(.ultraThinMaterial)
-                    .clipShape(Capsule())
+            if isConnected {
+                Divider()
+                Button(role: .destructive) {
+                    droneManager.disconnect()
+                } label: {
+                    Label("Disconnect", systemImage: "xmark.circle")
+                }
             }
+        } label: {
+            Image(systemName: "line.3.horizontal")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.85))
+                .frame(width: 44, height: 44)
+                .background(.regularMaterial)
+                .clipShape(Circle())
         }
     }
 
-    private var availableModes: [String] {
-        droneManager.availableModes
+    private var disconnectedMenu: some View {
+        Menu {
+            Button {
+                switchTab?(.video)
+            } label: {
+                Label("Video", systemImage: "video")
+            }
+            Button {
+                switchTab?(.plan)
+            } label: {
+                Label("Plan", systemImage: "map")
+            }
+            Button {
+                switchTab?(.tools)
+            } label: {
+                Label("Tools", systemImage: "wrench.and.screwdriver")
+            }
+        } label: {
+            Image(systemName: "line.3.horizontal")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.85))
+                .frame(width: 44, height: 44)
+                .background(.regularMaterial)
+                .clipShape(Circle())
+        }
     }
 
     // MARK: - Action Buttons
@@ -459,20 +483,30 @@ struct FlyView: View {
         }
     }
 
+    // MARK: - Navigation
+
+    private func navigateToTab(_ tab: AppTab) {
+        if showJoysticks && !tab.isFlightView {
+            pendingTab = tab
+            showManualWarning = true
+        } else {
+            switchTab?(tab)
+        }
+    }
+
+    // MARK: - Helpers
+
     private func uploadMission(_ mission: SavedMission) {
         missionUploadProgress = "Uploading..."
         droneManager.uploadMission(waypoints: mission.waypoints) { success in
             if success {
                 activeMission = mission.waypoints
                 missionUploadProgress = "Uploaded \(mission.name)"
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                    missionUploadProgress = nil
-                }
             } else {
                 missionUploadProgress = "Upload failed"
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                    missionUploadProgress = nil
-                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                missionUploadProgress = nil
             }
         }
     }
@@ -484,8 +518,23 @@ struct FlyView: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .background(tint.gradient, in: .capsule)
+                .background {
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                        .overlay(Capsule().fill(tint.opacity(0.25)))
+                        .overlay(Capsule().strokeBorder(tint.opacity(0.4), lineWidth: 0.5))
+                }
         }
+    }
+
+    private func uploadStatusPill(_ status: String) -> some View {
+        Text(status)
+            .font(.system(size: 10, design: .monospaced))
+            .foregroundStyle(.cyan)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.ultraThinMaterial)
+            .clipShape(Capsule())
     }
 }
 
@@ -521,7 +570,6 @@ struct MessageConsole: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header
             HStack {
                 Image(systemName: "text.bubble")
                     .font(.caption2)
@@ -539,10 +587,8 @@ struct MessageConsole: View {
 
             Divider().background(.white.opacity(0.1))
 
-            // Messages
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
-                    // App status message at top if present
                     if !droneManager.statusMessage.isEmpty {
                         HStack(alignment: .top, spacing: 4) {
                             Text("APP")
@@ -557,7 +603,6 @@ struct MessageConsole: View {
                         .padding(.vertical, 2)
                     }
 
-                    // MAV status messages
                     ForEach(droneManager.statusMessages.prefix(50)) { msg in
                         HStack(alignment: .top, spacing: 4) {
                             Text(msg.type)

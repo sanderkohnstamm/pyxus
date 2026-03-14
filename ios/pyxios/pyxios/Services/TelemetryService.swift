@@ -57,6 +57,7 @@ final class TelemetryService {
         state.groundSpeed = t.groundSpeed
         state.verticalSpeed = t.climbRate
         state.batteryVoltage = t.batteryVoltage
+        state.batteryCurrent = t.batteryCurrent
         state.batteryPercent = t.batteryRemaining >= 0 ? Float(t.batteryRemaining) : -1
         state.satellites = Int(t.satellites)
         state.gpsFixType = Int(t.gpsFixType)

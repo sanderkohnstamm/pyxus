@@ -19,6 +19,18 @@ enum JoystickMode: Int, CaseIterable {
     }
 }
 
+enum MapType: String, CaseIterable {
+    case satellite, standard, hybrid
+
+    var description: String {
+        switch self {
+        case .satellite: return "Satellite"
+        case .standard: return "Standard"
+        case .hybrid: return "Hybrid"
+        }
+    }
+}
+
 enum UnitSystem: String, CaseIterable {
     case metric, imperial
 
@@ -54,6 +66,30 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(connectionHistory, forKey: "connectionHistory") }
     }
 
+    var useCameraFeed: Bool {
+        didSet { UserDefaults.standard.set(useCameraFeed, forKey: "useCameraFeed") }
+    }
+
+    var defaultTakeoffAltitude: Float {
+        didSet { UserDefaults.standard.set(defaultTakeoffAltitude, forKey: "defaultTakeoffAltitude") }
+    }
+
+    var videoStreamURL: String {
+        didSet { UserDefaults.standard.set(videoStreamURL, forKey: "videoStreamURL") }
+    }
+
+    var mapType: MapType {
+        didSet { UserDefaults.standard.set(mapType.rawValue, forKey: "mapType") }
+    }
+
+    var showTrail: Bool {
+        didSet { UserDefaults.standard.set(showTrail, forKey: "showTrail") }
+    }
+
+    var autoConnectOnLaunch: Bool {
+        didSet { UserDefaults.standard.set(autoConnectOnLaunch, forKey: "autoConnectOnLaunch") }
+    }
+
     private init() {
         let modeRaw = UserDefaults.standard.integer(forKey: "joystickMode")
         joystickMode = JoystickMode(rawValue: modeRaw) ?? .mode2
@@ -63,6 +99,19 @@ final class AppSettings {
 
         lastConnectionAddress = UserDefaults.standard.string(forKey: "lastConnectionAddress") ?? "udp://0.0.0.0:14550"
         connectionHistory = UserDefaults.standard.stringArray(forKey: "connectionHistory") ?? ["udp://0.0.0.0:14550", "tcp://127.0.0.1:5760"]
+        useCameraFeed = UserDefaults.standard.bool(forKey: "useCameraFeed")
+
+        let altVal = UserDefaults.standard.float(forKey: "defaultTakeoffAltitude")
+        defaultTakeoffAltitude = altVal > 0 ? altVal : 10
+
+        videoStreamURL = UserDefaults.standard.string(forKey: "videoStreamURL") ?? ""
+
+        let mapRaw = UserDefaults.standard.string(forKey: "mapType") ?? "satellite"
+        mapType = MapType(rawValue: mapRaw) ?? .satellite
+
+        showTrail = UserDefaults.standard.object(forKey: "showTrail") == nil ? true : UserDefaults.standard.bool(forKey: "showTrail")
+
+        autoConnectOnLaunch = UserDefaults.standard.bool(forKey: "autoConnectOnLaunch")
     }
 
     func addToHistory(_ address: String) {

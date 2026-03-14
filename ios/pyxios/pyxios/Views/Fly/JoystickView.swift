@@ -21,7 +21,7 @@ struct JoystickOverlay: View {
             // Left stick
             SingleJoystick(
                 label: isMode2 ? "THR" : "PIT",
-                springBack: isMode2 ? .horizontal : .both
+                springBack: .both
             ) { x, y in
                 if isMode2 {
                     // Left: throttle (Y) + yaw (X)
@@ -39,7 +39,7 @@ struct JoystickOverlay: View {
             // Right stick
             SingleJoystick(
                 label: isMode2 ? "PIT" : "THR",
-                springBack: isMode2 ? .both : .horizontal
+                springBack: .both
             ) { x, y in
                 if isMode2 {
                     // Right: pitch (Y) + roll (X)
@@ -66,7 +66,6 @@ struct SingleJoystick: View {
 
     enum SpringBackAxis {
         case both       // springs back to center on both axes
-        case horizontal // only X springs back (throttle stays on Y)
     }
 
     @State private var position: CGSize = .zero
@@ -126,7 +125,6 @@ struct SingleJoystick: View {
                 }
                 .onEnded { _ in
                     isDragging = false
-                    // Always snap to center on release
                     position = .zero
                     onChange(0, 0)
                 }

@@ -16,6 +16,7 @@ enum GeofenceType: String, CaseIterable {
 
 struct PlanView: View {
     let droneManager: DroneManager
+    var switchTab: ((AppTab) -> Void)?
     @State private var flightPlan = FlightPlan()
     @State private var selectedWaypointID: UUID?
     @State private var showWaypointList = false
@@ -168,16 +169,37 @@ struct PlanView: View {
             .navigationTitle("Plan")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .topBarTrailing) {
                     Menu {
+                        // Tab navigation — always first
+                        Button {
+                            switchTab?(.command)
+                        } label: {
+                            Label("Command", systemImage: "airplane")
+                        }
+                        Button {
+                            switchTab?(.video)
+                        } label: {
+                            Label("Video", systemImage: "video")
+                        }
+                        Button {
+                            switchTab?(.tools)
+                        } label: {
+                            Label("Tools", systemImage: "wrench.and.screwdriver")
+                        }
+
+                        Divider()
+
+                        // Plan actions
                         Button("Save Mission", systemImage: "square.and.arrow.down") {
                             showSaveSheet = true
                         }
                         Button("Load Mission", systemImage: "folder") {
                             showLoadSheet = true
                         }
-                        Divider()
+
                         if droneManager.state.connectionState.isConnected {
+                            Divider()
                             Button("Upload to Drone", systemImage: "arrow.up.doc") {
                                 droneManager.uploadMission(waypoints: flightPlan.waypoints) { _ in }
                             }
@@ -191,6 +213,7 @@ struct PlanView: View {
                                 }
                             }
                         }
+
                         Divider()
                         Button("Clear All", systemImage: "trash", role: .destructive) {
                             selectedWaypointID = nil
@@ -200,7 +223,7 @@ struct PlanView: View {
                         }
                         .disabled(flightPlan.waypoints.isEmpty && geofenceCenter == nil && polygonVertices.isEmpty)
                     } label: {
-                        Image(systemName: "ellipsis.circle")
+                        Image(systemName: "line.3.horizontal")
                     }
                 }
             }

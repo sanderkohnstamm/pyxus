@@ -67,66 +67,114 @@ struct ConnectSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 16) {
-                    // Connection type picker
-                    Picker("Type", selection: $connectionType) {
+                VStack(spacing: 20) {
+                    // Header icon
+                    Image(systemName: "antenna.radiowaves.left.and.right")
+                        .font(.system(size: 36))
+                        .foregroundStyle(.cyan.gradient)
+                        .padding(.top, 8)
+
+                    // Connection type cards
+                    HStack(spacing: 10) {
                         ForEach(ConnectionType.allCases, id: \.self) { type in
-                            Text(type.rawValue).tag(type)
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    connectionType = type
+                                    addressInput = ""
+                                }
+                            } label: {
+                                VStack(spacing: 6) {
+                                    Image(systemName: type.icon)
+                                        .font(.title3)
+                                    Text(type.rawValue)
+                                        .font(.system(size: 11, weight: .medium))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(connectionType == type
+                                    ? AnyShapeStyle(.cyan.opacity(0.15))
+                                    : AnyShapeStyle(Color(.systemGray6)))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .strokeBorder(connectionType == type ? .cyan.opacity(0.5) : .clear, lineWidth: 1.5)
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                            }
+                            .foregroundStyle(connectionType == type ? .cyan : .secondary)
                         }
                     }
-                    .pickerStyle(.segmented)
 
-                    // Hint + own IP
+                    // Info row
                     VStack(spacing: 4) {
                         Text(connectionType.hint)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         if let ip = Self.wifiIPAddress() {
-                            Text("This device: \(ip)")
-                                .font(.system(.caption2, design: .monospaced))
-                                .foregroundStyle(.tertiary)
+                            HStack(spacing: 4) {
+                                Image(systemName: "wifi")
+                                    .font(.system(size: 9))
+                                Text(ip)
+                                    .font(.system(.caption2, design: .monospaced))
+                            }
+                            .foregroundStyle(.tertiary)
                         }
                     }
 
                     // Address input
-                    TextField(connectionType.placeholder, text: $addressInput)
-                        .font(.system(.body, design: .monospaced))
-                        .padding(12)
-                        .background(Color(.systemGray6))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(connectionType == .udpListen ? .numberPad : .URL)
+                    HStack(spacing: 10) {
+                        Image(systemName: connectionType.icon)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 20)
+
+                        TextField(connectionType.placeholder, text: $addressInput)
+                            .font(.system(.body, design: .monospaced))
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                            .keyboardType(connectionType == .udpListen ? .numberPad : .URL)
+                    }
+                    .padding(12)
+                    .background(Color(.systemGray6))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
 
                     // Connect button
                     Button {
                         let address = connectionType.buildAddress(from: addressInput)
                         droneManager.connect(address: address)
                     } label: {
-                        Label("Connect", systemImage: "link")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
+                        HStack(spacing: 8) {
+                            if isConnecting {
+                                ProgressView()
+                                    .tint(.white)
+                                    .controlSize(.small)
+                                Text("Connecting...")
+                            } else {
+                                Image(systemName: "link")
+                                Text("Connect")
+                            }
+                        }
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(isConnecting || addressInput.isEmpty
+                                    ? AnyShapeStyle(Color.gray.opacity(0.3))
+                                    : AnyShapeStyle(Color.cyan.gradient))
+                        )
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.cyan)
                     .disabled(isConnecting || addressInput.isEmpty)
 
-                    // Status feedback
-                    if isConnecting {
-                        HStack(spacing: 8) {
-                            ProgressView()
-                                .tint(.cyan)
-                            Text("Connecting...")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
+                    // Error / status
                     if case .error(let msg) = droneManager.state.connectionState {
-                        Text(msg)
-                            .font(.caption)
-                            .foregroundStyle(.red)
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .font(.caption)
+                            Text(msg)
+                                .font(.caption)
+                        }
+                        .foregroundStyle(.red)
                     }
 
                     if !droneManager.statusMessage.isEmpty && !isConnecting {
@@ -137,30 +185,44 @@ struct ConnectSheet: View {
 
                     // Connection history
                     let history = AppSettings.shared.connectionHistory
-                    if history.count > 1 {
-                        Divider()
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Recent")
-                                .font(.caption.bold())
-                                .foregroundStyle(.secondary)
+                    if !history.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("Recent Connections")
+                                    .font(.caption.bold())
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                            }
+
                             ForEach(history.prefix(5), id: \.self) { addr in
                                 Button {
                                     applyHistoryAddress(addr)
                                 } label: {
-                                    HStack(spacing: 6) {
+                                    HStack(spacing: 8) {
                                         Image(systemName: iconForAddress(addr))
                                             .font(.caption2)
-                                            .foregroundStyle(.secondary)
+                                            .foregroundStyle(.cyan.opacity(0.7))
+                                            .frame(width: 16)
                                         Text(addr)
                                             .font(.system(.caption, design: .monospaced))
-                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .foregroundStyle(.primary)
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 9))
+                                            .foregroundStyle(.tertiary)
                                     }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 10)
+                                    .background(Color(.systemGray6))
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
                                 }
                             }
                         }
+                        .padding(.top, 4)
                     }
                 }
-                .padding()
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
             }
             .navigationTitle("Connect")
             .navigationBarTitleDisplayMode(.inline)
