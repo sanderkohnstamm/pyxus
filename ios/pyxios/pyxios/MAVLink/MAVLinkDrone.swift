@@ -526,6 +526,9 @@ final class MAVLinkDrone {
                 msg.start_stop = 1
                 connection.sendMessage(id: MsgRequestDataStream.id, payload: msg.encode())
             }
+            // Explicitly request HOME_POSITION (not always in data streams)
+            // MAV_CMD_REQUEST_MESSAGE = 512, param1 = message ID (242 = HOME_POSITION)
+            sendCommandLong(command: 512, param1: Float(MsgHomePosition.id))
         } else {
             // PX4: SET_MESSAGE_INTERVAL
             let intervals: [(UInt32, Int32)] = [
