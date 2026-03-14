@@ -186,8 +186,7 @@ struct MessageDetailSheet: View {
                     Divider()
 
                     // Raw payload hex dump
-                    if let drone = droneManager.drone,
-                       let payload = drone.lastPayloads[stream.name] {
+                    if let payload = droneManager.latestPayloads[stream.name] {
                         Text("Last Payload (\(payload.count) bytes)")
                             .font(.caption.bold())
                             .foregroundStyle(.secondary)

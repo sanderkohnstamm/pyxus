@@ -296,12 +296,7 @@ struct FlyView: View {
     }
 
     private var availableModes: [String] {
-        // Get all modes from the drone's autopilot mode map
-        if let drone = droneManager.drone {
-            return drone.availableModes
-        }
-        // Fallback when not connected
-        return ["STABILIZE", "ALT_HOLD", "LOITER", "GUIDED", "AUTO", "RTL", "LAND"]
+        droneManager.availableModes
     }
 
     // MARK: - Action Buttons

@@ -96,6 +96,39 @@ enum PX4Modes {
 
 // MARK: - MAVLink Drone
 
+/// Thread-safe telemetry snapshot passed from network queue to main queue.
+struct TelemetrySnapshot: Sendable {
+    var armed = false
+    var mode = ""
+    var systemStatus: UInt8 = 0
+    var lat: Double = 0
+    var lon: Double = 0
+    var altRelative: Float = 0
+    var altMSL: Float = 0
+    var roll: Float = 0
+    var pitch: Float = 0
+    var yaw: Float = 0
+    var groundSpeed: Float = 0
+    var airSpeed: Float = 0
+    var climbRate: Float = 0
+    var heading: UInt16 = 0
+    var batteryVoltage: Float = 0
+    var batteryCurrent: Float = 0
+    var batteryRemaining: Int8 = -1
+    var gpsFixType: UInt8 = 0
+    var satellites: UInt8 = 0
+    var hdop: Float = 99.99
+    var homeLat: Double = 0
+    var homeLon: Double = 0
+    var homeAlt: Float = 0
+    var missionSeq: UInt16 = 0
+    var linkLost = false
+    var mavType: UInt8 = 2
+    var isArdupilot = true
+    var messageRates: [String: (count: Int, firstSeen: Date)] = [:]
+    var lastPayloads: [String: Data] = [:]
+}
+
 /// High-level MAVLink drone API. Connects via UDP, parses telemetry, sends commands.
 final class MAVLinkDrone {
 
@@ -107,54 +140,53 @@ final class MAVLinkDrone {
     private(set) var isArdupilot = true
     private(set) var mavType: UInt8 = 2  // default quadrotor
 
-    // Telemetry callback
-    var onTelemetryUpdate: ((MAVLinkDrone) -> Void)?
+    // Callbacks (called on main thread)
+    var onTelemetryUpdate: ((TelemetrySnapshot) -> Void)?
     var onStatusText: ((UInt8, String) -> Void)?  // (severity, text)
-    var onMissionMessage: ((MAVLinkFrame) -> Void)?
     var onParamValue: ((String, Float, UInt8, UInt16, UInt16) -> Void)?  // (name, value, type, index, count)
     var onCommandAck: ((UInt16, UInt8) -> Void)?  // (command, result)
     var onConnectionStateChanged: ((MAVLinkConnection.State) -> Void)?
 
-    // Telemetry state (updated from message handler)
-    var armed = false
-    var mode = ""
-    var systemStatus: UInt8 = 0
+    // Telemetry state — only accessed from network queue
+    private var armed = false
+    private var mode = ""
+    private var systemStatus: UInt8 = 0
     var lastHeartbeat: Date = .distantPast
 
     // Position
-    var lat: Double = 0
-    var lon: Double = 0
-    var altRelative: Float = 0   // meters above home
-    var altMSL: Float = 0        // meters AMSL
+    private var lat: Double = 0
+    private var lon: Double = 0
+    private var altRelative: Float = 0
+    private var altMSL: Float = 0
 
     // Attitude
-    var roll: Float = 0          // radians
-    var pitch: Float = 0         // radians
-    var yaw: Float = 0           // radians
+    private var roll: Float = 0
+    private var pitch: Float = 0
+    private var yaw: Float = 0
 
     // Velocity
-    var groundSpeed: Float = 0   // m/s
-    var airSpeed: Float = 0      // m/s
-    var climbRate: Float = 0     // m/s
-    var heading: UInt16 = 0      // degrees
+    private var groundSpeed: Float = 0
+    private var airSpeed: Float = 0
+    private var climbRate: Float = 0
+    private var heading: UInt16 = 0
 
     // Battery
-    var batteryVoltage: Float = 0
-    var batteryCurrent: Float = 0
-    var batteryRemaining: Int8 = -1  // percent, -1 = unknown
+    private var batteryVoltage: Float = 0
+    private var batteryCurrent: Float = 0
+    private var batteryRemaining: Int8 = -1
 
     // GPS
-    var gpsFixType: UInt8 = 0
-    var satellites: UInt8 = 0
-    var hdop: Float = 99.99
+    private var gpsFixType: UInt8 = 0
+    private var satellites: UInt8 = 0
+    private var hdop: Float = 99.99
 
     // Home
-    var homeLat: Double = 0
-    var homeLon: Double = 0
-    var homeAlt: Float = 0
+    private var homeLat: Double = 0
+    private var homeLon: Double = 0
+    private var homeAlt: Float = 0
 
     // Mission
-    var missionSeq: UInt16 = 0
+    private var missionSeq: UInt16 = 0
 
     // Link
     var linkLost = false
@@ -163,10 +195,26 @@ final class MAVLinkDrone {
     private var linkCheckTimer: DispatchSourceTimer?
 
     // Stream rate tracking
-    var messageRates: [String: (count: Int, firstSeen: Date, lastValue: String)] = [:]
+    private var messageRates: [String: (count: Int, firstSeen: Date)] = [:]
 
     // Last raw payload per message type (for inspector)
-    var lastPayloads: [String: Data] = [:]
+    private var lastPayloads: [String: Data] = [:]
+
+    /// Create a thread-safe snapshot of current telemetry state.
+    private func makeSnapshot() -> TelemetrySnapshot {
+        TelemetrySnapshot(
+            armed: armed, mode: mode, systemStatus: systemStatus,
+            lat: lat, lon: lon, altRelative: altRelative, altMSL: altMSL,
+            roll: roll, pitch: pitch, yaw: yaw,
+            groundSpeed: groundSpeed, airSpeed: airSpeed, climbRate: climbRate, heading: heading,
+            batteryVoltage: batteryVoltage, batteryCurrent: batteryCurrent, batteryRemaining: batteryRemaining,
+            gpsFixType: gpsFixType, satellites: satellites, hdop: hdop,
+            homeLat: homeLat, homeLon: homeLon, homeAlt: homeAlt,
+            missionSeq: missionSeq, linkLost: linkLost,
+            mavType: mavType, isArdupilot: isArdupilot,
+            messageRates: messageRates, lastPayloads: lastPayloads
+        )
+    }
 
     // Mission protocol queue
     private var missionQueue: [MAVLinkFrame] = []
@@ -564,8 +612,9 @@ final class MAVLinkDrone {
                 if !self.linkLost {
                     self.linkLost = true
                     self.linkLostTime = Date()
+                    let snapshot = self.makeSnapshot()
                     DispatchQueue.main.async {
-                        self.onTelemetryUpdate?(self)
+                        self.onTelemetryUpdate?(snapshot)
                     }
                 }
             }
@@ -731,9 +780,9 @@ final class MAVLinkDrone {
         }
 
         if updated {
+            let snapshot = makeSnapshot()
             DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                self.onTelemetryUpdate?(self)
+                self?.onTelemetryUpdate?(snapshot)
             }
         }
     }
@@ -745,7 +794,7 @@ final class MAVLinkDrone {
             existing.count += 1
             messageRates[name] = existing
         } else {
-            messageRates[name] = (count: 1, firstSeen: Date(), lastValue: "")
+            messageRates[name] = (count: 1, firstSeen: Date())
         }
     }
 }

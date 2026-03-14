@@ -77,7 +77,7 @@ final class DroneManager {
 
     // MARK: - Private
 
-    private(set) var drone: MAVLinkDrone?
+    private var drone: MAVLinkDrone?
     private var manualControlTimer: Timer?
     private var paramCount: UInt16 = 0
     private var paramBuffer: [String: DroneParam] = [:]
@@ -116,8 +116,8 @@ final class DroneManager {
             }
         }
 
-        mav.onTelemetryUpdate = { [weak self] drone in
-            self?.updateTelemetry(from: drone)
+        mav.onTelemetryUpdate = { [weak self] snapshot in
+            self?.updateTelemetry(from: snapshot)
         }
 
         mav.onStatusText = { [weak self] severity, text in
@@ -566,53 +566,67 @@ final class DroneManager {
 
     // MARK: - Telemetry Updates
 
-    private func updateTelemetry(from drone: MAVLinkDrone) {
-        state.coordinate = CLLocationCoordinate2D(latitude: drone.lat, longitude: drone.lon)
-        state.altitudeRelative = drone.altRelative
-        state.altitudeAMSL = drone.altMSL
-        state.heading = Float(drone.heading)
-        state.pitch = drone.pitch * 180 / .pi
-        state.roll = drone.roll * 180 / .pi
-        state.groundSpeed = drone.groundSpeed
-        state.verticalSpeed = drone.climbRate
-        state.batteryVoltage = drone.batteryVoltage
-        state.batteryPercent = drone.batteryRemaining >= 0 ? Float(drone.batteryRemaining) : -1
-        state.satellites = Int(drone.satellites)
-        state.gpsFixType = Int(drone.gpsFixType)
-        state.armed = drone.armed
-        state.flightMode = drone.mode
-        state.landed = !drone.armed  // Simplified: landed ≈ not armed
+    private func updateTelemetry(from t: TelemetrySnapshot) {
+        state.coordinate = CLLocationCoordinate2D(latitude: t.lat, longitude: t.lon)
+        state.altitudeRelative = t.altRelative
+        state.altitudeAMSL = t.altMSL
+        state.heading = Float(t.heading)
+        state.pitch = t.pitch * 180 / .pi
+        state.roll = t.roll * 180 / .pi
+        state.groundSpeed = t.groundSpeed
+        state.verticalSpeed = t.climbRate
+        state.batteryVoltage = t.batteryVoltage
+        state.batteryPercent = t.batteryRemaining >= 0 ? Float(t.batteryRemaining) : -1
+        state.satellites = Int(t.satellites)
+        state.gpsFixType = Int(t.gpsFixType)
+        state.armed = t.armed
+        state.flightMode = t.mode
+        state.landed = !t.armed
 
-        if drone.homeLat != 0 || drone.homeLon != 0 {
-            state.homeCoordinate = CLLocationCoordinate2D(latitude: drone.homeLat, longitude: drone.homeLon)
+        if t.homeLat != 0 || t.homeLon != 0 {
+            state.homeCoordinate = CLLocationCoordinate2D(latitude: t.homeLat, longitude: t.homeLon)
         }
 
         // Distance to home
         if let home = state.homeCoordinate, state.hasValidPosition {
             let homeLoc = CLLocation(latitude: home.latitude, longitude: home.longitude)
-            let droneLoc = CLLocation(latitude: drone.lat, longitude: drone.lon)
+            let droneLoc = CLLocation(latitude: t.lat, longitude: t.lon)
             state.distanceToHome = Float(droneLoc.distance(from: homeLoc))
         }
 
         // Vehicle type
-        switch drone.mavType {
+        switch t.mavType {
         case 1: state.vehicleType = .plane
         case 10, 11: state.vehicleType = .rover
         default: state.vehicleType = .copter
         }
 
         // Link status
-        if drone.linkLost {
+        if t.linkLost {
             state.connectionState = .error("Link lost")
             statusMessage = "Link lost"
         }
 
-        // Update stream rates from drone's message tracking
-        for (name, info) in drone.messageRates {
+        // Update stream rates
+        for (name, info) in t.messageRates {
             let elapsed = Date().timeIntervalSince(info.firstSeen)
             let hz = elapsed > 1 ? Double(info.count) / elapsed : 0
             updateStreamRate(name: name, value: "\(hz > 0 ? String(format: "%.1f Hz", hz) : "—")")
         }
+
+        // Store latest payloads for inspector
+        latestPayloads = t.lastPayloads
+    }
+
+    /// Last payloads snapshot (thread-safe, updated from telemetry)
+    var latestPayloads: [String: Data] = [:]
+
+    /// Available flight modes for the current vehicle/autopilot
+    var availableModes: [String] {
+        if let drone {
+            return drone.availableModes
+        }
+        return ["STABILIZE", "ALT_HOLD", "LOITER", "GUIDED", "AUTO", "RTL", "LAND"]
     }
 
     // MARK: - Status Text Handler
