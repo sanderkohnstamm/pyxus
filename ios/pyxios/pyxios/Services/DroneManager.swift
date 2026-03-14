@@ -132,21 +132,95 @@ final class DroneManager {
             self?.handleCommandAck(command: command, result: result)
         }
 
-        // Parse address: "host:port" or just "host" (default 14550)
-        let parts = address.split(separator: ":")
-        let host: String
-        let port: UInt16
-        if parts.count >= 2, let p = UInt16(parts[1]) {
-            host = String(parts[0])
-            port = p
-        } else {
-            host = address.trimmingCharacters(in: .whitespaces)
-            port = 14550
+        // Parse URI: "udp://0.0.0.0:14550" (listen), "udp://host:port" (connect), "tcp://host:port"
+        let parsed = Self.parseConnectionURI(address)
+
+        switch parsed.mode {
+        case .udpListen:
+            statusMessage = "Listening on port \(parsed.port)..."
+            mav.listen(port: parsed.port)
+        case .udpConnect:
+            statusMessage = "Connecting to \(parsed.host):\(parsed.port)..."
+            mav.connect(host: parsed.host, port: parsed.port)
+        case .tcpConnect:
+            statusMessage = "Connecting via TCP to \(parsed.host):\(parsed.port)..."
+            mav.connect(host: parsed.host, port: parsed.port)
         }
 
-        mav.connect(host: host, port: port)
         startStreamFlush()
         AppSettings.shared.addToHistory(address)
+    }
+
+    // MARK: - URI Parsing
+
+    enum ConnectionMode {
+        case udpListen
+        case udpConnect
+        case tcpConnect
+    }
+
+    struct ParsedConnection {
+        let mode: ConnectionMode
+        let host: String
+        let port: UInt16
+    }
+
+    static func parseConnectionURI(_ address: String) -> ParsedConnection {
+        let trimmed = address.trimmingCharacters(in: .whitespaces)
+
+        // Strip scheme
+        var remainder = trimmed
+        var scheme = "udp"
+        if remainder.hasPrefix("udp://") {
+            scheme = "udp"
+            remainder = String(remainder.dropFirst(6))
+        } else if remainder.hasPrefix("tcp://") {
+            scheme = "tcp"
+            remainder = String(remainder.dropFirst(6))
+        }
+
+        // Parse host:port from remainder
+        let host: String
+        let port: UInt16
+
+        // Check for [IPv6]:port format
+        if remainder.hasPrefix("["), let closeBracket = remainder.firstIndex(of: "]") {
+            host = String(remainder[remainder.index(after: remainder.startIndex)..<closeBracket])
+            let afterBracket = remainder[remainder.index(after: closeBracket)...]
+            if afterBracket.hasPrefix(":"), let p = UInt16(afterBracket.dropFirst()) {
+                port = p
+            } else {
+                port = 14550
+            }
+        } else if let lastColon = remainder.lastIndex(of: ":") {
+            let beforeColon = String(remainder[..<lastColon])
+            let afterColon = String(remainder[remainder.index(after: lastColon)...])
+            if let p = UInt16(afterColon) {
+                host = beforeColon
+                port = p
+            } else {
+                host = remainder
+                port = 14550
+            }
+        } else {
+            // Port-only (e.g., "14550") or host-only
+            if let p = UInt16(remainder) {
+                host = "0.0.0.0"
+                port = p
+            } else {
+                host = remainder.isEmpty ? "0.0.0.0" : remainder
+                port = 14550
+            }
+        }
+
+        // Determine mode
+        if scheme == "tcp" {
+            return ParsedConnection(mode: .tcpConnect, host: host, port: port)
+        }
+
+        // UDP: listen if host is 0.0.0.0 or empty, connect otherwise
+        let isListen = host.isEmpty || host == "0.0.0.0" || host == ":"
+        return ParsedConnection(mode: isListen ? .udpListen : .udpConnect, host: host, port: port)
     }
 
     func disconnect() {

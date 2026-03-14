@@ -172,21 +172,23 @@ final class MAVLinkDrone {
 
     // MARK: - Connect / Disconnect
 
+    /// Whether we've received the first heartbeat and requested data streams.
+    private var hasRequestedStreams = false
+
     func connect(host: String, port: UInt16) {
+        hasRequestedStreams = false
         connection.connect(host: host, port: port, onFrame: { [weak self] frame in
             self?.handleFrame(frame)
         }, onState: { [weak self] state in
             DispatchQueue.main.async {
                 self?.onConnectionStateChanged?(state)
             }
-            if case .ready = state {
-                self?.requestDataStreams()
-            }
         })
         startLinkCheck()
     }
 
     func listen(port: UInt16) {
+        hasRequestedStreams = false
         connection.listen(port: port, onFrame: { [weak self] frame in
             self?.handleFrame(frame)
         }, onState: { [weak self] state in
@@ -200,6 +202,8 @@ final class MAVLinkDrone {
     func disconnect() {
         linkCheckTimer?.cancel()
         linkCheckTimer = nil
+        hasRequestedStreams = false
+        lastHeartbeat = .distantPast
         connection.disconnect()
     }
 
@@ -635,9 +639,15 @@ final class MAVLinkDrone {
                 mode = PX4Modes.decode(customMode: hb.custom_mode)
             }
 
-            // Link recovery
+            // Link recovery — re-request streams (vehicle may have rebooted)
             if linkLost {
                 linkLost = false
+                hasRequestedStreams = false
+            }
+
+            // Request data streams once after first heartbeat (or after link recovery)
+            if !hasRequestedStreams {
+                hasRequestedStreams = true
                 requestDataStreams()
             }
             updated = true

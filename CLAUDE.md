@@ -1,6 +1,6 @@
 ## Mission
 
-**Safe drone flight and mission success.** See `PROJECT.md` for full roadmap, priorities, and current state. Every feature must support graceful degradation when systems fail and keep operators informed. When things go wrong, Pyxus degrades safely — never silently. Reference https://mavlink.io for protocol specs.
+**Enhancing mission success.** See `PROJECT.md` for full roadmap, priorities, and current state. Every feature should give the pilot the right controls at the right time — full control with minimal friction. Reference https://mavlink.io for protocol specs.
 
 ## Workflow Orchestration
 

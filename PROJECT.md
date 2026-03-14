@@ -2,49 +2,45 @@
 
 ## Mission
 
-**Safe drone flight and mission success.**
+**Enhancing mission success.**
 
-Pyxus is a ground control station that ensures drones complete their missions safely. When autonomous systems degrade, Pyxus fails gracefully — never silently — and keeps operators fully informed.
+Pyxus is a ground control station that gives pilots full control of their drones — the right buttons, at the right time, with the information they need to complete their missions.
 
 ### Core Principles
 
-- **Graceful degradation** — when GPS drops, comms fail, or sensors drift, the system degrades safely, not catastrophically
-- **Operator awareness** — every autonomous system failure is surfaced clearly to the operator. No silent failures.
-- **Mission success** — help operators complete what they set out to do, reliably
+- **Pilot in control** — the interface surfaces what the pilot needs, when they need it. No clutter, no guesswork.
+- **Mission success** — every feature exists to help pilots complete what they set out to do, reliably
+- **Operator awareness** — clear telemetry, status, and alerts so the pilot always knows the state of their vehicle
 
 ## Priorities
 
-1. **Graceful Degradation** — systems fail safely, never silently or catastrophically
-2. **Operator Awareness** — warnings, alerts, status when autonomous systems degrade
-3. **Mission Success** — features that help complete missions reliably
-4. **Core Operations** — mission planning, telemetry, vehicle control
+1. **Pilot Control** — right controls at the right time, minimal friction
+2. **Mission Success** — features that help complete missions reliably
+3. **Operator Awareness** — clear telemetry, alerts, status
+4. **Core Operations** — mission planning, vehicle control, parameters
 5. **Quality of Life** — UI polish, field usability, settings
 
 ## Roadmap
 
-### Now — Safety Foundation
-
-High-priority issues that make flight fundamentally safer.
+### Now — Pilot Control & Mission Reliability
 
 | # | Issue | Labels |
 |---|-------|--------|
-| 3 | Connection loss failsafe: auto-detect disconnect and trigger RTL | safety, high |
-| 4 | Dangerous command confirmation dialog | safety, high |
-| 5 | Pre-upload mission validation with safety checks | safety, high |
-| 8 | Emergency stop / kill switch with prominent UI placement | safety, high |
+| 3 | Connection loss detection with clear status and reconnect | reliability, high |
+| 4 | Command confirmation for destructive actions | ux, high |
+| 8 | Emergency stop with prominent UI placement | ux, high |
 | 9 | Robust auto-reconnect with exponential backoff | reliability, high |
-| 10 | Telemetry alerts and threshold warnings system | safety, high |
-| 27 | Predictive RTL safety envelope with live map overlay | safety, high, experimental |
+| 10 | Telemetry alerts and threshold warnings system | awareness, high |
+| 5 | Pre-upload mission validation | mission, high |
 
-### Next — Operator Awareness & Mission Reliability
+### Next — Awareness & Field Readiness
 
 | # | Issue | Labels |
 |---|-------|--------|
 | 6 | Flight data logging and post-flight replay | high |
-| 22 | Parameter validation and range checking before SET | safety, medium |
-| 23 | RC input validation and PWM bounds checking | safety, medium |
-| 28 | Structured pre-arm readiness dashboard | safety, medium, experimental |
-| 12 | No-fly zone / airspace restriction overlay | safety, medium |
+| 22 | Parameter validation and range checking before SET | medium |
+| 28 | Structured pre-arm readiness dashboard | medium |
+| 12 | No-fly zone / airspace restriction overlay | medium |
 
 ### Later — Core Ops & Quality of Life
 
@@ -59,27 +55,17 @@ High-priority issues that make flight fundamentally safer.
 | 19 | Military-grade wireframe theme | ux, medium |
 | 14 | MAVLink message rate configuration per stream | low |
 
-## Open PRs
-
-| # | Title | Status |
-|---|-------|--------|
-| 2 | Multi-drone control support | Needs fixes (dict mutation bug, deadlock risk) |
-| 18 | Home position tracking, WS buffering, map refactor | Needs fixes (stale closure, gamepad defaults) |
-
-## Recently Shipped
-
-- **#21** — Fix bare exception handling (structured logging, specific exception types)
-- **#20** — Sanitize video proxy URL (SSRF protection, shell injection prevention)
-
 ## Architecture
 
 - **Backend**: FastAPI + pymavlink (Python) — `/backend/`
 - **Frontend**: React + Vite + Tailwind + Zustand + Leaflet — `/frontend/`
+- **iOS**: Native SwiftUI + pure Swift MAVLink v2 — `/ios/`
 - **Electron**: Desktop wrapper — `/electron/`
-- **Protocol**: MAVLink via pymavlink — reference https://mavlink.io
+- **Protocol**: MAVLink v2 — reference https://mavlink.io
+- **Docs**: Architecture, protocol guide, codebase review — `/docs/`
 
 ## Current State
 
-Core GCS implemented: real-time telemetry, mission planning/upload/download, geofencing (circle + polygon), gamepad/keyboard control, parameter management, video streaming, pre-flight checklists, dark/light theme.
+Core GCS implemented: real-time telemetry, mission planning/upload/download, geofencing (circle + polygon), gamepad/keyboard control, parameter management, video streaming, pre-flight checklists, dark/light theme. iOS app with native MAVLink v2 stack (no MAVSDK dependency).
 
-**Key gaps**: No graceful degradation handling. No operator alerts for system failures. No flight logging. Emergency stop not prominent enough. Connection loss not handled gracefully.
+**Key gaps**: No flight logging. Connection loss not surfaced well. Emergency stop could be more prominent. No offline map support.

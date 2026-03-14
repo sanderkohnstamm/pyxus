@@ -98,20 +98,28 @@ final class MAVLinkConnection: @unchecked Sendable {
                 self.connection?.cancel()
                 self.connection = newConn
                 newConn.stateUpdateHandler = { [weak self] nwState in
+                    guard let self else { return }
                     if case .ready = nwState {
-                        self?.state = .ready
-                        self?.stateHandler?(self!.state)
-                        self?.startReceiveLoop(newConn)
-                        self?.startHeartbeat()
+                        self.state = .ready
+                        self.stateHandler?(self.state)
+                        self.startReceiveLoop(newConn)
+                        self.startHeartbeat()
                     }
                 }
                 newConn.start(queue: self.queue)
             }
 
             l.stateUpdateHandler = { [weak self] listenerState in
-                if case .failed(let err) = listenerState {
-                    self?.state = .failed(err.localizedDescription)
-                    self?.stateHandler?(self!.state)
+                guard let self else { return }
+                switch listenerState {
+                case .ready:
+                    // Listener is bound and waiting for incoming packets
+                    break
+                case .failed(let err):
+                    self.state = .failed(err.localizedDescription)
+                    self.stateHandler?(self.state)
+                default:
+                    break
                 }
             }
 
