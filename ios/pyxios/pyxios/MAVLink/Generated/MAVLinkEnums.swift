@@ -28,7 +28,7 @@ enum MavAutopilot: UInt32, CaseIterable, Sendable {
     case reflex = 20
 }
 
-/// MAVLINK component type reported in HEARTBEAT message. Flight controllers must report the type of the vehicle on which th
+/// MAVLINK component type reported in HEARTBEAT message. Flight controllers must report the type of the vehicle on which th...
 enum MavType: UInt32, CaseIterable, Sendable {
     case generic = 0
     case fixedWing = 1
@@ -89,7 +89,7 @@ struct MavModeFlag: OptionSet, Sendable {
     static let customModeEnabled = MavModeFlag(rawValue: 1)
 }
 
-/// These values encode the bit positions of the decode position. These values can be used to read the value of a flag bit b
+/// These values encode the bit positions of the decode position. These values can be used to read the value of a flag bit b...
 struct MavModeFlagDecodePosition: OptionSet, Sendable {
     let rawValue: UInt32
 
@@ -116,7 +116,7 @@ enum MavState: UInt32, CaseIterable, Sendable {
     case flightTermination = 8
 }
 
-/// Component ids (values) for the different types and instances of onboard hardware/software that might make up a MAVLink s
+/// Component ids (values) for the different types and instances of onboard hardware/software that might make up a MAVLink s...
 enum MavComponent: UInt32, CaseIterable, Sendable {
     case mavCompIdAll = 0
     case mavCompIdAutopilot1 = 1
@@ -254,7 +254,7 @@ enum MavComponent: UInt32, CaseIterable, Sendable {
     case mavCompIdSystemControl = 250
 }
 
-/// These values define the type of firmware release.  These values indicate the first version or release of this type.  For
+/// These values define the type of firmware release. These values indicate the first version or release of this type. For e...
 enum FirmwareVersionType: UInt32, CaseIterable, Sendable {
     case dev = 0
     case alpha = 64
@@ -291,8 +291,7 @@ enum MavGoto: UInt32, CaseIterable, Sendable {
     case holdAtSpecifiedPosition = 3
 }
 
-/// These defines are predefined OR-combined mode flags. There is no need to use values from this enum, but it
-             
+/// These defines are predefined OR-combined mode flags. There is no need to use values from this enum, but it simplifies th...
 enum MavMode: UInt32, CaseIterable, Sendable {
     case preflight = 0
     case stabilizeDisarmed = 80
@@ -344,9 +343,7 @@ struct MavSysStatusSensor: OptionSet, Sendable {
     static let propulsion = MavSysStatusSensor(rawValue: 1073741824)
 }
 
-/// Co-ordinate frames used by MAVLink. Not all frames are supported by all commands, messages, or vehicles.
-      
-      Gl
+/// Co-ordinate frames used by MAVLink. Not all frames are supported by all commands, messages, or vehicles. Global frames u...
 enum MavFrame: UInt32, CaseIterable, Sendable {
     case global = 0
     case localNed = 1
@@ -384,7 +381,7 @@ enum MavlinkDataStreamType: UInt32, CaseIterable, Sendable {
 
 /// FENCE_ACTION
 enum FenceAction: UInt32, CaseIterable, Sendable {
-    case none = 0
+    case `none` = 0
     case guided = 1
     case report = 2
     case guidedThrPass = 3
@@ -393,7 +390,7 @@ enum FenceAction: UInt32, CaseIterable, Sendable {
 
 /// FENCE_BREACH
 enum FenceBreach: UInt32, CaseIterable, Sendable {
-    case none = 0
+    case `none` = 0
     case minalt = 1
     case maxalt = 2
     case boundary = 3
@@ -402,7 +399,7 @@ enum FenceBreach: UInt32, CaseIterable, Sendable {
 /// Actions being taken to mitigate/prevent fence breach
 enum FenceMitigate: UInt32, CaseIterable, Sendable {
     case unknown = 0
-    case none = 1
+    case `none` = 1
     case velLimit = 2
 }
 
@@ -448,7 +445,7 @@ struct GimbalDeviceCapFlags: OptionSet, Sendable {
     static let hasRcInputs = GimbalDeviceCapFlags(rawValue: 8192)
 }
 
-/// Gimbal manager high level capability flags (bitmap). The first 16 bits are identical to the GIMBAL_DEVICE_CAP_FLAGS. How
+/// Gimbal manager high level capability flags (bitmap). The first 16 bits are identical to the GIMBAL_DEVICE_CAP_FLAGS. How...
 struct GimbalManagerCapFlags: OptionSet, Sendable {
     let rawValue: UInt32
 
@@ -593,7 +590,7 @@ struct AutotuneAxis: OptionSet, Sendable {
     static let yaw = AutotuneAxis(rawValue: 4)
 }
 
-/// Commands to be executed by the MAV. They can be executed on user request, or as part of a mission script. If the action 
+/// Commands to be executed by the MAV. They can be executed on user request, or as part of a mission script. If the action ...
 enum MavCmd: UInt32, CaseIterable, Sendable {
     case navWaypoint = 16
     case navLoiterUnlim = 17
@@ -751,8 +748,7 @@ enum MavCmd: UInt32, CaseIterable, Sendable {
     case canForward = 32000
 }
 
-/// A data stream is not a fixed set of messages, but rather a
-     recommendation to the autopilot software. Individual aut
+/// A data stream is not a fixed set of messages, but rather a recommendation to the autopilot software. Individual autopilo...
 enum MavDataStream: UInt32, CaseIterable, Sendable {
     case all = 0
     case rawSensors = 1
@@ -765,10 +761,9 @@ enum MavDataStream: UInt32, CaseIterable, Sendable {
     case extra3 = 12
 }
 
-/// The ROI (region of interest) for the vehicle. This can be
-                be used by the vehicle for camera/vehicle atti
+/// The ROI (region of interest) for the vehicle. This can be be used by the vehicle for camera/vehicle attitude alignment (...
 enum MavRoi: UInt32, CaseIterable, Sendable {
-    case none = 0
+    case `none` = 0
     case wpnext = 1
     case wpindex = 2
     case location = 3
@@ -836,7 +831,7 @@ enum MavMissionResult: UInt32, CaseIterable, Sendable {
     case mavMissionOperationCancelled = 15
 }
 
-/// Indicates the severity level, generally used for status messages to indicate their relative urgency. Based on RFC-5424 u
+/// Indicates the severity level, generally used for status messages to indicate their relative urgency. Based on RFC-5424 u...
 enum MavSeverity: UInt32, CaseIterable, Sendable {
     case emergency = 0
     case alert = 1
@@ -1019,14 +1014,14 @@ enum MavBatteryChargeState: UInt32, CaseIterable, Sendable {
     case charging = 7
 }
 
-/// Battery mode. Note, the normal operation mode (i.e. when flying) should be reported as MAV_BATTERY_MODE_UNKNOWN to allow
+/// Battery mode. Note, the normal operation mode (i.e. when flying) should be reported as MAV_BATTERY_MODE_UNKNOWN to allow...
 enum MavBatteryMode: UInt32, CaseIterable, Sendable {
     case unknown = 0
     case autoDischarging = 1
     case hotSwap = 2
 }
 
-/// Smart battery supply status/fault flags (bitmask) for health indication. The battery must also report either MAV_BATTERY
+/// Smart battery supply status/fault flags (bitmask) for health indication. The battery must also report either MAV_BATTERY...
 struct MavBatteryFault: OptionSet, Sendable {
     let rawValue: UInt32
 
@@ -1041,7 +1036,7 @@ struct MavBatteryFault: OptionSet, Sendable {
     static let batteryFaultIncompatibleCellsConfiguration = MavBatteryFault(rawValue: 256)
 }
 
-/// Flags to report status/failure cases for a power generator (used in GENERATOR_STATUS). Note that FAULTS are conditions t
+/// Flags to report status/failure cases for a power generator (used in GENERATOR_STATUS). Note that FAULTS are conditions t...
 struct MavGeneratorStatusFlag: OptionSet, Sendable {
     let rawValue: UInt32
 
@@ -1198,7 +1193,7 @@ struct GpsInputIgnoreFlags: OptionSet, Sendable {
 
 /// Possible actions an aircraft can take to avoid a collision.
 enum MavCollisionAction: UInt32, CaseIterable, Sendable {
-    case none = 0
+    case `none` = 0
     case report = 1
     case ascendOrDescend = 2
     case moveHorizontally = 3
@@ -1209,7 +1204,7 @@ enum MavCollisionAction: UInt32, CaseIterable, Sendable {
 
 /// Aircraft-rated danger from this threat.
 enum MavCollisionThreatLevel: UInt32, CaseIterable, Sendable {
-    case none = 0
+    case `none` = 0
     case low = 1
     case high = 2
 }
@@ -1229,7 +1224,7 @@ enum GpsFixType: UInt32, CaseIterable, Sendable {
     case dgps = 4
     case rtkFloat = 5
     case rtkFixed = 6
-    case static = 7
+    case `static` = 7
     case ppp = 8
 }
 
@@ -1253,7 +1248,7 @@ enum VtolTransitionHeading: UInt32, CaseIterable, Sendable {
     case nextWaypoint = 1
     case takeoff = 2
     case specified = 3
-    case any = 4
+    case `any` = 4
 }
 
 /// Camera capability flags (Bitmap)
@@ -1308,7 +1303,7 @@ enum CameraTrackingStatusFlags: UInt32, CaseIterable, Sendable {
 
 /// Camera tracking modes
 enum CameraTrackingMode: UInt32, CaseIterable, Sendable {
-    case none = 0
+    case `none` = 0
     case point = 1
     case rectangle = 2
 }
@@ -1317,7 +1312,7 @@ enum CameraTrackingMode: UInt32, CaseIterable, Sendable {
 struct CameraTrackingTargetData: OptionSet, Sendable {
     let rawValue: UInt32
 
-    static let none = CameraTrackingTargetData(rawValue: 0)
+    static let `none` = CameraTrackingTargetData(rawValue: 0)
     static let embedded = CameraTrackingTargetData(rawValue: 1)
     static let rendered = CameraTrackingTargetData(rawValue: 2)
     static let inStatus = CameraTrackingTargetData(rawValue: 4)
@@ -1368,7 +1363,7 @@ enum CameraMode: UInt32, CaseIterable, Sendable {
 /// MAV_ARM_AUTH_DENIED_REASON
 enum MavArmAuthDeniedReason: UInt32, CaseIterable, Sendable {
     case generic = 0
-    case none = 1
+    case `none` = 1
     case invalidWaypoint = 2
     case timeout = 3
     case airspaceInUse = 4
@@ -1386,7 +1381,7 @@ enum EngineControlOptions: UInt32, CaseIterable, Sendable {
     case allowStartWhileDisarmed = 1
 }
 
-/// Bitmap to indicate which dimensions should be ignored by the vehicle: a value of 0b0000000000000000 or 0b000000100000000
+/// Bitmap to indicate which dimensions should be ignored by the vehicle: a value of 0b0000000000000000 or 0b000000100000000...
 struct PositionTargetTypemask: OptionSet, Sendable {
     let rawValue: UInt32
 
@@ -1404,7 +1399,7 @@ struct PositionTargetTypemask: OptionSet, Sendable {
     static let yawRateIgnore = PositionTargetTypemask(rawValue: 2048)
 }
 
-/// Bitmap to indicate which dimensions should be ignored by the vehicle: a value of 0b00000000 indicates that none of the s
+/// Bitmap to indicate which dimensions should be ignored by the vehicle: a value of 0b00000000 indicates that none of the s...
 struct AttitudeTargetTypemask: OptionSet, Sendable {
     let rawValue: UInt32
 
@@ -1442,7 +1437,7 @@ struct UtmDataAvailFlags: OptionSet, Sendable {
 enum PrecisionLandMode: UInt32, CaseIterable, Sendable {
     case disabled = 0
     case opportunistic = 1
-    case required = 2
+    case `required` = 2
 }
 
 /// Parachute actions. Trigger release and enable/disable auto-release.
@@ -1469,7 +1464,7 @@ enum MavTunnelPayloadType: UInt32, CaseIterable, Sendable {
 
 /// MAV_ODID_ID_TYPE
 enum MavOdidIdType: UInt32, CaseIterable, Sendable {
-    case none = 0
+    case `none` = 0
     case serialNumber = 1
     case caaRegistrationId = 2
     case utmAssignedUuid = 3
@@ -1478,7 +1473,7 @@ enum MavOdidIdType: UInt32, CaseIterable, Sendable {
 
 /// MAV_ODID_UA_TYPE
 enum MavOdidUaType: UInt32, CaseIterable, Sendable {
-    case none = 0
+    case `none` = 0
     case aeroplane = 1
     case helicopterOrMultirotor = 2
     case gyroplane = 3
@@ -1570,7 +1565,7 @@ enum MavOdidTimeAcc: UInt32, CaseIterable, Sendable {
 
 /// MAV_ODID_AUTH_TYPE
 enum MavOdidAuthType: UInt32, CaseIterable, Sendable {
-    case none = 0
+    case `none` = 0
     case uasIdSignature = 1
     case operatorIdSignature = 2
     case messageSetSignature = 3
@@ -1601,7 +1596,7 @@ enum MavOdidClassificationType: UInt32, CaseIterable, Sendable {
 /// MAV_ODID_CATEGORY_EU
 enum MavOdidCategoryEu: UInt32, CaseIterable, Sendable {
     case undeclared = 0
-    case open = 1
+    case `open` = 1
     case specific = 2
     case certified = 3
 }
@@ -1753,7 +1748,7 @@ enum AisNavStatus: UInt32, CaseIterable, Sendable {
     case aisNavUnknown = 15
 }
 
-/// These flags are used in the AIS_VESSEL.fields bitmask to indicate validity of data in the other message fields. When set
+/// These flags are used in the AIS_VESSEL.fields bitmask to indicate validity of data in the other message fields. When set...
 struct AisFlags: OptionSet, Sendable {
     let rawValue: UInt32
 
@@ -1808,8 +1803,7 @@ enum NavVtolLandOptions: UInt32, CaseIterable, Sendable {
     case fwApproach = 2
 }
 
-/// States of the mission state machine.
-        Note that these states are independent of whether the mission is in a mode 
+/// States of the mission state machine. Note that these states are independent of whether the mission is in a mode that can...
 enum MissionState: UInt32, CaseIterable, Sendable {
     case unknown = 0
     case noMission = 1
@@ -1961,7 +1955,7 @@ enum UavionixAdsbOutStatusNicNacp: UInt32, CaseIterable, Sendable {
     case uavionixAdsbNicCr01Nm = 8
     case uavionixAdsbNicCr75M = 9
     case uavionixAdsbNicCr25M = 10
-    case uavionixAdsbNicCr75M = 11
+    case uavionixAdsbNicCr75M_11 = 11
     case uavionixAdsbNacpEpu10Nm = 16
     case uavionixAdsbNacpEpu4Nm = 32
     case uavionixAdsbNacpEpu2Nm = 48
@@ -2012,8 +2006,8 @@ enum AirlinkAuthResponseType: UInt32, CaseIterable, Sendable {
 /// ACCELCAL_VEHICLE_POS
 enum AccelcalVehiclePos: UInt32, CaseIterable, Sendable {
     case level = 1
-    case left = 2
-    case right = 3
+    case `left` = 2
+    case `right` = 3
     case nosedown = 4
     case noseup = 5
     case back = 6
@@ -2441,7 +2435,7 @@ enum CopterMode: UInt32, CaseIterable, Sendable {
     case autotune = 15
     case poshold = 16
     case brake = 17
-    case throw = 18
+    case `throw` = 18
     case avoidAdsb = 19
     case guidedNogps = 20
     case smartRtl = 21

@@ -280,8 +280,21 @@ def to_swift_case_name(entry_name, enum_prefix):
         result = "_" + result
 
     # Avoid Swift keywords
-    if result in ("default", "return", "switch", "case", "break", "continue",
-                  "class", "struct", "enum", "protocol", "import", "true", "false"):
+    SWIFT_KEYWORDS = {
+        "default", "return", "switch", "case", "break", "continue",
+        "class", "struct", "enum", "protocol", "import", "true", "false",
+        "static", "throw", "throws", "try", "catch", "in", "for", "while",
+        "do", "if", "else", "guard", "let", "var", "func", "nil", "self",
+        "super", "is", "as", "where", "repeat", "defer", "init", "deinit",
+        "extension", "subscript", "typealias", "associatedtype", "operator",
+        "precedencegroup", "internal", "public", "private", "fileprivate",
+        "open", "mutating", "nonmutating", "override", "required", "final",
+        "lazy", "weak", "unowned", "convenience", "dynamic", "indirect",
+        "infix", "prefix", "postfix", "left", "right", "none", "some", "any",
+        "async", "await", "rethrows", "yield", "consume", "copy", "borrowing",
+        "sending", "nonisolated",
+    }
+    if result in SWIFT_KEYWORDS:
         result = "`" + result + "`"
 
     return result
@@ -319,20 +332,37 @@ def generate_enums_swift(enums, out_path):
     Path(out_path).write_text("\n".join(lines))
 
 
+def _sanitize_description(desc, max_len=120):
+    """Sanitize a description for use in a Swift comment."""
+    # Replace newlines and excessive whitespace with single spaces
+    cleaned = " ".join(desc.split())
+    if len(cleaned) > max_len:
+        cleaned = cleaned[:max_len] + "..."
+    return cleaned
+
+
 def _gen_enum(e, lines):
     swift_name = to_swift_name(e["name"])
     prefix = e["name"]
 
-    lines.append(f"/// {e['description'][:120]}" if e["description"] else f"/// {e['name']}")
+    desc = _sanitize_description(e["description"]) if e["description"] else e["name"]
+    lines.append(f"/// {desc}")
     lines.append(f"enum {swift_name}: UInt32, CaseIterable, Sendable {{")
 
     seen_values = set()
+    seen_names = set()
     for entry in e["entries"]:
         val = entry["value"]
         if val in seen_values:
             continue
         seen_values.add(val)
         case_name = to_swift_case_name(entry["name"], prefix)
+        # Disambiguate duplicate case names
+        if case_name in seen_names:
+            case_name = to_swift_case_name(entry["name"], prefix + "_DISAMBIG")
+            if case_name in seen_names:
+                case_name = f"{case_name}_{val}"
+        seen_names.add(case_name)
         lines.append(f"    case {case_name} = {val}")
 
     lines.append("}")
@@ -342,7 +372,8 @@ def _gen_option_set(e, lines):
     swift_name = to_swift_name(e["name"])
     prefix = e["name"]
 
-    lines.append(f"/// {e['description'][:120]}" if e["description"] else f"/// {e['name']}")
+    desc = _sanitize_description(e["description"]) if e["description"] else e["name"]
+    lines.append(f"/// {desc}")
     lines.append(f"struct {swift_name}: OptionSet, Sendable {{")
     lines.append(f"    let rawValue: UInt32")
     lines.append("")
