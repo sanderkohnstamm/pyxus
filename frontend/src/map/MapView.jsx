@@ -3,7 +3,7 @@ import { Map, NavigationControl, AttributionControl } from '@vis.gl/react-maplib
 import 'maplibre-gl/dist/maplibre-gl.css';
 import useDroneStore from '../store/droneStore';
 import { INITIAL_TELEMETRY, EMPTY_ARRAY } from '../store/droneStore';
-import { createMapStyle, enableTerrain, disableTerrain } from './styles';
+import { createMapStyle } from './styles';
 import { DRONE_COLORS, DRONE_STROKES, NAV_TYPES, MARKER_COLORS, TYPE_LABELS, generateArc, hexToRgba } from './constants';
 import { toLngLat, fromLngLat, trailToCoords, circleToPolygon, emptyFC, feature, lineString, polygon, point } from './utils';
 import { droneApi } from '../utils/api';
@@ -52,8 +52,6 @@ export default function MapView() {
   const measureMode = useDroneStore((s) => s.measureMode);
   const setMeasureMode = useDroneStore((s) => s.setMeasureMode);
   const clearMeasure = useDroneStore((s) => s.clearMeasure);
-  const is3DMode = useDroneStore((s) => s.is3DMode);
-
   const [contextMenu, setContextMenu] = useState(null);
   const [manipMode, setManipMode] = useState(null);
 
@@ -107,15 +105,6 @@ export default function MapView() {
     return () => document.removeEventListener('click', handleClick);
   }, [contextMenu]);
 
-  // Enable/disable terrain based on 3D mode
-  const onMapLoad = useCallback((e) => {
-    // Don't overwrite mapRef — React sets it to MapRef via <Map ref={mapRef}>
-    // Use e.target for the raw Map when needed here
-    if (is3DMode) {
-      enableTerrain(e.target);
-    }
-  }, [is3DMode]);
-
   return (
     <div className="w-full h-full relative">
       <Map
@@ -124,13 +113,12 @@ export default function MapView() {
           longitude: initialCenter[0],
           latitude: initialCenter[1],
           zoom: initialZoom,
-          pitch: is3DMode ? 45 : 0,
+          pitch: 0,
           bearing: 0,
         }}
         style={{ width: '100%', height: '100%' }}
         mapStyle={mapStyle}
         attributionControl={false}
-        onLoad={onMapLoad}
         maxPitch={85}
         antialias={true}
       >

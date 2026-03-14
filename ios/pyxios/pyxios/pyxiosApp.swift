@@ -9,16 +9,12 @@ import SwiftUI
 
 @main
 struct pyxiosApp: App {
-    @State private var pythonRunner = PythonRunner()
-    // Keep backend alive when backgrounded during active flights
+    // Keep reference so BackgroundManager stays alive for notification handling
     private let backgroundManager = BackgroundManager.shared
 
     var body: some Scene {
         WindowGroup {
-            ContentView(pythonRunner: pythonRunner)
-                .task {
-                    await pythonRunner.start()
-                }
+            ContentView(droneManager: DroneManager.shared)
         }
     }
 }

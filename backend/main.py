@@ -21,7 +21,6 @@ _terrain_cache: dict[tuple[float, float], float] = {}
 
 from drone import DroneConnection
 from mission import MissionManager, Waypoint
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -824,7 +823,10 @@ async def api_params_set(req: ParamSetRequest, drone_id: str = Query(...)):
 @app.get("/api/params/metadata/{vehicle}")
 async def api_params_metadata(vehicle: str):
     """Proxy parameter metadata to avoid CORS issues. Supports ArduPilot and PX4."""
-    import httpx
+    try:
+        import httpx
+    except ImportError:
+        return {"status": "error", "error": "httpx not available (iOS embedded mode)"}
 
     ardupilot_map = {
         "arducopter": "ArduCopter",
@@ -1005,6 +1007,11 @@ async def api_terrain_elevation(locations: str = Query(...)):
 
     if not parsed:
         return {"elevations": []}
+
+    try:
+        import httpx
+    except ImportError:
+        return {"elevations": [{"lat": lat, "lon": lon, "elevation": None} for lat, lon in parsed]}
 
     # Check cache, collect misses
     results = {}  # index -> elevation

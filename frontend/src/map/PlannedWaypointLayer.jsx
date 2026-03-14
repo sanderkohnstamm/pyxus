@@ -16,7 +16,6 @@ export default function PlannedWaypointLayer({ onContextMenu }) {
   const setPlanSubTab = useDroneStore((s) => s.setPlanSubTab);
   const setSidebarCollapsed = useDroneStore((s) => s.setSidebarCollapsed);
   const missionViolations = useDroneStore((s) => s.missionViolations);
-  const is3DMode = useDroneStore((s) => s.is3DMode);
 
   const isPlanning = activeTab === 'planning';
   const plannedOpacity = isPlanning ? 1 : 0.3;

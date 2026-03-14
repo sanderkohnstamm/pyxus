@@ -3,7 +3,6 @@
 //  pyxios
 //
 //  mDNS browser for auto-discovering MAVLink endpoints on the local network.
-//  Discovered services are sent to the React frontend via the JS bridge.
 //
 
 import Foundation

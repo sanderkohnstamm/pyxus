@@ -3,14 +3,13 @@
 //  pyxios
 //
 //  Native RTSP video player using AVPlayer with Picture-in-Picture support.
-//  Controlled from the React frontend via the JS bridge.
 //
 
 import SwiftUI
 import AVKit
 import Combine
 
-/// Manages native video playback state shared between SwiftUI views and the JS bridge.
+/// Manages native video playback state shared between SwiftUI views.
 @Observable
 final class VideoPlayerManager {
     static let shared = VideoPlayerManager()

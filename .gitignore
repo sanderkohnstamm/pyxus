@@ -20,6 +20,23 @@ backend/venv/
 *.swp
 *.swo
 
+# iOS bundled resources
+ios/BundledResources/
+ios/Python.xcframework/
+
+# MAVLink logs and params
+*.tlog
+*.tlog.raw
+*.parm
+mavproxy/
+
+# iOS testbed (CPython embedding test)
+ios/testbed/
+
+# Xcode user state
+*.xcuserstate
+xcuserdata/
+
 # OS
 .DS_Store
 Thumbs.db

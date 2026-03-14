@@ -2,17 +2,15 @@
 //  BackgroundManager.swift
 //  pyxios
 //
-//  Keeps the Python backend alive when the app is backgrounded during active flights.
+//  Keeps the MAVSDK connection alive when the app is backgrounded during active flights.
 //  Uses beginBackgroundTask to request extended execution time from iOS.
 //
 
 import UIKit
 
-@Observable
-final class BackgroundManager {
+final class BackgroundManager: @unchecked Sendable {
     static let shared = BackgroundManager()
 
-    var isInBackground = false
     private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
 
     private init() {
@@ -35,20 +33,17 @@ final class BackgroundManager {
     }
 
     @objc private func appDidEnterBackground() {
-        isInBackground = true
         beginBackgroundTask()
     }
 
     @objc private func appWillEnterForeground() {
-        isInBackground = false
         endBackgroundTask()
     }
 
     private func beginBackgroundTask() {
         guard backgroundTask == .invalid else { return }
 
-        backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "PyxusBackend") { [weak self] in
-            // System is about to kill our background time — clean up
+        backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "PyxusFlight") { [weak self] in
             self?.endBackgroundTask()
         }
     }

@@ -3,52 +3,24 @@
 //  pyxios
 //
 //  Telemetry heads-up display shown over the fullscreen video player.
-//  Displays critical flight info: armed state, mode, battery, altitude, speed.
-//  Data is pushed from the React frontend via the JS bridge.
 //
 
 import SwiftUI
 
-/// Telemetry data pushed from the JS frontend.
-@Observable
-final class TelemetryHUD {
-    static let shared = TelemetryHUD()
-
-    var armed = false
-    var mode = ""
-    var batteryPercent: Int = -1
-    var altitude: Double = 0
-    var groundSpeed: Double = 0
-    var heading: Int = 0
-
-    private init() {}
-
-    func update(from dict: [String: Any]) {
-        armed = dict["armed"] as? Bool ?? armed
-        mode = dict["mode"] as? String ?? mode
-        batteryPercent = dict["battery"] as? Int ?? batteryPercent
-        altitude = dict["altitude"] as? Double ?? altitude
-        groundSpeed = dict["groundSpeed"] as? Double ?? groundSpeed
-        heading = dict["heading"] as? Int ?? heading
-    }
-}
-
-/// HUD overlay shown in top-left corner of fullscreen video.
 struct VideoHUDOverlay: View {
-    let hud = TelemetryHUD.shared
+    let state: VehicleState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            // Armed + Mode
             HStack(spacing: 6) {
                 Circle()
-                    .fill(hud.armed ? Color.red : Color.green)
+                    .fill(state.armed ? Color.red : Color.green)
                     .frame(width: 8, height: 8)
-                Text(hud.armed ? "ARMED" : "DISARMED")
+                Text(state.armed ? "ARMED" : "DISARMED")
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundStyle(hud.armed ? .red : .green)
-                if !hud.mode.isEmpty {
-                    Text(hud.mode)
+                    .foregroundStyle(state.armed ? .red : .green)
+                if !state.flightMode.isEmpty {
+                    Text(state.flightMode)
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 6)
@@ -58,16 +30,16 @@ struct VideoHUDOverlay: View {
                 }
             }
 
-            // Telemetry values
             HStack(spacing: 12) {
-                hudItem(icon: "arrow.up", value: String(format: "%.1fm", hud.altitude))
-                hudItem(icon: "speedometer", value: String(format: "%.1fm/s", hud.groundSpeed))
-                hudItem(icon: "location.north", value: "\(hud.heading)°")
-                if hud.batteryPercent >= 0 {
+                hudItem(icon: "arrow.up", value: String(format: "%.1fm", state.altitudeRelative))
+                hudItem(icon: "speedometer", value: String(format: "%.1fm/s", state.groundSpeed))
+                hudItem(icon: "location.north", value: "\(Int(state.heading))°")
+                if state.batteryPercent >= 0 {
+                    let pct = Int(state.batteryPercent)
                     hudItem(
                         icon: "battery.50",
-                        value: "\(hud.batteryPercent)%",
-                        color: hud.batteryPercent <= 20 ? .red : (hud.batteryPercent <= 30 ? .yellow : .white)
+                        value: "\(pct)%",
+                        color: pct <= 20 ? .red : (pct <= 30 ? .yellow : .white)
                     )
                 }
             }

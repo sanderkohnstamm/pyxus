@@ -1,7 +1,6 @@
 import React from 'react';
-import { Ruler, Box, Square } from 'lucide-react';
+import { Ruler } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
-import { enableTerrain, disableTerrain } from './styles';
 import MavLog from '../components/MavLog';
 import VideoOverlay from '../components/VideoOverlay';
 
@@ -16,27 +15,9 @@ export default function MapOverlays({ mapRef }) {
   const setMeasureMode = useDroneStore((s) => s.setMeasureMode);
   const clearMeasure = useDroneStore((s) => s.clearMeasure);
   const activeDroneId = useDroneStore((s) => s.activeDroneId);
-  const is3DMode = useDroneStore((s) => s.is3DMode);
-  const setIs3DMode = useDroneStore((s) => s.setIs3DMode);
 
   const isPlanning = activeTab === 'planning';
   const isConnected = !!activeDroneId;
-
-  const toggle3D = () => {
-    const mapInstance = mapRef?.current?.getMap?.();
-    if (!mapInstance) return;
-
-    const newMode = !is3DMode;
-    setIs3DMode(newMode);
-
-    if (newMode) {
-      enableTerrain(mapInstance);
-      mapInstance.easeTo({ pitch: 45, duration: 500 });
-    } else {
-      disableTerrain(mapInstance);
-      mapInstance.easeTo({ pitch: 0, bearing: 0, duration: 500 });
-    }
-  };
 
   return (
     <>
@@ -85,19 +66,6 @@ export default function MapOverlays({ mapRef }) {
           title="Measure distance & bearing"
         >
           <Ruler size={14} />
-        </button>
-
-        {/* 2D/3D toggle */}
-        <button
-          onClick={toggle3D}
-          className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all border backdrop-blur-md ${
-            is3DMode
-              ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
-              : 'bg-gray-900/60 text-gray-400 hover:text-gray-200 border-gray-700/40'
-          }`}
-          title={is3DMode ? 'Switch to 2D' : 'Switch to 3D'}
-        >
-          {is3DMode ? <Box size={14} /> : <Square size={14} />}
         </button>
 
         {isConnected && <VideoOverlay />}
