@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+
 struct MainTabView: View {
     let droneManager: DroneManager
 

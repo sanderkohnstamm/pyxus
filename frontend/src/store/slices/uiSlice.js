@@ -56,6 +56,9 @@ const uiSlice = (set, get) => ({
   gcsPosition: null,
   _gcsZoomed: false,
 
+  // Map bounds (for offline tile caching)
+  mapBounds: null,
+
   // Actions
   setActiveTab: (tab) => set({ activeTab: tab, addWaypointMode: false }),
 
@@ -125,6 +128,9 @@ const uiSlice = (set, get) => ({
   // GCS position
   setGcsPosition: (pos) => set({ gcsPosition: pos }),
   markGcsZoomed: () => set({ _gcsZoomed: true }),
+
+  // Map bounds
+  setMapBounds: (bounds) => set({ mapBounds: bounds }),
 });
 
 export default uiSlice;

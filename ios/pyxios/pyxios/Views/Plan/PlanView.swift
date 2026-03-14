@@ -9,6 +9,11 @@
 import SwiftUI
 import MapKit
 
+enum GeofenceType: String, CaseIterable {
+    case circle = "Circle"
+    case polygon = "Polygon"
+}
+
 struct PlanView: View {
     let droneManager: DroneManager
     @State private var flightPlan = FlightPlan()
@@ -21,6 +26,8 @@ struct PlanView: View {
     @State private var isGeofenceMode = false
     @State private var geofenceCenter: CLLocationCoordinate2D?
     @State private var geofenceRadius: Double = 200
+    @State private var geofenceType: GeofenceType = .circle
+    @State private var polygonVertices: [CLLocationCoordinate2D] = []
 
     var body: some View {
         NavigationStack {
@@ -43,10 +50,25 @@ struct PlanView: View {
                     .allowsHitTesting(false)
                 }
 
-                if isGeofenceMode && geofenceCenter == nil {
+                if isGeofenceMode && geofenceType == .circle && geofenceCenter == nil {
                     VStack {
                         Spacer()
                         Text("Tap map to set geofence center")
+                            .font(.callout)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(.red.opacity(0.6))
+                            .clipShape(Capsule())
+                            .padding(.bottom, 80)
+                    }
+                    .allowsHitTesting(false)
+                }
+
+                if isGeofenceMode && geofenceType == .polygon && polygonVertices.isEmpty {
+                    VStack {
+                        Spacer()
+                        Text("Tap map to add polygon vertices")
                             .font(.callout)
                             .foregroundStyle(.white)
                             .padding(.horizontal, 16)
@@ -62,8 +84,8 @@ struct PlanView: View {
                 VStack {
                     Spacer()
                     VStack(spacing: 8) {
-                        // Geofence radius slider
-                        if geofenceCenter != nil {
+                        // Geofence radius slider (circle mode)
+                        if geofenceCenter != nil && geofenceType == .circle {
                             HStack(spacing: 8) {
                                 Text("\(Int(geofenceRadius))m")
                                     .font(.system(.caption, design: .monospaced))
@@ -77,6 +99,49 @@ struct PlanView: View {
                             .background(.ultraThinMaterial)
                             .clipShape(Capsule())
                         }
+
+                        // Geofence type picker + polygon controls
+                        if isGeofenceMode {
+                            HStack(spacing: 12) {
+                                Picker("Type", selection: $geofenceType) {
+                                    ForEach(GeofenceType.allCases, id: \.self) { type in
+                                        Text(type.rawValue).tag(type)
+                                    }
+                                }
+                                .pickerStyle(.segmented)
+                                .frame(width: 180)
+
+                                if geofenceType == .polygon && polygonVertices.count >= 3 {
+                                    Button {
+                                        // Polygon is auto-closed in rendering
+                                    } label: {
+                                        Text("\(polygonVertices.count) pts")
+                                            .font(.system(.caption, design: .monospaced))
+                                            .foregroundStyle(.white)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 6)
+                                            .background(.red.opacity(0.5))
+                                            .clipShape(Capsule())
+                                    }
+                                }
+
+                                if geofenceType == .polygon && !polygonVertices.isEmpty {
+                                    Button {
+                                        polygonVertices.removeLast()
+                                    } label: {
+                                        Image(systemName: "arrow.uturn.backward")
+                                            .foregroundStyle(.white)
+                                            .padding(6)
+                                            .background(.ultraThinMaterial)
+                                            .clipShape(Circle())
+                                    }
+                                }
+
+                                Spacer()
+                            }
+                            .padding(.horizontal, 16)
+                        }
+
                         bottomBar
                     }
                 }
@@ -131,8 +196,9 @@ struct PlanView: View {
                             selectedWaypointID = nil
                             flightPlan.clear()
                             geofenceCenter = nil
+                            polygonVertices = []
                         }
-                        .disabled(flightPlan.waypoints.isEmpty && geofenceCenter == nil)
+                        .disabled(flightPlan.waypoints.isEmpty && geofenceCenter == nil && polygonVertices.isEmpty)
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
@@ -143,11 +209,21 @@ struct PlanView: View {
                     .presentationDetents([.medium, .large])
             }
             .sheet(isPresented: $showSaveSheet) {
-                SaveMissionSheet(flightPlan: flightPlan)
+                SaveMissionSheet(flightPlan: flightPlan, geofenceCenter: geofenceCenter, geofenceRadius: geofenceRadius, polygonVertices: polygonVertices)
                     .presentationDetents([.height(200)])
             }
             .sheet(isPresented: $showLoadSheet) {
-                LoadMissionSheet(flightPlan: flightPlan)
+                LoadMissionSheet(flightPlan: flightPlan, onLoadGeofence: { mission in
+                    if let geo = mission.geofence {
+                        geofenceCenter = CLLocationCoordinate2D(latitude: geo.latitude, longitude: geo.longitude)
+                        geofenceRadius = geo.radius
+                        geofenceType = .circle
+                    }
+                    if let poly = mission.polygonGeofence, !poly.vertices.isEmpty {
+                        polygonVertices = poly.vertices.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
+                        geofenceType = .polygon
+                    }
+                })
                     .presentationDetents([.medium])
             }
             .onAppear {
@@ -191,19 +267,49 @@ struct PlanView: View {
                     }
                 }
 
-                // Geofence circle
-                if let center = geofenceCenter {
+                // Circle geofence
+                if let center = geofenceCenter, geofenceType == .circle {
                     MapCircle(center: center, radius: geofenceRadius)
                         .stroke(.red, lineWidth: 2)
                         .foregroundStyle(.red.opacity(0.1))
                 }
+
+                // Polygon geofence
+                if geofenceType == .polygon && polygonVertices.count >= 3 {
+                    let closed = polygonVertices + [polygonVertices[0]]
+                    MapPolyline(coordinates: closed)
+                        .stroke(.red, lineWidth: 2)
+                    MapPolygon(coordinates: polygonVertices)
+                        .foregroundStyle(.red.opacity(0.1))
+                }
+
+                // Polygon vertices
+                if geofenceType == .polygon {
+                    ForEach(Array(polygonVertices.enumerated()), id: \.offset) { idx, vertex in
+                        Annotation("", coordinate: vertex) {
+                            Circle()
+                                .fill(.red)
+                                .frame(width: 12, height: 12)
+                                .overlay(
+                                    Text("\(idx + 1)")
+                                        .font(.system(size: 7, weight: .bold))
+                                        .foregroundStyle(.white)
+                                )
+                        }
+                    }
+                }
             }
             .mapStyle(.imagery(elevation: .flat))
             .mapControls { }
+            .cachedTileOverlay()
             .onTapGesture { screenPoint in
                 if let coordinate = proxy.convert(screenPoint, from: .local) {
                     if isGeofenceMode {
-                        geofenceCenter = coordinate
+                        if geofenceType == .circle {
+                            geofenceCenter = coordinate
+                        } else {
+                            polygonVertices.append(coordinate)
+                        }
                     } else if isAddMode {
                         flightPlan.addWaypoint(at: coordinate)
                         selectedWaypointID = flightPlan.waypoints.last?.id
@@ -423,6 +529,9 @@ struct WaypointListView: View {
 
 struct SaveMissionSheet: View {
     let flightPlan: FlightPlan
+    var geofenceCenter: CLLocationCoordinate2D?
+    var geofenceRadius: Double = 200
+    var polygonVertices: [CLLocationCoordinate2D] = []
     @Environment(\.dismiss) private var dismiss
     @State private var missionName: String = ""
 
@@ -437,7 +546,13 @@ struct SaveMissionSheet: View {
 
                 Button {
                     flightPlan.name = missionName.isEmpty ? "Untitled" : missionName
-                    flightPlan.save()
+                    let circleGeo: GeofenceData? = geofenceCenter.map {
+                        GeofenceData(latitude: $0.latitude, longitude: $0.longitude, radius: geofenceRadius)
+                    }
+                    let polyGeo: PolygonGeofenceData? = polygonVertices.count >= 3
+                        ? PolygonGeofenceData(vertices: polygonVertices.map { PolygonGeofenceVertex(latitude: $0.latitude, longitude: $0.longitude) })
+                        : nil
+                    flightPlan.save(geofence: circleGeo, polygonGeofence: polyGeo)
                     dismiss()
                 } label: {
                     Label("Save", systemImage: "square.and.arrow.down")
@@ -468,6 +583,7 @@ struct SaveMissionSheet: View {
 
 struct LoadMissionSheet: View {
     let flightPlan: FlightPlan
+    var onLoadGeofence: ((SavedMission) -> Void)?
     @Environment(\.dismiss) private var dismiss
     @State private var missions: [SavedMission] = []
 
@@ -482,6 +598,7 @@ struct LoadMissionSheet: View {
                         ForEach(missions) { mission in
                             Button {
                                 flightPlan.load(from: mission)
+                                onLoadGeofence?(mission)
                                 dismiss()
                             } label: {
                                 HStack {

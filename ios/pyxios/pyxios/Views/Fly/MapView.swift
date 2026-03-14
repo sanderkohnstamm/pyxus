@@ -13,79 +13,158 @@ struct DroneMapView: View {
     let droneManager: DroneManager
     @Binding var followMode: Bool
     let missionWaypoints: [Waypoint]
+    var activeMissionSeq: Int = -1
+    var onMapTap: ((CLLocationCoordinate2D) -> Void)?
+    var onWaypointTap: ((Int) -> Void)?
 
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var hasInitiallyFramed = false
     @State private var trail: [CLLocationCoordinate2D] = []
     @State private var lastTrailUpdate = Date.distantPast
     @State private var isProgrammaticMove = false
+    @State private var viewSize: CGSize = .zero
+    @State private var droneScreenPoint: CGPoint?
+    @State private var droneOffScreen = false
+    @State private var offScreenAngle: Angle = .zero
 
     private var state: VehicleState { droneManager.state }
 
     var body: some View {
-        Map(position: $cameraPosition) {
-            // Drone marker
-            if state.hasValidPosition {
-                Annotation("Drone", coordinate: state.coordinate) {
-                    droneMarker
-                }
+        GeometryReader { geo in
+            ZStack {
+                MapReader { proxy in
+                    Map(position: $cameraPosition) {
+                        // Drone marker
+                        if state.hasValidPosition {
+                            Annotation("Drone", coordinate: state.coordinate) {
+                                droneMarker
+                            }
 
-                // Flight trail
-                if trail.count >= 2 {
-                    MapPolyline(coordinates: trail)
-                        .stroke(.cyan.opacity(0.5), lineWidth: 2)
-                }
-            }
+                            // Flight trail
+                            if trail.count >= 2 {
+                                MapPolyline(coordinates: trail)
+                                    .stroke(.cyan.opacity(0.5), lineWidth: 2)
+                            }
+                        }
 
-            // Home marker
-            if let home = state.homeCoordinate {
-                Annotation("Home", coordinate: home) {
-                    Image(systemName: "house.fill")
-                        .font(.caption)
-                        .foregroundStyle(.white)
-                        .padding(4)
-                        .background(.green)
-                        .clipShape(Circle())
-                }
-            }
+                        // Home marker
+                        if let home = state.homeCoordinate {
+                            Annotation("Home", coordinate: home) {
+                                Image(systemName: "house.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.white)
+                                    .padding(4)
+                                    .background(.green)
+                                    .clipShape(Circle())
+                            }
+                        }
 
-            // Mission waypoints overlay
-            if !missionWaypoints.isEmpty {
-                MapPolyline(coordinates: missionWaypoints.map(\.coordinate))
-                    .stroke(.orange.opacity(0.8), lineWidth: 2)
+                        // Mission waypoints overlay
+                        if !missionWaypoints.isEmpty {
+                            MapPolyline(coordinates: missionWaypoints.map(\.coordinate))
+                                .stroke(.orange.opacity(0.8), lineWidth: 2)
 
-                ForEach(Array(missionWaypoints.enumerated()), id: \.element.id) { idx, wp in
-                    Annotation("", coordinate: wp.coordinate) {
-                        ZStack {
-                            Circle()
-                                .fill(wp.action.markerColor)
-                                .frame(width: 24, height: 24)
-                            Text("\(idx + 1)")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(.white)
+                            ForEach(Array(missionWaypoints.enumerated()), id: \.element.id) { idx, wp in
+                                let isActive = (idx + 1) == activeMissionSeq  // mission seq is 1-based (seq 0 = home)
+                                Annotation("", coordinate: wp.coordinate) {
+                                    ZStack {
+                                        if isActive {
+                                            Circle()
+                                                .stroke(.cyan, lineWidth: 2)
+                                                .frame(width: 34, height: 34)
+                                        }
+                                        Circle()
+                                            .fill(isActive ? Color.cyan : wp.action.markerColor)
+                                            .frame(width: 24, height: 24)
+                                        Text("\(idx + 1)")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundStyle(.white)
+                                    }
+                                    .onTapGesture {
+                                        onWaypointTap?(idx)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .mapStyle(.imagery(elevation: .flat))
+                    .mapControls { }
+                    .cachedTileOverlay()
+                    .onTapGesture { screenPoint in
+                        if let coordinate = proxy.convert(screenPoint, from: .local) {
+                            onMapTap?(coordinate)
+                        }
+                    }
+                    .onMapCameraChange(frequency: .continuous) { context in
+                        // Manual pan disables follow mode (but not programmatic camera updates)
+                        if followMode && hasInitiallyFramed && !isProgrammaticMove {
+                            followMode = false
+                        }
+                        isProgrammaticMove = false
+
+                        // Update edge-sticking
+                        if state.hasValidPosition {
+                            if let pt = proxy.convert(state.coordinate, to: .local) {
+                                updateEdgeIndicator(screenPoint: pt, viewSize: geo.size)
+                            } else {
+                                droneOffScreen = true
+                            }
+                        }
+                    }
+                    .onChange(of: state.coordinate.latitude + state.coordinate.longitude) { _, _ in
+                        updateTrail()
+                        if followMode {
+                            updateFollowCamera()
+                        } else {
+                            frameOnDroneIfNeeded()
                         }
                     }
                 }
+
+                // Edge-sticking chevron indicator
+                if droneOffScreen && !followMode && state.hasValidPosition {
+                    edgeChevron
+                }
             }
-        }
-        .mapStyle(.imagery(elevation: .flat))
-        .mapControls { }
-        .onMapCameraChange(frequency: .continuous) { _ in
-            // Manual pan disables follow mode (but not programmatic camera updates)
-            if followMode && hasInitiallyFramed && !isProgrammaticMove {
-                followMode = false
-            }
-            isProgrammaticMove = false
-        }
-        .onChange(of: state.coordinate.latitude + state.coordinate.longitude) { _, _ in
-            updateTrail()
-            if followMode {
-                updateFollowCamera()
-            } else {
-                frameOnDroneIfNeeded()
-            }
+            .onAppear { viewSize = geo.size }
+            .onChange(of: geo.size) { _, newSize in viewSize = newSize }
         }
     }
+
+    // MARK: - Edge Chevron
+
+    private var edgeChevron: some View {
+        let margin: CGFloat = 40
+        let clampedX = min(max(droneScreenPoint?.x ?? viewSize.width / 2, margin), viewSize.width - margin)
+        let clampedY = min(max(droneScreenPoint?.y ?? viewSize.height / 2, margin), viewSize.height - margin)
+
+        return Image(systemName: "arrowtriangle.up.fill")
+            .font(.title3)
+            .foregroundStyle(.cyan)
+            .rotationEffect(offScreenAngle)
+            .shadow(color: .black, radius: 3)
+            .position(x: clampedX, y: clampedY)
+    }
+
+    private func updateEdgeIndicator(screenPoint: CGPoint, viewSize: CGSize) {
+        droneScreenPoint = screenPoint
+        let inset: CGFloat = 20
+        let isInside = screenPoint.x >= inset && screenPoint.x <= viewSize.width - inset
+            && screenPoint.y >= inset && screenPoint.y <= viewSize.height - inset
+
+        if isInside {
+            droneOffScreen = false
+        } else {
+            droneOffScreen = true
+            let centerX = viewSize.width / 2
+            let centerY = viewSize.height / 2
+            let dx = screenPoint.x - centerX
+            let dy = screenPoint.y - centerY
+            offScreenAngle = Angle(radians: atan2(Double(dy), Double(dx)) - .pi / 2)
+        }
+    }
+
+    // MARK: - Drone Marker
 
     private var droneMarker: some View {
         Image(systemName: droneIcon)

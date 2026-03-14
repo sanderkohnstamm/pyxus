@@ -15,7 +15,7 @@ import {
   TILE_URL, TILE_ATTR, DRONE_COLORS, DRONE_STROKES,
   createDroneIcon, createDroneNameIcon, homeIcon, gcsIcon,
 } from '../map/mapIcons';
-import { GcsLocator, MapResizer, DroneFollower, MapClickHandler, AddModeCursor } from '../map/MapBehaviors';
+import { GcsLocator, MapResizer, DroneFollower, MapClickHandler, AddModeCursor, MapBoundsTracker } from '../map/MapBehaviors';
 import { MissionContextMenu, ManipulationOverlay } from '../map/MissionOverlays';
 import { PlannedWaypointMarkers, FenceVertexMarkers } from '../map/PlannedMissionLayer';
 import { DroneMissionMarkers, DroneFenceDisplay, PatternBoundsPolygon } from '../map/DroneMissionLayer';
@@ -116,6 +116,7 @@ export default function MapView() {
         <GcsLocator />
         <MapClickHandler />
         <AddModeCursor />
+        <MapBoundsTracker />
 
         {/* All drone trails + markers + non-active drone missions */}
         {Object.entries(drones).map(([droneId, drone]) => {

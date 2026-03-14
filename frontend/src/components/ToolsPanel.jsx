@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { SlidersHorizontal, Cog, Gamepad2, Compass, Keyboard, Zap, Plus, X, Trash2, ChevronDown, ChevronUp, Radio, Activity, ArrowDownToLine, Gauge, Loader2, Check, Video, ShieldAlert } from 'lucide-react';
+import { SlidersHorizontal, Cog, Gamepad2, Compass, Keyboard, Zap, Plus, X, Trash2, ChevronDown, ChevronUp, Radio, Activity, ArrowDownToLine, Gauge, Loader2, Check, Video, ShieldAlert, MapPin, Download } from 'lucide-react';
 import useDroneStore from '../store/droneStore';
 import { droneApi } from '../utils/api';
 import ParamsPanel from './ParamsPanel';
@@ -490,6 +490,117 @@ function SystemPanel() {
   );
 }
 
+// Offline Maps Panel
+function OfflineMapsPanel() {
+  const mapBounds = useDroneStore((s) => s.mapBounds);
+  const [cacheStats, setCacheStats] = useState(null);
+  const [progress, setProgress] = useState(null); // { cached, total }
+  const [caching, setCaching] = useState(false);
+
+  // Get cache stats on mount
+  useEffect(() => {
+    const sw = navigator.serviceWorker?.controller;
+    if (!sw) return;
+
+    const handler = (event) => {
+      const { type } = event.data || {};
+      if (type === 'cache-stats') setCacheStats(event.data.count);
+      if (type === 'cache-progress') setProgress(event.data);
+      if (type === 'cache-complete') {
+        setProgress(null);
+        setCaching(false);
+        setCacheStats(event.data.cached);
+      }
+      if (type === 'cache-cleared') {
+        setCacheStats(0);
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', handler);
+    sw.postMessage({ type: 'cache-stats' });
+    return () => navigator.serviceWorker.removeEventListener('message', handler);
+  }, []);
+
+  const cacheVisibleArea = useCallback(() => {
+    const sw = navigator.serviceWorker?.controller;
+    if (!sw || !mapBounds) return;
+    setCaching(true);
+    setProgress({ cached: 0, total: 0 });
+    sw.postMessage({
+      type: 'cache-region',
+      data: {
+        bounds: mapBounds,
+        minZoom: Math.max(1, (mapBounds.zoom || 13) - 2),
+        maxZoom: Math.min(18, (mapBounds.zoom || 13) + 2),
+      },
+    });
+  }, [mapBounds]);
+
+  const clearCache = useCallback(() => {
+    const sw = navigator.serviceWorker?.controller;
+    if (sw) sw.postMessage({ type: 'clear-cache' });
+  }, []);
+
+  const swAvailable = !!navigator.serviceWorker?.controller;
+
+  return (
+    <div className="p-4 space-y-3">
+      <div className="text-[10px] text-gray-600 mb-2">Cache map tiles for offline use. Tiles are cached from the Esri World Imagery layer.</div>
+
+      {!swAvailable && (
+        <div className="text-[10px] text-amber-400/80 bg-amber-950/20 border border-amber-800/25 rounded-lg p-3">
+          Service worker not active yet. Reload the page to enable offline maps.
+        </div>
+      )}
+
+      <div className="bg-gray-800/40 rounded-lg border border-gray-800/50 p-3 space-y-3">
+        <div className="flex items-center gap-1.5">
+          <MapPin size={11} className="text-cyan-500" />
+          <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Tile Cache</span>
+        </div>
+
+        {cacheStats !== null && (
+          <div className="text-[11px] text-gray-300">
+            <span className="font-mono text-cyan-300">{cacheStats.toLocaleString()}</span> tiles cached
+          </div>
+        )}
+
+        {progress && (
+          <div className="space-y-1">
+            <div className="flex justify-between text-[10px] text-gray-400">
+              <span>Caching tiles...</span>
+              <span>{progress.cached}/{progress.total}</span>
+            </div>
+            <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-cyan-500 rounded-full transition-all"
+                style={{ width: progress.total > 0 ? `${(progress.cached / progress.total) * 100}%` : '0%' }}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <button
+            onClick={cacheVisibleArea}
+            disabled={!swAvailable || !mapBounds || caching}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-semibold bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 text-cyan-300 disabled:opacity-30 transition-colors"
+          >
+            <Download size={12} />
+            {caching ? 'Caching...' : 'Cache visible area'}
+          </button>
+          <button
+            onClick={clearCache}
+            disabled={!swAvailable}
+            className="px-3 py-2 rounded-md text-xs font-semibold bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-300 disabled:opacity-30 transition-colors"
+          >
+            <Trash2 size={12} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ToolsPanel({ sendMessage }) {
   const [subTab, setSubTab] = useState('video');
   const tabs = [
@@ -497,6 +608,7 @@ export default function ToolsPanel({ sendMessage }) {
     { id: 'input', label: 'Input', icon: Gamepad2 },
     { id: 'hardware', label: 'Hardware', icon: Cog },
     { id: 'system', label: 'System', icon: SlidersHorizontal },
+    { id: 'maps', label: 'Maps', icon: MapPin },
   ];
 
   return (
@@ -512,6 +624,7 @@ export default function ToolsPanel({ sendMessage }) {
         {subTab === 'video' ? <VideoFeed /> :
          subTab === 'input' ? <InputPanel sendMessage={sendMessage} /> :
          subTab === 'hardware' ? <HardwarePanel /> :
+         subTab === 'maps' ? <OfflineMapsPanel /> :
          <SystemPanel />}
       </div>
     </div>

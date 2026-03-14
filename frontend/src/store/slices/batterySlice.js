@@ -9,6 +9,9 @@ const batterySlice = (set, get) => ({
   // Per-drone battery alert tracking: { [droneId]: { warn: bool, crit: bool } }
   _batteryAlertState: {},
 
+  // Altitude fence warning state
+  altitudeWarnings: { exceeded: false },
+
   // Battery warning thresholds
   setBatteryWarnThreshold: (val) => {
     const v = Math.max(0, Math.min(100, parseInt(val, 10) || 30));
@@ -24,6 +27,11 @@ const batterySlice = (set, get) => ({
   // Battery warnings (legacy voltage-based)
   setBatteryWarnings: (warnings) => set((s) => ({
     batteryWarnings: { ...s.batteryWarnings, ...warnings }
+  })),
+
+  // Altitude warnings
+  setAltitudeWarnings: (warnings) => set((s) => ({
+    altitudeWarnings: { ...s.altitudeWarnings, ...warnings }
   })),
 
   // Per-drone battery alert state

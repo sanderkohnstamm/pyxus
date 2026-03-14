@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import CoreLocation
 
 struct FlyView: View {
     let droneManager: DroneManager
@@ -21,6 +22,10 @@ struct FlyView: View {
     @State private var missionUploadProgress: String?
     @State private var followMode = true
     @State private var activeMission: [Waypoint] = []
+    @State private var gotoTarget: CLLocationCoordinate2D?
+    @State private var showGotoConfirm = false
+    @State private var continueFromSeq: Int?
+    @State private var showContinueConfirm = false
     private let videoManager = VideoPlayerManager.shared
 
     private var isConnected: Bool { droneManager.state.connectionState.isConnected }
@@ -40,12 +45,31 @@ struct FlyView: View {
                 VideoFeedView()
                     .ignoresSafeArea()
             } else {
-                DroneMapView(droneManager: droneManager, followMode: $followMode, missionWaypoints: activeMission)
-                    .ignoresSafeArea(edges: .top)
+                DroneMapView(
+                    droneManager: droneManager,
+                    followMode: $followMode,
+                    missionWaypoints: activeMission,
+                    activeMissionSeq: droneManager.state.missionSeq,
+                    onMapTap: { coordinate in
+                        guard droneManager.state.armed && !droneManager.state.landed else { return }
+                        gotoTarget = coordinate
+                        showGotoConfirm = true
+                    },
+                    onWaypointTap: { index in
+                        continueFromSeq = index + 1  // mission seq is 1-based (0 = home)
+                        showContinueConfirm = true
+                    }
+                )
+                .ignoresSafeArea(edges: .top)
             }
 
             // HUD + controls overlay
             VStack(spacing: 0) {
+                // Link lost banner
+                if let since = droneManager.state.linkLostSince {
+                    LinkLostBanner(since: since)
+                }
+
                 if showHUD {
                     HStack(alignment: .top, spacing: 8) {
                         if isConnected {
@@ -63,6 +87,25 @@ struct FlyView: View {
                     }
                     .padding(.horizontal, 12)
                     .padding(.top, 8)
+
+                    // Telemetry alerts
+                    if !droneManager.alertService.activeAlerts.isEmpty {
+                        VStack(spacing: 4) {
+                            ForEach(droneManager.alertService.activeAlerts) { alert in
+                                HStack(spacing: 6) {
+                                    Image(systemName: alert.level == .critical ? "exclamationmark.triangle.fill" : "exclamationmark.circle.fill")
+                                        .font(.caption2)
+                                    Text(alert.message)
+                                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                }
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background((alert.level == .critical ? Color.red : Color.orange).gradient, in: .capsule)
+                            }
+                        }
+                        .padding(.top, 4)
+                    }
                 }
 
                 Spacer()
@@ -73,24 +116,16 @@ struct FlyView: View {
                         JoystickOverlay(droneManager: droneManager)
                     }
 
-                    if isLandscape {
-                        HStack {
-                            Spacer()
-                            VStack(spacing: 12) {
-                                modeSelector
-                                actionButtons
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 16)
-                    } else {
+                    HStack(alignment: .bottom) {
+                        Spacer()
                         VStack(spacing: 12) {
+                            controlToggles
                             modeSelector
                             actionButtons
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 16)
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
                 }
             }
 
@@ -160,33 +195,41 @@ struct FlyView: View {
                     Spacer()
                 }
             }
-
-            // Follow toggle button (bottom-right)
-            if isConnected && !showVideo {
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Button {
-                            followMode.toggle()
-                        } label: {
-                            Image(systemName: followMode ? "location.fill" : "location")
-                                .font(.title3)
-                                .foregroundStyle(followMode ? .cyan : .white.opacity(0.7))
-                                .padding(10)
-                                .background(followMode ? Color.cyan.opacity(0.2) : Color.clear)
-                                .background(.ultraThinMaterial)
-                                .clipShape(Circle())
-                        }
-                        .padding(.trailing, 16)
-                        .padding(.bottom, isLandscape ? 16 : 120)
-                    }
-                }
-            }
         }
         .sheet(isPresented: $showConnectSheet) {
             ConnectSheet(droneManager: droneManager, isPresented: $showConnectSheet)
                 .presentationDetents([.medium, .large])
+        }
+        .alert("Go to location?", isPresented: $showGotoConfirm) {
+            Button("Go", role: .destructive) {
+                if let target = gotoTarget {
+                    droneManager.gotoLocation(
+                        lat: target.latitude,
+                        lon: target.longitude,
+                        alt: droneManager.state.altitudeRelative
+                    )
+                }
+                gotoTarget = nil
+            }
+            Button("Cancel", role: .cancel) { gotoTarget = nil }
+        } message: {
+            if let target = gotoTarget {
+                Text(String(format: "Fly to %.5f, %.5f at current altitude?", target.latitude, target.longitude))
+            }
+        }
+        .alert("Continue from waypoint?", isPresented: $showContinueConfirm) {
+            Button("Continue") {
+                if let seq = continueFromSeq {
+                    droneManager.setMissionCurrent(seq: seq)
+                    droneManager.startMission()
+                }
+                continueFromSeq = nil
+            }
+            Button("Cancel", role: .cancel) { continueFromSeq = nil }
+        } message: {
+            if let seq = continueFromSeq {
+                Text("Continue mission from waypoint \(seq)?")
+            }
         }
         .onChange(of: isConnected) { _, connected in
             if connected {
@@ -216,36 +259,21 @@ struct FlyView: View {
         }
     }
 
-    // MARK: - Mode Selector
+    // MARK: - Control Toggles
 
-    private var modeSelector: some View {
+    private var controlToggles: some View {
         HStack(spacing: 8) {
-            Menu {
-                ForEach(availableModes, id: \.self) { mode in
-                    Button {
-                        droneManager.setFlightMode(mode)
-                    } label: {
-                        if mode == droneManager.state.flightMode {
-                            Label(mode, systemImage: "checkmark")
-                        } else {
-                            Text(mode)
-                        }
-                    }
-                }
+            // Follow toggle
+            Button {
+                followMode.toggle()
             } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "airplane.circle")
-                        .font(.body)
-                    Text(droneManager.state.flightMode.isEmpty ? "Mode" : droneManager.state.flightMode)
-                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.caption2)
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(.ultraThinMaterial)
-                .clipShape(Capsule())
+                Image(systemName: followMode ? "location.fill" : "location")
+                    .font(.body)
+                    .foregroundStyle(followMode ? .cyan : .white.opacity(0.7))
+                    .padding(8)
+                    .background(followMode ? Color.cyan.opacity(0.2) : Color.clear)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Circle())
             }
 
             // Joystick toggle (landscape only)
@@ -279,6 +307,40 @@ struct FlyView: View {
                     .background(showConsole ? Color.cyan.opacity(0.2) : Color.clear)
                     .background(.ultraThinMaterial)
                     .clipShape(Circle())
+            }
+        }
+    }
+
+    // MARK: - Mode Selector
+
+    private var modeSelector: some View {
+        HStack(spacing: 8) {
+            Menu {
+                ForEach(availableModes, id: \.self) { mode in
+                    Button {
+                        droneManager.setFlightMode(mode)
+                    } label: {
+                        if mode == droneManager.state.flightMode {
+                            Label(mode, systemImage: "checkmark")
+                        } else {
+                            Text(mode)
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "airplane.circle")
+                        .font(.body)
+                    Text(droneManager.state.flightMode.isEmpty ? "Mode" : droneManager.state.flightMode)
+                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption2)
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial)
+                .clipShape(Capsule())
             }
 
             // Mission menu
@@ -423,6 +485,31 @@ struct FlyView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
                 .background(tint.gradient, in: .capsule)
+        }
+    }
+}
+
+// MARK: - Link Lost Banner
+
+struct LinkLostBanner: View {
+    let since: Date
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let elapsed = Int(context.date.timeIntervalSince(since))
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                Text("LINK LOST")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                Text("\(elapsed)s")
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.8))
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(.red.gradient)
         }
     }
 }

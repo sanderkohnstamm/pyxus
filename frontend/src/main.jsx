@@ -12,3 +12,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <RootApp />
   </React.StrictMode>
 );
+
+// Register tile cache service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./tile-sw.js').catch(() => {});
+}

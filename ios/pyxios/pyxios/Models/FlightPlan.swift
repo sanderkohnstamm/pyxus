@@ -110,9 +110,9 @@ final class FlightPlan {
 
     // MARK: - Persistence
 
-    func save(geofence: GeofenceData? = nil) {
+    func save(geofence: GeofenceData? = nil, polygonGeofence: PolygonGeofenceData? = nil) {
         let file = Self.storageDir.appendingPathComponent(sanitizedName + ".json")
-        let data = SavedMission(name: name, waypoints: waypoints, geofence: geofence)
+        let data = SavedMission(name: name, waypoints: waypoints, geofence: geofence, polygonGeofence: polygonGeofence)
         if let encoded = try? JSONEncoder().encode(data) {
             try? encoded.write(to: file)
         }
@@ -157,9 +157,19 @@ struct GeofenceData: Codable {
     let radius: Double
 }
 
+struct PolygonGeofenceVertex: Codable {
+    let latitude: Double
+    let longitude: Double
+}
+
+struct PolygonGeofenceData: Codable {
+    let vertices: [PolygonGeofenceVertex]
+}
+
 struct SavedMission: Codable, Identifiable {
     var id: String { name }
     let name: String
     let waypoints: [Waypoint]
     var geofence: GeofenceData?
+    var polygonGeofence: PolygonGeofenceData?
 }

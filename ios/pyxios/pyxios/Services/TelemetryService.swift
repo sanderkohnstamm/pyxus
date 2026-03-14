@@ -63,6 +63,7 @@ final class TelemetryService {
         state.armed = t.armed
         state.flightMode = t.mode
         state.landed = !t.armed
+        state.missionSeq = Int(t.missionSeq)
 
         if t.homeLat != 0 || t.homeLon != 0 {
             state.homeCoordinate = CLLocationCoordinate2D(latitude: t.homeLat, longitude: t.homeLon)
@@ -94,8 +95,13 @@ final class TelemetryService {
 
         // Link status
         if t.linkLost {
+            if state.linkLostSince == nil {
+                state.linkLostSince = Date()
+            }
             state.connectionState = .error("Link lost")
             return "Link lost"
+        } else {
+            state.linkLostSince = nil
         }
 
         return nil

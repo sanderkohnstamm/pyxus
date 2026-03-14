@@ -55,10 +55,14 @@ struct VehicleState {
     var flightMode: String = ""
     var landed: Bool = true
     var vehicleType: VehicleType = .copter
+    var missionSeq: Int = -1
 
     // Home
     var homeCoordinate: CLLocationCoordinate2D?
     var distanceToHome: Float = 0    // meters
+
+    // Link
+    var linkLostSince: Date?
 
     // Health
     var isGyrCalOk: Bool = false

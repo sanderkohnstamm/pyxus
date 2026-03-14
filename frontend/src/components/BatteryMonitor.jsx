@@ -69,6 +69,31 @@ export default function BatteryMonitor() {
     }
   }, [voltage, remaining, activeDroneId, params, batteryWarnings, setBatteryWarnings, addAlert, soundEnabled]);
 
+  // Altitude fence warning for active drone (FENCE_ALT_MAX param)
+  const altitude = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry?.alt : 0) || 0;
+  const altitudeWarnings = useDroneStore((s) => s.altitudeWarnings);
+  const setAltitudeWarnings = useDroneStore((s) => s.setAltitudeWarnings);
+
+  useEffect(() => {
+    if (!activeDroneId || altitude <= 0) {
+      if (altitudeWarnings.exceeded) setAltitudeWarnings({ exceeded: false });
+      return;
+    }
+
+    const fenceAlt = params.FENCE_ALT_MAX?.value;
+    if (!fenceAlt || fenceAlt <= 0) return;
+
+    if (altitudeWarnings.exceeded && altitude < fenceAlt - 5) {
+      setAltitudeWarnings({ exceeded: false });
+    }
+
+    if (altitude >= fenceAlt && !altitudeWarnings.exceeded) {
+      setAltitudeWarnings({ exceeded: true });
+      addAlert(`Altitude ${altitude.toFixed(0)}m ≥ fence ${fenceAlt}m`, 'warning');
+      if (soundEnabled) playBeep(700, 0.2);
+    }
+  }, [altitude, activeDroneId, params, altitudeWarnings, setAltitudeWarnings, addAlert, soundEnabled]);
+
   // Percentage-based warnings for ALL connected drones
   useEffect(() => {
     const droneIds = Object.keys(drones);

@@ -175,7 +175,7 @@ export default function ConnectionBar() {
   const lostDrones = useMemo(() => {
     const lost = [];
     for (const [id, d] of Object.entries(drones)) {
-      if (d.linkLost) lost.push({ id, name: d.name || id, since: d.linkLostSince });
+      if (d.linkLost) lost.push({ id, name: d.name || id, since: d.linkLostSince, connectionString: d.connectionString });
     }
     return lost;
   }, [drones]);
@@ -336,17 +336,22 @@ export default function ConnectionBar() {
         </button>
       </div>
     </div>
-    {lostDrones.length > 0 && <LinkLostBanner drones={lostDrones} />}
+    {lostDrones.length > 0 && <LinkLostBanner drones={lostDrones} onDisconnect={handleDisconnect} onConnect={handleConnect} />}
     </>
   );
 }
 
-function LinkLostBanner({ drones }) {
+function LinkLostBanner({ drones, onDisconnect, onConnect }) {
   const [, setTick] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
   }, []);
+
+  const handleReconnect = useCallback(async (drone) => {
+    await onDisconnect(drone.id);
+    onConnect(drone.connectionString, drone.name);
+  }, [onDisconnect, onConnect]);
 
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 bg-red-950/80 border-b border-red-800/40 animate-pulse shrink-0">
@@ -357,9 +362,19 @@ function LinkLostBanner({ drones }) {
       {drones.map((d) => {
         const elapsed = d.since ? Math.round((Date.now() - d.since) / 1000) : 0;
         return (
-          <span key={d.id} className="text-[11px] text-red-200/80 font-medium">
-            {d.name} ({elapsed}s)
-          </span>
+          <div key={d.id} className="flex items-center gap-1.5">
+            <span className="text-[11px] text-red-200/80 font-medium">
+              {d.name} ({elapsed}s)
+            </span>
+            {d.connectionString && (
+              <button
+                onClick={() => handleReconnect(d)}
+                className="px-2 py-0.5 rounded text-[10px] font-semibold bg-red-500/20 hover:bg-red-500/40 text-red-200 border border-red-500/30 transition-colors"
+              >
+                Reconnect
+              </button>
+            )}
+          </div>
         );
       })}
     </div>

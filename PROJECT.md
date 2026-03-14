@@ -70,4 +70,10 @@ Core GCS implemented: real-time telemetry, mission planning/upload/download, geo
 
 iOS FlyView: follow-mode (auto-centers on drone, disables on manual pan), mission waypoint overlay on map, mission download from drone, auto-download on connect, landscape-optimized bottom-right button layout. iOS PlanView: live drone position marker, geofence planning (tap to place center, radius slider 50-2000m), mission download from drone. Geofence data persisted with saved missions.
 
-**Key gaps**: No flight logging. Connection loss not surfaced well. Emergency stop could be more prominent. No offline map support.
+**Connection loss detection**: iOS shows a red banner with elapsed time when link is lost. Desktop shows per-drone link-lost banners with reconnect buttons.
+
+**Telemetry alerts**: iOS TelemetryAlertService monitors battery voltage and altitude against autopilot params (BATT_LOW_VOLT, BATT_CRT_VOLT, FENCE_ALT_MAX) with hysteresis and haptic feedback. Alert capsules overlay below HUD. Desktop BatteryMonitor includes altitude fence warnings.
+
+**Offline map tiles**: Desktop uses a service worker (cache-first) for Esri satellite tiles with a ToolsPanel UI for caching visible area, progress display, stats, and cache clearing. iOS uses CachedTileOverlay (MKTileOverlay subclass) with 30-day disk cache for satellite tiles.
+
+**Key gaps**: No flight logging. Emergency stop could be more prominent.

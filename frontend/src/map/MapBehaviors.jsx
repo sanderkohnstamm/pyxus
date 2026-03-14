@@ -132,6 +132,27 @@ export function MapClickHandler() {
   return null;
 }
 
+// Track map bounds for offline tile caching
+export function MapBoundsTracker() {
+  const map = useMap();
+  const setMapBounds = useDroneStore((s) => s.setMapBounds);
+
+  useMapEvents({
+    moveend: () => {
+      const b = map.getBounds();
+      setMapBounds({
+        north: b.getNorth(),
+        south: b.getSouth(),
+        east: b.getEast(),
+        west: b.getWest(),
+        zoom: map.getZoom(),
+      });
+    },
+  });
+
+  return null;
+}
+
 // Set crosshair cursor when in add mode or measure mode
 export function AddModeCursor() {
   const map = useMap();

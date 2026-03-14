@@ -58,6 +58,7 @@ final class DroneManager {
     let missionService = MissionService()
     let paramService = ParameterService()
     let telemetryService = TelemetryService()
+    let alertService = TelemetryAlertService()
 
     // MARK: - Published State
 
@@ -131,6 +132,7 @@ final class DroneManager {
             if let linkMsg = self.telemetryService.updateTelemetry(from: snapshot, state: &self.state) {
                 self.statusMessage = linkMsg
             }
+            self.alertService.check(state: self.state, params: self.paramService.params)
         }
 
         mav.onStatusText = { [weak self] severity, text in
@@ -252,6 +254,7 @@ final class DroneManager {
         missionService.reset()
         paramService.reset()
         telemetryService.reset()
+        alertService.reset()
     }
 
     // MARK: - Flight Actions
@@ -455,6 +458,18 @@ final class DroneManager {
         missionService.clearMission { [weak self] msg in
             self?.statusMessage = msg
         }
+    }
+
+    /// Fly to a specific coordinate in GUIDED mode.
+    func gotoLocation(lat: Double, lon: Double, alt: Float) {
+        drone?.gotoLocation(lat: lat, lon: lon, alt: alt)
+        statusMessage = "Going to location"
+    }
+
+    /// Set the current mission item (continue-from).
+    func setMissionCurrent(seq: Int) {
+        drone?.sendMissionSetCurrent(seq: UInt16(seq))
+        statusMessage = "Setting mission to WP \(seq)"
     }
 
     /// Fetch all params via ParameterService.
