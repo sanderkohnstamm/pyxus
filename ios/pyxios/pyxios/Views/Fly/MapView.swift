@@ -177,9 +177,9 @@ struct DroneMapView: View {
     // MARK: - Drone Marker
 
     private var droneMarker: some View {
-        Triangle()
+        ArrowShape()
             .fill(.cyan)
-            .frame(width: 14, height: 18)
+            .frame(width: 20, height: 22)
             .rotationEffect(.degrees(Double(state.heading)))
             .shadow(color: .black.opacity(0.6), radius: 3)
             .shadow(color: .cyan.opacity(0.4), radius: 6)
@@ -221,14 +221,31 @@ struct DroneMapView: View {
     }
 }
 
-// MARK: - Triangle Shape
+// MARK: - Arrow Shape
 
-struct Triangle: Shape {
+struct ArrowShape: Shape {
     func path(in rect: CGRect) -> Path {
+        let w = rect.width
+        let h = rect.height
         var path = Path()
-        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        // Rounded arrow pointing up
+        path.move(to: CGPoint(x: w / 2, y: 0))
+        path.addQuadCurve(
+            to: CGPoint(x: w, y: h * 0.75),
+            control: CGPoint(x: w * 0.85, y: h * 0.25)
+        )
+        path.addQuadCurve(
+            to: CGPoint(x: w / 2, y: h * 0.55),
+            control: CGPoint(x: w * 0.7, y: h * 0.7)
+        )
+        path.addQuadCurve(
+            to: CGPoint(x: 0, y: h * 0.75),
+            control: CGPoint(x: w * 0.3, y: h * 0.7)
+        )
+        path.addQuadCurve(
+            to: CGPoint(x: w / 2, y: 0),
+            control: CGPoint(x: w * 0.15, y: h * 0.25)
+        )
         path.closeSubpath()
         return path
     }
