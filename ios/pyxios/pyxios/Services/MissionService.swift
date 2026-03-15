@@ -40,7 +40,7 @@ final class MissionService {
 
     // MARK: - Mission Upload
 
-    func uploadMission(waypoints: [Waypoint], statusCallback: @escaping (String) -> Void, completion: @escaping (Bool) -> Void) {
+    func uploadMission(waypoints: [Waypoint], repeatFromWaypoint: Int = 0, repeatCount: Int = 0, statusCallback: @escaping (String) -> Void, completion: @escaping (Bool) -> Void) {
         guard let drone else {
             missionUploadStatus = "No drone connected"
             completion(false)
@@ -73,7 +73,8 @@ final class MissionService {
 
             // Drain again before starting upload
             drone.drainMissionQueue()
-            let totalCount = UInt16(waypoints.count + 1)  // +1 for home at seq 0
+            let hasDoJump = repeatCount != 0 && repeatFromWaypoint > 0 && repeatFromWaypoint <= waypoints.count
+            let totalCount = UInt16(waypoints.count + 1 + (hasDoJump ? 1 : 0))  // +1 home, +1 optional DO_JUMP
             drone.sendMissionCount(totalCount)
 
             DispatchQueue.main.async {
@@ -128,6 +129,15 @@ final class MissionService {
                     } else if seq <= waypoints.count {
                         let wp = waypoints[Int(seq) - 1]
                         self.sendMissionItem(drone: drone, seq: seq, waypoint: wp)
+                    } else if hasDoJump && seq == UInt16(waypoints.count + 1) {
+                        // DO_JUMP: jump back to repeatFromWaypoint (seq = wp index since home is seq 0)
+                        drone.sendMissionItemInt(
+                            seq: seq,
+                            frame: 2,   // MAV_FRAME_MISSION
+                            command: 177,  // MAV_CMD_DO_JUMP
+                            param1: Float(repeatFromWaypoint),  // target seq (1-based = matches our wp index)
+                            param2: Float(repeatCount)  // repeat count (-1 = infinite)
+                        )
                     }
 
                 default:
@@ -224,16 +234,16 @@ final class MissionService {
 
     // MARK: - Mission Download
 
-    func downloadMission(statusCallback: @escaping (String) -> Void, completion: @escaping ([Waypoint]?) -> Void) {
+    func downloadMission(statusCallback: @escaping (String) -> Void, completion: @escaping ([Waypoint]?, _ repeatFrom: Int, _ repeatCount: Int) -> Void) {
         guard let drone else {
             statusCallback("No drone connected")
-            completion(nil)
+            completion(nil, 0, 0)
             return
         }
 
         guard !isMissionUploading else {
             statusCallback("Upload in progress")
-            completion(nil)
+            completion(nil, 0, 0)
             return
         }
 
@@ -252,7 +262,7 @@ final class MissionService {
                 DispatchQueue.main.async {
                     self.isMissionDownloading = false
                     statusCallback("Mission download timeout")
-                    completion(nil)
+                    completion(nil, 0, 0)
                 }
                 return
             }
@@ -262,7 +272,7 @@ final class MissionService {
                 DispatchQueue.main.async {
                     self.isMissionDownloading = false
                     statusCallback("No mission on drone")
-                    completion([])
+                    completion([], 0, 0)
                 }
                 return
             }
@@ -277,7 +287,7 @@ final class MissionService {
                     DispatchQueue.main.async {
                         self.isMissionDownloading = false
                         statusCallback("Download failed at item \(seq)")
-                        completion(nil)
+                        completion(nil, 0, 0)
                     }
                     return
                 }
@@ -288,9 +298,18 @@ final class MissionService {
             // Send ACK
             drone.sendMissionAck(type: 0)
 
-            // Convert to Waypoints, skipping seq 0 (home position)
+            // Convert to Waypoints, skipping seq 0 (home) and DO_JUMP items
             var waypoints: [Waypoint] = []
+            var dlRepeatFrom = 0
+            var dlRepeatCount = 0
             for item in items where item.seq > 0 {
+                // DO_JUMP (177): extract repeat info, don't add as waypoint
+                if item.command == 177 {
+                    dlRepeatFrom = Int(item.param1)
+                    dlRepeatCount = Int(item.param2)
+                    continue
+                }
+
                 let lat = Double(item.x) / 1e7
                 let lon = Double(item.y) / 1e7
                 let coord = CLLocationCoordinate2D(latitude: lat, longitude: lon)
@@ -305,10 +324,13 @@ final class MissionService {
                 waypoints.append(wp)
             }
 
+            let repeatFrom = dlRepeatFrom
+            let repeatCt = dlRepeatCount
+
             DispatchQueue.main.async {
                 self.isMissionDownloading = false
                 statusCallback("Downloaded \(waypoints.count) waypoints")
-                completion(waypoints)
+                completion(waypoints, repeatFrom, repeatCt)
             }
         }
     }

@@ -141,8 +141,16 @@ struct FlightHUD: View {
                 HStack(spacing: 4) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 10))
-                    Text("NO LINK")
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    if let since = state.linkLostSince {
+                        TimelineView(.periodic(from: .now, by: 1)) { context in
+                            let elapsed = Int(context.date.timeIntervalSince(since))
+                            Text("NO LINK \(elapsed)s")
+                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        }
+                    } else {
+                        Text("NO LINK")
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    }
                 }
                 .foregroundStyle(.white)
             } else {

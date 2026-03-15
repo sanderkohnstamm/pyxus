@@ -71,7 +71,8 @@ final class ParameterService {
             floatVal = value
             intVal = nil
         } else {
-            intVal = Int32(bitPattern: value.bitPattern)
+            // Integer params: value is the float representation of the integer (e.g. 1500 → 1500.0)
+            intVal = Int32(value)
             displayValue = "\(intVal!)"
             floatVal = nil
         }

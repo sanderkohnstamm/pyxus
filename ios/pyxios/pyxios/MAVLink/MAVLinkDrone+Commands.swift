@@ -140,4 +140,35 @@ extension MAVLinkDrone {
         // MAV_CMD_DO_FENCE_ENABLE = 207
         sendCommandLong(command: 207, param1: enabled ? 1 : 0)
     }
+
+    // MARK: - Logs
+
+    /// Request list of available logs. Vehicle responds with LOG_ENTRY messages.
+    func sendLogRequestList(start: UInt16 = 0, end: UInt16 = 0xFFFF) {
+        var msg = MsgLogRequestList()
+        msg.target_system = targetSystem
+        msg.target_component = targetComponent
+        msg.start = start
+        msg.end = end
+        connection.sendMessage(id: MsgLogRequestList.id, payload: msg.encode())
+    }
+
+    /// Request log data chunk.
+    func sendLogRequestData(logID: UInt16, offset: UInt32, count: UInt32) {
+        var msg = MsgLogRequestData()
+        msg.target_system = targetSystem
+        msg.target_component = targetComponent
+        msg.id = logID
+        msg.ofs = offset
+        msg.count = count
+        connection.sendMessage(id: MsgLogRequestData.id, payload: msg.encode())
+    }
+
+    /// End log transfer session.
+    func sendLogRequestEnd() {
+        var msg = MsgLogRequestEnd()
+        msg.target_system = targetSystem
+        msg.target_component = targetComponent
+        connection.sendMessage(id: MsgLogRequestEnd.id, payload: msg.encode())
+    }
 }

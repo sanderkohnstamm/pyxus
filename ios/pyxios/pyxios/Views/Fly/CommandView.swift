@@ -14,7 +14,6 @@ struct CommandView: View {
     var switchTab: ((AppTab) -> Void)?
     @Binding var showJoysticks: Bool
     @State private var showConnectSheet = false
-    @State private var wasConnected = false
     @State private var showConsole = false
     @State private var isLandscape = false
     @State private var savedMissions: [SavedMission] = []
@@ -36,7 +35,10 @@ struct CommandView: View {
     ]
 
     private var isConnected: Bool { droneManager.state.connectionState.isConnected }
-    private var connectionLost: Bool { wasConnected && !isConnected }
+    private var connectionLost: Bool {
+        if case .error = droneManager.state.connectionState { return true }
+        return false
+    }
     private var showHUD: Bool { isConnected || connectionLost }
     private var isManualMode: Bool { Self.manualModes.contains(droneManager.state.flightMode) }
 
@@ -60,12 +62,8 @@ struct CommandView: View {
             )
             .ignoresSafeArea(edges: .top)
 
-            // Top: link-lost banner + HUD + hamburger + alerts
+            // Top: HUD + hamburger + alerts
             VStack(spacing: 0) {
-                if let since = droneManager.state.linkLostSince {
-                    LinkLostBanner(since: since)
-                }
-
                 // Thin param loading bar
                 if droneManager.paramService.isLoadingParams {
                     ProgressView(value: droneManager.paramService.paramLoadProgress)
@@ -184,6 +182,16 @@ struct CommandView: View {
                     MiniVideoView(videoManager: videoManager)
                         .onTapGesture { switchTab?(.video) }
                 }
+                .onAppear {
+                    // For non-RTSP preset URLs, ensure AVPlayer is playing
+                    if !videoManager.isPlaying {
+                        let settings = AppSettings.shared
+                        if settings.videoSource == .preset, !settings.videoStreamURL.isEmpty,
+                           !settings.videoStreamURL.lowercased().hasPrefix("rtsp://") {
+                            videoManager.play(urlString: settings.videoStreamURL)
+                        }
+                    }
+                }
             }
         }
         .sheet(isPresented: $showConnectSheet) {
@@ -221,13 +229,9 @@ struct CommandView: View {
             }
         }
         .onChange(of: isConnected) { _, connected in
-            if connected {
-                wasConnected = true
-            } else {
-                if showJoysticks {
-                    showJoysticks = false
-                    droneManager.stopManualControl()
-                }
+            if !connected && showJoysticks {
+                showJoysticks = false
+                droneManager.stopManualControl()
             }
         }
         .onChange(of: droneManager.missionService.downloadedMission) { _, newMission in
@@ -371,7 +375,7 @@ struct CommandView: View {
                     Divider()
                 }
                 Button {
-                    droneManager.downloadMission { waypoints in
+                    droneManager.downloadMission { waypoints, _, _ in
                         activeMission = waypoints ?? []
                     }
                 } label: {
@@ -570,31 +574,6 @@ struct CommandView: View {
             .padding(.vertical, 4)
             .background(.ultraThinMaterial)
             .clipShape(Capsule())
-    }
-}
-
-// MARK: - Link Lost Banner
-
-struct LinkLostBanner: View {
-    let since: Date
-
-    var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            let elapsed = Int(context.date.timeIntervalSince(since))
-            HStack(spacing: 8) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                Text("LINK LOST")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                Text("\(elapsed)s")
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.8))
-            }
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .background(.red.gradient)
-        }
     }
 }
 

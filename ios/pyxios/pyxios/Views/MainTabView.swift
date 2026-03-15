@@ -23,17 +23,19 @@ struct MainTabView: View {
     @State private var showJoysticks = false
 
     var body: some View {
-        Group {
-            switch selectedTab {
-            case .command:
-                CommandView(droneManager: droneManager, switchTab: { selectedTab = $0 }, showJoysticks: $showJoysticks)
-            case .video:
-                VideoView(droneManager: droneManager, switchTab: { selectedTab = $0 }, showJoysticks: $showJoysticks)
-            case .plan:
-                PlanView(droneManager: droneManager, switchTab: { selectedTab = $0 })
-            case .tools:
-                ToolsView(droneManager: droneManager, switchTab: { selectedTab = $0 })
-            }
+        ZStack {
+            CommandView(droneManager: droneManager, switchTab: { selectedTab = $0 }, showJoysticks: $showJoysticks)
+                .opacity(selectedTab == .command ? 1 : 0)
+                .allowsHitTesting(selectedTab == .command)
+            VideoView(droneManager: droneManager, switchTab: { selectedTab = $0 }, showJoysticks: $showJoysticks)
+                .opacity(selectedTab == .video ? 1 : 0)
+                .allowsHitTesting(selectedTab == .video)
+            PlanView(droneManager: droneManager, switchTab: { selectedTab = $0 })
+                .opacity(selectedTab == .plan ? 1 : 0)
+                .allowsHitTesting(selectedTab == .plan)
+            ToolsView(droneManager: droneManager, switchTab: { selectedTab = $0 })
+                .opacity(selectedTab == .tools ? 1 : 0)
+                .allowsHitTesting(selectedTab == .tools)
         }
     }
 }

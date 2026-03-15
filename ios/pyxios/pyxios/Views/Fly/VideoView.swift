@@ -30,29 +30,26 @@ struct VideoView: View {
         ZStack {
             // Full-screen video or camera feed
             Color.black.ignoresSafeArea()
-            if let player = videoManager.player, videoManager.isPlaying {
-                VideoPlayerView(player: player)
-                    .ignoresSafeArea()
-            } else if settings.useCameraFeed {
+            switch settings.videoSource {
+            case .preset:
+                videoContent(url: settings.videoStreamURL, placeholder: "No stream — check RTSP URL in Settings")
+            case .mavlink:
+                // MAVLink auto-discovery uses AVPlayer via VideoPlayerManager
+                if let player = videoManager.player, videoManager.isPlaying {
+                    VideoPlayerView(player: player)
+                        .ignoresSafeArea()
+                } else {
+                    videoPlaceholder("Waiting for drone camera...")
+                }
+            case .deviceCamera:
                 CameraFeedView()
                     .ignoresSafeArea()
-            } else {
-                VStack(spacing: 12) {
-                    Image(systemName: "video.slash")
-                        .font(.system(size: 40))
-                        .foregroundStyle(.gray.opacity(0.5))
-                    Text("No video feed")
-                        .font(.callout)
-                        .foregroundStyle(.gray.opacity(0.5))
-                }
+            case .off:
+                videoPlaceholder("Video off — change in Settings")
             }
 
             // Top: HUD + hamburger
             VStack(spacing: 0) {
-                if let since = droneManager.state.linkLostSince {
-                    LinkLostBanner(since: since)
-                }
-
                 // Thin param loading bar
                 if droneManager.paramService.isLoadingParams {
                     ProgressView(value: droneManager.paramService.paramLoadProgress)
@@ -167,6 +164,42 @@ struct VideoView: View {
             Button("Cancel", role: .cancel) { pendingTab = nil }
         } message: {
             Text("You are sending manual control input. Leaving this view will stop stick input and the drone may fall out of the sky.")
+        }
+    }
+
+    // MARK: - Video Helpers
+
+    /// Shows VLC for RTSP, AVPlayer for HTTP/HLS, or placeholder if empty.
+    @ViewBuilder
+    private func videoContent(url: String, placeholder: String) -> some View {
+        if url.isEmpty {
+            videoPlaceholder(placeholder)
+        } else if url.lowercased().hasPrefix("rtsp://") {
+            VLCVideoView(url: url)
+                .ignoresSafeArea()
+        } else if let player = videoManager.player, videoManager.isPlaying {
+            VideoPlayerView(player: player)
+                .ignoresSafeArea()
+        } else {
+            videoPlaceholder(placeholder)
+        }
+    }
+
+    private func videoPlaceholder(_ text: String) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: "video.slash")
+                .font(.system(size: 40))
+                .foregroundStyle(.gray.opacity(0.5))
+            Text(text)
+                .font(.callout)
+                .foregroundStyle(.gray.opacity(0.5))
+            if !videoManager.errorMessage.isEmpty {
+                Text(videoManager.errorMessage)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.red.opacity(0.7))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+            }
         }
     }
 
@@ -408,10 +441,15 @@ struct MiniVideoView: View {
 
     var body: some View {
         Group {
-            if let player = videoManager.player, videoManager.isPlaying {
-                VideoPlayerView(player: player)
-            } else if settings.useCameraFeed {
+            if settings.videoSource == .deviceCamera {
                 CameraFeedView()
+            } else if settings.videoSource == .preset,
+                      !settings.videoStreamURL.isEmpty,
+                      settings.videoStreamURL.lowercased().hasPrefix("rtsp://") {
+                // RTSP via VLC — same URL as main video view
+                VLCVideoView(url: settings.videoStreamURL)
+            } else if let player = videoManager.player, videoManager.isPlaying {
+                VideoPlayerView(player: player)
             } else {
                 ZStack {
                     Color.black

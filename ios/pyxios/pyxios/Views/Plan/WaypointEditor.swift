@@ -3,6 +3,7 @@
 //  pyxios
 //
 //  Inline editor for a single waypoint shown as overlay on map.
+//  Responsive: compact on iPhone, comfortable on iPad.
 //
 
 import SwiftUI
@@ -14,17 +15,24 @@ struct WaypointEditor: View {
     var onDelete: () -> Void
     var onDismiss: () -> Void
 
+    @Environment(\.horizontalSizeClass) private var hSizeClass
+    private var isCompact: Bool { hSizeClass == .compact }
+
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: isCompact ? 8 : 10) {
             // Header
             HStack {
                 Image(systemName: waypoint.action.icon)
                     .foregroundStyle(waypoint.action.markerColor)
-                Text("Waypoint \(index + 1)")
+                Text("WP \(index + 1)")
                     .font(.headline)
                 Spacer()
+                Text(String(format: "%.5f, %.5f", waypoint.latitude, waypoint.longitude))
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.secondary)
                 Button { onDelete() } label: {
                     Image(systemName: "trash")
+                        .font(.subheadline)
                         .foregroundStyle(.red)
                 }
                 Button { onDismiss() } label: {
@@ -34,27 +42,21 @@ struct WaypointEditor: View {
                 }
             }
 
-            // Coordinates
-            Text(String(format: "%.6f, %.6f", waypoint.latitude, waypoint.longitude))
-                .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            // Type picker — full width, scrollable
+            // Type picker — scrollable chips
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
+                HStack(spacing: 5) {
                     ForEach(Waypoint.WaypointAction.allCases, id: \.self) { action in
                         Button {
                             waypoint.action = action
                         } label: {
-                            HStack(spacing: 4) {
+                            HStack(spacing: 3) {
                                 Image(systemName: action.icon)
-                                    .font(.system(size: 10))
+                                    .font(.system(size: 9))
                                 Text(action.rawValue)
-                                    .font(.caption2)
+                                    .font(.system(size: 10, weight: .medium))
                             }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 6)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 5)
                             .background(waypoint.action == action ? action.markerColor : Color(.systemGray5))
                             .foregroundStyle(waypoint.action == action ? .white : .primary)
                             .clipShape(Capsule())
@@ -63,36 +65,63 @@ struct WaypointEditor: View {
                 }
             }
 
-            // Parameters row
-            HStack(spacing: 10) {
-                paramField(label: "Alt (m)", value: $waypoint.altitude)
-                paramField(label: "Speed (m/s)", value: $waypoint.speed)
+            // Parameters — adaptive grid
+            let showRadius = waypoint.action == .loiter || waypoint.action == .loiterTurns
+            let showTime = waypoint.action == .loiter
 
-                if waypoint.action == .loiter || waypoint.action == .loiterTurns {
-                    paramField(label: "Radius (m)", value: $waypoint.loiterRadius)
-                }
-                if waypoint.action == .loiter {
-                    paramField(label: "Time (s)", value: $waypoint.loiterTime)
-                }
-            }
-
-            // Advanced row
-            HStack(spacing: 10) {
-                // Camera action
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Camera").font(.caption2).foregroundStyle(.secondary)
-                    Picker("", selection: $waypoint.cameraAction) {
-                        ForEach(Waypoint.CameraAction.allCases, id: \.self) { ca in
-                            Text(ca.rawValue).tag(ca)
-                        }
+            if isCompact {
+                // iPhone: 2-column grid
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
+                    paramField(label: "Alt (m)", value: $waypoint.altitude)
+                    paramField(label: "Speed (m/s)", value: $waypoint.speed)
+                    if showRadius {
+                        paramField(label: "Radius (m)", value: $waypoint.loiterRadius)
                     }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .tint(.primary)
+                    if showTime {
+                        paramField(label: "Time (s)", value: $waypoint.loiterTime)
+                    }
+                    paramField(label: "Yaw (°)", value: $waypoint.yawAngle)
+                    // Camera
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Camera").font(.system(size: 10)).foregroundStyle(.secondary)
+                        Picker("", selection: $waypoint.cameraAction) {
+                            ForEach(Waypoint.CameraAction.allCases, id: \.self) { ca in
+                                Text(ca.rawValue).tag(ca)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .tint(.primary)
+                        .font(.system(size: 12))
+                    }
                 }
+            } else {
+                // iPad: single row of params, then advanced row
+                HStack(spacing: 10) {
+                    paramField(label: "Alt (m)", value: $waypoint.altitude)
+                    paramField(label: "Speed (m/s)", value: $waypoint.speed)
+                    if showRadius {
+                        paramField(label: "Radius (m)", value: $waypoint.loiterRadius)
+                    }
+                    if showTime {
+                        paramField(label: "Time (s)", value: $waypoint.loiterTime)
+                    }
+                    paramField(label: "Yaw (°)", value: $waypoint.yawAngle)
+                    paramField(label: "Accept (m)", value: $waypoint.acceptRadius)
 
-                paramField(label: "Yaw (°)", value: $waypoint.yawAngle)
-                paramField(label: "Accept (m)", value: $waypoint.acceptRadius)
+                    // Camera
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Camera").font(.caption2).foregroundStyle(.secondary)
+                        Picker("", selection: $waypoint.cameraAction) {
+                            ForEach(Waypoint.CameraAction.allCases, id: \.self) { ca in
+                                Text(ca.rawValue).tag(ca)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .tint(.primary)
+                    }
+                }
             }
         }
         .onDisappear { clampValues() }
@@ -100,11 +129,12 @@ struct WaypointEditor: View {
 
     private func paramField(label: String, value: Binding<Float>) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(label).font(.caption2).foregroundStyle(.secondary)
+            Text(label).font(.system(size: 10)).foregroundStyle(.secondary)
             TextField("0", value: value, format: .number)
                 .keyboardType(.decimalPad)
-                .font(.system(.callout, design: .monospaced))
-                .padding(6)
+                .font(.system(size: isCompact ? 13 : 14, design: .monospaced))
+                .padding(.horizontal, 6)
+                .padding(.vertical, isCompact ? 5 : 6)
                 .background(Color(.systemGray6))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
         }

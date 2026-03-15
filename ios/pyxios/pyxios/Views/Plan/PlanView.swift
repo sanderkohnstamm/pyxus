@@ -162,6 +162,7 @@ struct PlanView: View {
                         .padding()
                         .background(.ultraThinMaterial)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .frame(maxWidth: 480)
                         .padding(.horizontal)
                         .padding(.bottom, 60)
                     }
@@ -202,14 +203,20 @@ struct PlanView: View {
                         if droneManager.state.connectionState.isConnected {
                             Divider()
                             Button("Upload to Drone", systemImage: "arrow.up.doc") {
-                                droneManager.uploadMission(waypoints: flightPlan.waypoints) { _ in }
+                                droneManager.uploadMission(
+                                    waypoints: flightPlan.waypoints,
+                                    repeatFromWaypoint: flightPlan.repeatFromWaypoint,
+                                    repeatCount: flightPlan.repeatCount
+                                ) { _ in }
                             }
                             .disabled(flightPlan.waypoints.isEmpty)
 
                             Button("Download from Drone", systemImage: "arrow.down.doc") {
-                                droneManager.downloadMission { waypoints in
+                                droneManager.downloadMission { waypoints, repeatFrom, repeatCt in
                                     if let waypoints {
                                         flightPlan.waypoints = waypoints
+                                        flightPlan.repeatFromWaypoint = repeatFrom
+                                        flightPlan.repeatCount = repeatCt
                                     }
                                 }
                             }
@@ -426,6 +433,43 @@ struct PlanView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Capsule())
+                }
+            }
+
+            // Repeat control
+            if !flightPlan.waypoints.isEmpty {
+                Menu {
+                    Button("Off") {
+                        flightPlan.repeatFromWaypoint = 0
+                        flightPlan.repeatCount = 0
+                    }
+                    Divider()
+                    ForEach(1...max(1, flightPlan.waypoints.count), id: \.self) { wp in
+                        Menu("From WP \(wp)") {
+                            Button("1x") { flightPlan.repeatFromWaypoint = wp; flightPlan.repeatCount = 1 }
+                            Button("2x") { flightPlan.repeatFromWaypoint = wp; flightPlan.repeatCount = 2 }
+                            Button("3x") { flightPlan.repeatFromWaypoint = wp; flightPlan.repeatCount = 3 }
+                            Button("5x") { flightPlan.repeatFromWaypoint = wp; flightPlan.repeatCount = 5 }
+                            Button("10x") { flightPlan.repeatFromWaypoint = wp; flightPlan.repeatCount = 10 }
+                            Button("Infinite") { flightPlan.repeatFromWaypoint = wp; flightPlan.repeatCount = -1 }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: flightPlan.repeatCount != 0 ? "repeat.circle.fill" : "repeat")
+                            .font(.caption)
+                        if flightPlan.repeatCount != 0 {
+                            let countStr = flightPlan.repeatCount == -1 ? "∞" : "\(flightPlan.repeatCount)x"
+                            Text("WP\(flightPlan.repeatFromWaypoint) \(countStr)")
+                                .font(.system(.caption2, design: .monospaced))
+                        }
+                    }
+                    .foregroundStyle(flightPlan.repeatCount != 0 ? .cyan : .white.opacity(0.7))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(flightPlan.repeatCount != 0 ? Color.cyan.opacity(0.15) : Color.clear)
                     .background(.ultraThinMaterial)
                     .clipShape(Capsule())
                 }

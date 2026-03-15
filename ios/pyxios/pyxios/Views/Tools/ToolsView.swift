@@ -276,29 +276,35 @@ struct SettingsView: View {
             }
 
             Section {
-                HStack {
-                    Label("Stream URL", systemImage: "video")
-                    Spacer()
-                    TextField("rtsp://...", text: Binding(
-                        get: { settings.videoStreamURL },
-                        set: { settings.videoStreamURL = $0 }
-                    ))
-                    .font(.system(.caption, design: .monospaced))
-                    .multilineTextAlignment(.trailing)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
+                Picker(selection: Binding(
+                    get: { settings.videoSource },
+                    set: { settings.videoSource = $0 }
+                )) {
+                    ForEach(VideoSource.allCases, id: \.self) { source in
+                        Text(source.description).tag(source)
+                    }
+                } label: {
+                    Label("Source", systemImage: "video")
                 }
 
-                Toggle(isOn: Binding(
-                    get: { settings.useCameraFeed },
-                    set: { settings.useCameraFeed = $0 }
-                )) {
-                    Label("Use Device Camera", systemImage: "camera")
+                if settings.videoSource == .preset {
+                    HStack {
+                        Label("URL", systemImage: "link")
+                        Spacer()
+                        TextField("rtsp://192.168.1.1:8554/video", text: Binding(
+                            get: { settings.videoStreamURL },
+                            set: { settings.videoStreamURL = $0 }
+                        ))
+                        .font(.system(.caption, design: .monospaced))
+                        .multilineTextAlignment(.trailing)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                    }
                 }
             } header: {
                 Label("Video", systemImage: "play.rectangle")
             } footer: {
-                Text("Stream URL for RTSP video feed. Device camera is for testing without a drone.")
+                Text(settings.videoSource.detail)
             }
 
             Section {

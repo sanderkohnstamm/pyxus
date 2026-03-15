@@ -70,6 +70,12 @@ final class DroneManager {
     var statusMessages: [StatusMessage] = []
     var logEntries: [LogEntry] = []
     var isLoadingLogs = false
+    var logDownloadProgress: [Int: Float] = [:]  // logID → 0..1 progress
+    var logDownloadingID: Int? = nil
+    private var logDownloadBuffer: Data = Data()
+    private var logDownloadSize: Int = 0
+    private var logDownloadLogID: UInt16 = 0
+    private var logDownloadTimeout: Timer?
 
     // Manual control state (normalized -1..1, throttle 0..1)
     var manualControlActive = false
@@ -117,6 +123,13 @@ final class DroneManager {
                     guard let self, self.state.connectionState.isConnected else { return }
                     self.fetchAllParams()
                 }
+                // Auto-play preset HTTP/HLS URL if configured (RTSP is handled by VLC in the view)
+                if AppSettings.shared.videoSource == .preset {
+                    let url = AppSettings.shared.videoStreamURL
+                    if !url.isEmpty, !url.lowercased().hasPrefix("rtsp://") {
+                        VideoPlayerManager.shared.play(urlString: url)
+                    }
+                }
                 // Auto-discover camera after connection stabilizes
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
                     self?.cameraService.startDiscovery()
@@ -126,7 +139,7 @@ final class DroneManager {
                     guard let self, self.state.connectionState.isConnected else { return }
                     self.missionService.downloadMission(statusCallback: { [weak self] msg in
                         self?.statusMessage = msg
-                    }) { [weak self] waypoints in
+                    }) { [weak self] waypoints, _, _ in
                         if let waypoints, !waypoints.isEmpty {
                             self?.missionService.downloadedMission = waypoints
                         }
@@ -182,6 +195,39 @@ final class DroneManager {
 
         mav.onMagCalReport = { [weak self] compassId, status, fitness in
             self?.calibrationService.handleMagCalReport(compassId: compassId, status: status, fitness: fitness)
+        }
+
+        mav.onLogEntry = { [weak self] logId, numLogs, lastLogNum, timeUTC, size in
+            guard let self else { return }
+            let date: String
+            if timeUTC > 0 {
+                let d = Date(timeIntervalSince1970: TimeInterval(timeUTC))
+                let fmt = DateFormatter()
+                fmt.dateStyle = .medium
+                fmt.timeStyle = .short
+                date = fmt.string(from: d)
+            } else {
+                date = "Unknown date"
+            }
+            let entry = LogEntry(id: Int(logId), date: date, sizeBytes: Int(size))
+
+            // Avoid duplicates
+            if !self.logEntries.contains(where: { $0.id == entry.id }) {
+                self.logEntries.append(entry)
+                self.logEntries.sort { $0.id > $1.id }  // newest first
+            }
+
+            // Check if we've received all entries
+            if self.logEntries.count >= Int(numLogs) || logId == lastLogNum {
+                self.isLoadingLogs = false
+                self.statusMessage = "\(self.logEntries.count) logs found"
+            } else {
+                self.statusMessage = "Fetching logs... \(self.logEntries.count)/\(numLogs)"
+            }
+        }
+
+        mav.onLogData = { [weak self] logID, offset, count, data in
+            self?.handleLogData(logID: logID, offset: offset, count: count, data: data)
         }
 
         mav.onCameraMessage = { [weak self] msgID, payload in
@@ -297,6 +343,8 @@ final class DroneManager {
         statusMessage = "Disconnected"
         statusMessages = []
         logEntries = []
+
+        VideoPlayerManager.shared.stop()
 
         missionService.reset()
         paramService.reset()
@@ -440,7 +488,119 @@ final class DroneManager {
     // MARK: - Log Files
 
     func fetchLogEntries() {
-        statusMessage = "Log download not yet available via native MAVLink"
+        guard let drone, state.connectionState.isConnected else {
+            statusMessage = "Not connected"
+            return
+        }
+
+        isLoadingLogs = true
+        logEntries = []
+        statusMessage = "Fetching log list..."
+
+        drone.sendLogRequestList()
+
+        // Timeout: if no entries arrive within 5s, stop loading
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+            guard let self, self.isLoadingLogs else { return }
+            self.isLoadingLogs = false
+            if self.logEntries.isEmpty {
+                self.statusMessage = "No logs found on vehicle"
+            }
+        }
+    }
+
+    func downloadLog(entry: LogEntry) {
+        guard let drone, state.connectionState.isConnected else {
+            statusMessage = "Not connected"
+            return
+        }
+        guard logDownloadingID == nil else {
+            statusMessage = "Download already in progress"
+            return
+        }
+
+        let logID = UInt16(entry.id)
+        logDownloadingID = entry.id
+        logDownloadLogID = logID
+        logDownloadSize = entry.sizeBytes
+        logDownloadBuffer = Data()
+        logDownloadProgress[entry.id] = 0
+        statusMessage = "Downloading log #\(entry.id)..."
+
+        // Request first chunk (90 bytes per LOG_DATA)
+        let chunkSize: UInt32 = 512 * 90  // request ~45KB at a time
+        drone.sendLogRequestData(logID: logID, offset: 0, count: min(chunkSize, UInt32(entry.sizeBytes)))
+        resetLogDownloadTimeout()
+    }
+
+    private func handleLogData(logID: UInt16, offset: UInt32, count: UInt8, data: [UInt8]) {
+        guard logDownloadingID != nil, logID == logDownloadLogID else { return }
+
+        // Write data at offset
+        let neededSize = Int(offset) + Int(count)
+        if logDownloadBuffer.count < neededSize {
+            logDownloadBuffer.append(Data(repeating: 0, count: neededSize - logDownloadBuffer.count))
+        }
+        logDownloadBuffer.replaceSubrange(Int(offset)..<Int(offset) + Int(count), with: data)
+
+        // Update progress
+        let received = Int(offset) + Int(count)
+        let progress = logDownloadSize > 0 ? Float(received) / Float(logDownloadSize) : 0
+        logDownloadProgress[Int(logID)] = min(progress, 1)
+        statusMessage = "Log #\(logID): \(Int(progress * 100))%"
+
+        resetLogDownloadTimeout()
+
+        // Check if complete
+        if received >= logDownloadSize {
+            finishLogDownload(logID: Int(logID))
+        } else if count < 90 {
+            // Partial chunk = end of current request, request next chunk
+            let nextOffset = UInt32(received)
+            let remaining = UInt32(logDownloadSize) - nextOffset
+            let chunkSize: UInt32 = 512 * 90
+            drone?.sendLogRequestData(logID: logID, offset: nextOffset, count: min(chunkSize, remaining))
+        }
+    }
+
+    private func resetLogDownloadTimeout() {
+        logDownloadTimeout?.invalidate()
+        logDownloadTimeout = Timer.scheduledTimer(withTimeInterval: 10, repeats: false) { [weak self] _ in
+            guard let self, let id = self.logDownloadingID else { return }
+            self.statusMessage = "Log download timed out"
+            self.logDownloadProgress[id] = nil
+            self.logDownloadingID = nil
+            self.drone?.sendLogRequestEnd()
+        }
+    }
+
+    private func finishLogDownload(logID: Int) {
+        logDownloadTimeout?.invalidate()
+        logDownloadTimeout = nil
+        drone?.sendLogRequestEnd()
+
+        // Save to Documents
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let logsDir = docs.appendingPathComponent("Logs", isDirectory: true)
+        try? FileManager.default.createDirectory(at: logsDir, withIntermediateDirectories: true)
+        let file = logsDir.appendingPathComponent("log_\(logID).bin")
+        do {
+            try logDownloadBuffer.write(to: file)
+            logDownloadProgress[logID] = 1
+            statusMessage = "Log #\(logID) saved (\(logDownloadBuffer.count) bytes)"
+            HapticManager.shared.trigger(style: "success")
+        } catch {
+            statusMessage = "Failed to save log: \(error.localizedDescription)"
+            logDownloadProgress[logID] = nil
+        }
+        logDownloadingID = nil
+        logDownloadBuffer = Data()
+    }
+
+    func logFileURL(for logID: Int) -> URL? {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let file = docs.appendingPathComponent("Logs/log_\(logID).bin")
+        return FileManager.default.fileExists(atPath: file.path) ? file : nil
     }
 
     /// Available flight modes for the current vehicle/autopilot
@@ -484,6 +644,15 @@ final class DroneManager {
             handleStatusText(severity: result == 0 || result == 5 ? 6 : 4, text: text)
         }
 
+        if command == 183 {  // MAV_CMD_DO_SET_SERVO
+            if result == 0 {
+                statusMessage = "Servo set OK"
+            } else {
+                statusMessage = "Servo command failed (result=\(result))"
+                HapticManager.shared.trigger(style: "error")
+            }
+        }
+
         if command == 400 {
             if result == 0 {
                 statusMessage = state.armed ? "Armed" : "Disarmed"
@@ -497,14 +666,14 @@ final class DroneManager {
     // MARK: - Convenience Forwarding
 
     /// Upload mission via MissionService.
-    func uploadMission(waypoints: [Waypoint], completion: @escaping (Bool) -> Void) {
-        missionService.uploadMission(waypoints: waypoints, statusCallback: { [weak self] msg in
+    func uploadMission(waypoints: [Waypoint], repeatFromWaypoint: Int = 0, repeatCount: Int = 0, completion: @escaping (Bool) -> Void) {
+        missionService.uploadMission(waypoints: waypoints, repeatFromWaypoint: repeatFromWaypoint, repeatCount: repeatCount, statusCallback: { [weak self] msg in
             self?.statusMessage = msg
         }, completion: completion)
     }
 
     /// Download mission via MissionService.
-    func downloadMission(completion: @escaping ([Waypoint]?) -> Void) {
+    func downloadMission(completion: @escaping ([Waypoint]?, _ repeatFrom: Int, _ repeatCount: Int) -> Void) {
         missionService.downloadMission(statusCallback: { [weak self] msg in
             self?.statusMessage = msg
         }, completion: completion)
@@ -572,6 +741,7 @@ final class DroneManager {
     func servoSet(servo: Int, pwm: UInt16) {
         drone?.servoSet(servo: servo, pwm: pwm)
         statusMessage = "Servo \(servo) → \(pwm) µs"
+        HapticManager.shared.trigger(style: "success")
     }
 
     // MARK: - Calibration

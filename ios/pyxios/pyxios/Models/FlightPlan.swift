@@ -82,6 +82,13 @@ final class FlightPlan {
     var waypoints: [Waypoint] = []
     var name: String = "Untitled Mission"
 
+    /// Mission repeat: jump back to this waypoint index (1-based) after the last item.
+    /// 0 = no repeat.
+    var repeatFromWaypoint: Int = 0
+
+    /// How many times to repeat. 0 = no repeat, -1 = infinite.
+    var repeatCount: Int = 0
+
     private static let storageDir: URL = {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let dir = docs.appendingPathComponent("Missions", isDirectory: true)
@@ -106,13 +113,17 @@ final class FlightPlan {
 
     func clear() {
         waypoints.removeAll()
+        repeatFromWaypoint = 0
+        repeatCount = 0
     }
 
     // MARK: - Persistence
 
     func save(geofence: GeofenceData? = nil, polygonGeofence: PolygonGeofenceData? = nil) {
         let file = Self.storageDir.appendingPathComponent(sanitizedName + ".json")
-        let data = SavedMission(name: name, waypoints: waypoints, geofence: geofence, polygonGeofence: polygonGeofence)
+        let data = SavedMission(name: name, waypoints: waypoints, geofence: geofence, polygonGeofence: polygonGeofence,
+                                repeatFromWaypoint: repeatFromWaypoint > 0 ? repeatFromWaypoint : nil,
+                                repeatCount: repeatCount != 0 ? repeatCount : nil)
         if let encoded = try? JSONEncoder().encode(data) {
             try? encoded.write(to: file)
         }
@@ -121,6 +132,8 @@ final class FlightPlan {
     func load(from mission: SavedMission) {
         name = mission.name
         waypoints = mission.waypoints
+        repeatFromWaypoint = mission.repeatFromWaypoint ?? 0
+        repeatCount = mission.repeatCount ?? 0
     }
 
     static func savedMissions() -> [SavedMission] {
@@ -172,4 +185,6 @@ struct SavedMission: Codable, Identifiable {
     let waypoints: [Waypoint]
     var geofence: GeofenceData?
     var polygonGeofence: PolygonGeofenceData?
+    var repeatFromWaypoint: Int?
+    var repeatCount: Int?
 }

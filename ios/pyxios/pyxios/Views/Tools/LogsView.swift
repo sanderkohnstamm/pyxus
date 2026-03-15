@@ -2,13 +2,15 @@
 //  LogsView.swift
 //  pyxios
 //
-//  Log file list from vehicle via MAVSDK LogFiles plugin.
+//  Log file list with per-log download via MAVLink LOG protocol.
 //
 
 import SwiftUI
 
 struct LogsView: View {
     let droneManager: DroneManager
+    @State private var shareURL: URL?
+    @State private var showShareSheet = false
 
     var body: some View {
         Group {
@@ -34,21 +36,7 @@ struct LogsView: View {
                 }
             } else {
                 List(droneManager.logEntries) { entry in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Log #\(entry.id)")
-                                .font(.subheadline.bold())
-                            Text(entry.date)
-                                .font(.system(.caption, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-
-                        Text(formatBytes(entry.sizeBytes))
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                    }
+                    logRow(entry)
                 }
             }
         }
@@ -68,6 +56,61 @@ struct LogsView: View {
                 droneManager.fetchLogEntries()
             }
         }
+        .sheet(isPresented: $showShareSheet) {
+            if let url = shareURL {
+                ShareSheet(url: url)
+            }
+        }
+    }
+
+    // MARK: - Log Row
+
+    private func logRow(_ entry: LogEntry) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Log #\(entry.id)")
+                    .font(.subheadline.bold())
+                Text(entry.date)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Text(formatBytes(entry.sizeBytes))
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(.secondary)
+
+            // Download / progress / share
+            let progress = droneManager.logDownloadProgress[entry.id]
+            let isDownloading = droneManager.logDownloadingID == entry.id
+
+            if isDownloading, let p = progress {
+                ProgressView(value: p)
+                    .frame(width: 40)
+                    .tint(.cyan)
+            } else if let p = progress, p >= 1, droneManager.logFileURL(for: entry.id) != nil {
+                // Downloaded — share button
+                Button {
+                    shareURL = droneManager.logFileURL(for: entry.id)
+                    showShareSheet = true
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                        .foregroundStyle(.cyan)
+                }
+                .buttonStyle(.plain)
+            } else {
+                // Download button
+                Button {
+                    droneManager.downloadLog(entry: entry)
+                } label: {
+                    Image(systemName: "arrow.down.circle")
+                        .foregroundStyle(.cyan)
+                }
+                .buttonStyle(.plain)
+                .disabled(droneManager.logDownloadingID != nil)
+            }
+        }
     }
 
     private func formatBytes(_ bytes: Int) -> String {
@@ -75,4 +118,16 @@ struct LogsView: View {
         if bytes < 1024 * 1024 { return String(format: "%.1f KB", Double(bytes) / 1024) }
         return String(format: "%.1f MB", Double(bytes) / (1024 * 1024))
     }
+}
+
+// MARK: - Share Sheet
+
+struct ShareSheet: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

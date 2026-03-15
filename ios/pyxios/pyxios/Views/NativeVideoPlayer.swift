@@ -21,40 +21,144 @@ final class VideoPlayerManager {
 
     private init() {}
 
-    func play(urlString: String) {
-        guard let url = URL(string: urlString) else { return }
+    var errorMessage: String = ""
+    private var statusObserver: NSKeyValueObservation?
+    private var errorObserver: NSKeyValueObservation?
 
-        // Reuse player if same URL
-        if currentURL == urlString, let player = player {
-            player.play()
-            isPlaying = true
+    func play(urlString: String) {
+        print("[VideoPlayer] play() called with: \(urlString)")
+        guard let url = URL(string: urlString) else {
+            errorMessage = "Invalid URL: \(urlString)"
+            print("[VideoPlayer] Invalid URL: \(urlString)")
             return
         }
+
+        // Reuse player if same URL and player is ready
+        if currentURL == urlString, let player = player {
+            let itemStatus = player.currentItem?.status ?? .unknown
+            print("[VideoPlayer] Same URL, item status: \(itemStatus.rawValue) (0=unknown, 1=ready, 2=failed), timeControlStatus: \(player.timeControlStatus.rawValue)")
+            if itemStatus == .readyToPlay {
+                player.play()
+                isPlaying = true
+                return
+            }
+            // If unknown (still loading), just wait — don't recreate
+            if itemStatus == .unknown {
+                print("[VideoPlayer] Still loading, not recreating")
+                return
+            }
+            // If failed, fall through to recreate
+            print("[VideoPlayer] Previous player failed, recreating")
+        }
+
+        print("[VideoPlayer] Creating new player for: \(urlString)")
+        stop()
+        errorMessage = ""
 
         // Configure audio session for video playback
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
         try? AVAudioSession.sharedInstance().setActive(true)
 
-        let asset = AVURLAsset(url: url, options: [
-            "AVURLAssetHTTPHeaderFieldsKey": [:] as [String: String]
-        ])
+        // For RTSP: use networkAccessType .none to avoid HTTP-only options
+        let isRTSP = urlString.lowercased().hasPrefix("rtsp://")
+        print("[VideoPlayer] isRTSP: \(isRTSP), URL scheme: \(url.scheme ?? "nil")")
+        let asset: AVURLAsset
+        if isRTSP {
+            // RTSP streams: no HTTP headers, use default transport
+            asset = AVURLAsset(url: url)
+        } else {
+            asset = AVURLAsset(url: url, options: [
+                "AVURLAssetHTTPHeaderFieldsKey": [:] as [String: String]
+            ])
+        }
+        print("[VideoPlayer] Asset created: \(asset.url)")
+
         let item = AVPlayerItem(asset: asset)
+        item.preferredForwardBufferDuration = 1  // low latency
+        print("[VideoPlayer] PlayerItem created, status: \(item.status.rawValue)")
+
         let newPlayer = AVPlayer(playerItem: item)
         newPlayer.automaticallyWaitsToMinimizeStalling = false
+        print("[VideoPlayer] AVPlayer created, calling play()")
+
+        // Observe playback status for errors
+        statusObserver = item.observe(\.status, options: [.new]) { [weak self] item, _ in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                switch item.status {
+                case .failed:
+                    let underlying = (item.error as? NSError)?.localizedDescription ?? "Unknown error"
+                    self.errorMessage = underlying
+                    self.isPlaying = false
+                    self.currentURL = ""  // Allow retry
+                    print("[VideoPlayer] Failed: \(underlying)")
+                    if let err = item.error as? NSError {
+                        print("[VideoPlayer] Domain: \(err.domain) Code: \(err.code)")
+                        if let underlying = err.userInfo[NSUnderlyingErrorKey] as? NSError {
+                            print("[VideoPlayer] Underlying: \(underlying)")
+                        }
+                    }
+                case .readyToPlay:
+                    self.errorMessage = ""
+                    print("[VideoPlayer] Ready to play")
+                default:
+                    break
+                }
+            }
+        }
+
+        // Observe player error
+        errorObserver = newPlayer.observe(\.status, options: [.new]) { [weak self] player, _ in
+            if player.status == .failed, let error = player.error {
+                DispatchQueue.main.async {
+                    self?.errorMessage = error.localizedDescription
+                    self?.isPlaying = false
+                    print("[VideoPlayer] Player error: \(error)")
+                }
+            }
+        }
 
         self.player = newPlayer
         self.currentURL = urlString
         newPlayer.play()
         isPlaying = true
+        print("[VideoPlayer] play() called on AVPlayer, url: \(urlString)")
+
+        // Periodic status check for debugging
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self, weak newPlayer] in
+            guard let self, let p = newPlayer else { return }
+            let item = p.currentItem
+            print("[VideoPlayer] +2s check — item.status: \(item?.status.rawValue ?? -1), timeControl: \(p.timeControlStatus.rawValue), rate: \(p.rate), error: \(item?.error?.localizedDescription ?? "none")")
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self, weak newPlayer] in
+            guard let self, let p = newPlayer else { return }
+            let item = p.currentItem
+            print("[VideoPlayer] +5s check — item.status: \(item?.status.rawValue ?? -1), timeControl: \(p.timeControlStatus.rawValue), rate: \(p.rate), error: \(item?.error?.localizedDescription ?? "none")")
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self, weak newPlayer] in
+            guard let self, let p = newPlayer else { return }
+            let item = p.currentItem
+            print("[VideoPlayer] +10s check — item.status: \(item?.status.rawValue ?? -1), timeControl: \(p.timeControlStatus.rawValue), rate: \(p.rate), error: \(item?.error?.localizedDescription ?? "none")")
+            if item?.status == .unknown {
+                self.errorMessage = "Stream timeout — could not connect"
+                print("[VideoPlayer] Timeout: still in .unknown after 10s")
+            }
+        }
     }
 
     func stop() {
+        print("[VideoPlayer] stop() called, was playing: \(currentURL)")
+        statusObserver?.invalidate()
+        statusObserver = nil
+        errorObserver?.invalidate()
+        errorObserver = nil
         player?.pause()
         player?.replaceCurrentItem(with: nil)
         player = nil
         isPlaying = false
         isFullscreen = false
         currentURL = ""
+        errorMessage = ""
     }
 
     func toggleFullscreen() {

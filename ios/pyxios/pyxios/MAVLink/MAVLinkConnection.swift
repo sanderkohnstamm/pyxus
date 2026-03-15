@@ -135,10 +135,15 @@ final class MAVLinkConnection: @unchecked Sendable {
     func disconnect() {
         heartbeatTimer?.cancel()
         heartbeatTimer = nil
-        connection?.cancel()
+        // Cancel asynchronously to avoid blocking the main thread
+        let conn = connection
+        let list = listener
         connection = nil
-        listener?.cancel()
         listener = nil
+        queue.async {
+            conn?.cancel()
+            list?.cancel()
+        }
         parser.reset()
         state = .idle
     }

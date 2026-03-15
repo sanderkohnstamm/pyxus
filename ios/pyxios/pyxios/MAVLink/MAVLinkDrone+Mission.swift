@@ -92,17 +92,20 @@ extension MAVLinkDrone {
         let result = missionSemaphore.wait(timeout: .now() + timeout)
         guard result == .success else { return nil }
         missionLock.lock()
+        defer { missionLock.unlock() }
         let msg = missionQueue.isEmpty ? nil : missionQueue.removeFirst()
-        missionLock.unlock()
         return msg
     }
 
     /// Clear any stale mission messages from the queue.
     func drainMissionQueue() {
         missionLock.lock()
+        defer { missionLock.unlock() }
         missionQueue.removeAll()
-        missionLock.unlock()
-        // Drain semaphore
-        while missionSemaphore.wait(timeout: .now()) == .success {}
+        // Drain semaphore (with spin guard)
+        var drained = 0
+        while drained < 1000, missionSemaphore.wait(timeout: .now()) == .success {
+            drained += 1
+        }
     }
 }

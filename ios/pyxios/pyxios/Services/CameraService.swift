@@ -237,10 +237,13 @@ final class CameraService {
             streams.append(stream)
         }
 
-        // Auto-connect to first RTSP stream if VideoPlayerManager isn't playing
-        if streams.count == 1, !stream.uri.isEmpty {
+        // Auto-connect to first RTSP stream if video source is set to MAVLink
+        print("[CameraService] Stream discovered: uri='\(stream.uri)', source=\(AppSettings.shared.videoSource)")
+        if streams.count == 1, !stream.uri.isEmpty,
+           AppSettings.shared.videoSource == .mavlink {
             let videoManager = VideoPlayerManager.shared
             if !videoManager.isPlaying {
+                print("[CameraService] Auto-playing MAVLink stream: \(stream.uri)")
                 videoManager.play(urlString: stream.uri)
                 statusMessage = "Streaming: \(stream.resolution) \(stream.encodingName)"
             }

@@ -63,6 +63,31 @@ enum ThrottleCenter: String, CaseIterable {
     }
 }
 
+enum VideoSource: String, CaseIterable {
+    case off             // No video feed
+    case preset          // Manual RTSP URL from settings
+    case mavlink         // Auto-discover from drone via MAVLink camera protocol
+    case deviceCamera    // iOS device camera (testing)
+
+    var description: String {
+        switch self {
+        case .off: return "Off"
+        case .preset: return "Preset RTSP URL"
+        case .mavlink: return "MAVLink Camera"
+        case .deviceCamera: return "Device Camera"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .off: return "No video feed"
+        case .preset: return "Use the RTSP URL configured below"
+        case .mavlink: return "Auto-discover stream from drone"
+        case .deviceCamera: return "Use iPhone camera for testing"
+        }
+    }
+}
+
 enum MapType: String, CaseIterable {
     case satellite, standard, hybrid
 
@@ -110,8 +135,8 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(connectionHistory, forKey: "connectionHistory") }
     }
 
-    var useCameraFeed: Bool {
-        didSet { UserDefaults.standard.set(useCameraFeed, forKey: "useCameraFeed") }
+    var videoSource: VideoSource {
+        didSet { UserDefaults.standard.set(videoSource.rawValue, forKey: "videoSource") }
     }
 
     var defaultTakeoffAltitude: Float {
@@ -166,7 +191,14 @@ final class AppSettings {
 
         lastConnectionAddress = UserDefaults.standard.string(forKey: "lastConnectionAddress") ?? "udp://0.0.0.0:14550"
         connectionHistory = UserDefaults.standard.stringArray(forKey: "connectionHistory") ?? ["udp://0.0.0.0:14550", "tcp://127.0.0.1:5760"]
-        useCameraFeed = UserDefaults.standard.bool(forKey: "useCameraFeed")
+        // Migrate from old useCameraFeed boolean
+        if let sourceRaw = UserDefaults.standard.string(forKey: "videoSource") {
+            videoSource = VideoSource(rawValue: sourceRaw) ?? .mavlink
+        } else if UserDefaults.standard.bool(forKey: "useCameraFeed") {
+            videoSource = .deviceCamera
+        } else {
+            videoSource = .mavlink
+        }
 
         let altVal = UserDefaults.standard.float(forKey: "defaultTakeoffAltitude")
         defaultTakeoffAltitude = altVal > 0 ? altVal : 10

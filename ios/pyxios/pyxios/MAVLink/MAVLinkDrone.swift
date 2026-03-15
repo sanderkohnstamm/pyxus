@@ -65,6 +65,8 @@ final class MAVLinkDrone {
     var onMagCalProgress: ((UInt8, UInt8, UInt8, UInt8) -> Void)?  // (compassId, calMask, percent, status)
     var onMagCalReport: ((UInt8, UInt8, Float) -> Void)?    // (compassId, status, fitness)
     var onCameraMessage: ((UInt32, Data) -> Void)?  // (messageID, payload)
+    var onLogEntry: ((UInt16, UInt16, UInt16, UInt32, UInt32) -> Void)?  // (id, numLogs, lastLogNum, timeUTC, size)
+    var onLogData: ((UInt16, UInt32, UInt8, [UInt8]) -> Void)?  // (logID, offset, count, data)
     var onConnectionStateChanged: ((MAVLinkConnection.State) -> Void)?
 
     // Telemetry state — only accessed from network queue
@@ -267,8 +269,8 @@ final class MAVLinkDrone {
         case MsgMissionRequestInt.id, MsgMissionRequest.id, MsgMissionAck.id,
              MsgMissionCount.id, MsgMissionItemInt.id:
             missionLock.lock()
+            defer { missionLock.unlock() }
             missionQueue.append(frame)
-            missionLock.unlock()
             missionSemaphore.signal()
             return
         default:
@@ -340,6 +342,25 @@ final class MAVLinkDrone {
             let report = MsgMagCalReport(from: frame.payload)
             DispatchQueue.main.async { [weak self] in
                 self?.onMagCalReport?(report.compass_id, report.cal_status, report.fitness)
+            }
+            return
+        }
+
+        // Route LOG_ENTRY
+        if msgID == MsgLogEntry.id {
+            let entry = MsgLogEntry(from: frame.payload)
+            DispatchQueue.main.async { [weak self] in
+                self?.onLogEntry?(entry.id, entry.num_logs, entry.last_log_num, entry.time_utc, entry.size)
+            }
+            return
+        }
+
+        // Route LOG_DATA
+        if msgID == MsgLogData.id {
+            let ld = MsgLogData(from: frame.payload)
+            let data = Array(ld.data.prefix(Int(ld.count)))
+            DispatchQueue.main.async { [weak self] in
+                self?.onLogData?(ld.id, ld.ofs, ld.count, data)
             }
             return
         }
