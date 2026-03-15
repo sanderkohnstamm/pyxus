@@ -57,10 +57,12 @@ Pyxus is a ground control station that gives pilots full control of their drones
 
 ## Architecture
 
-- **Backend**: FastAPI + pymavlink (Python) — `/backend/`
-- **Frontend**: React + Vite + Tailwind + Zustand + Leaflet — `/frontend/`
+- **Desktop**: Electron + React + Python backend — `/desktop/`
+  - Backend: FastAPI + pymavlink — `/desktop/backend/`
+  - Frontend: React + Vite + Tailwind + Zustand + Leaflet — `/desktop/frontend/`
+  - Electron: Desktop wrapper — `/desktop/electron/`
 - **iOS**: Native SwiftUI + pure Swift MAVLink v2 — `/ios/`
-- **Electron**: Desktop wrapper — `/electron/`
+- **Tools**: Mock drone, MAVLink code gen — `/tools/`
 - **Protocol**: MAVLink v2 — reference https://mavlink.io
 - **Docs**: Architecture, protocol guide, codebase review — `/docs/`
 

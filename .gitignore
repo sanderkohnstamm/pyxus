@@ -2,13 +2,14 @@
 node_modules/
 
 # Build output
-frontend/dist/
+desktop/frontend/dist/
+desktop/electron/dist/
 
 # Python
 __pycache__/
 *.pyc
 *.pyo
-backend/venv/
+desktop/backend/venv/
 
 # Environment
 .env
@@ -28,10 +29,6 @@ ios/Python.xcframework/
 *.tlog
 *.tlog.raw
 *.parm
-mavproxy/
-
-# iOS testbed (CPython embedding test)
-ios/testbed/
 
 # Xcode user state
 *.xcuserstate
