@@ -10,6 +10,7 @@ import batterySlice from './slices/batterySlice';
 import patternSlice from './slices/patternSlice';
 import flyModeSlice from './slices/flyModeSlice';
 import calibrationSlice from './slices/calibrationSlice';
+import followMeSlice from './slices/followMeSlice';
 
 const MAX_TRAIL_POINTS = 500;
 const MAX_BATTERY_SAMPLES = 300; // ~5 min at 1 sample/sec
@@ -62,6 +63,7 @@ const useDroneStore = create((set, get) => ({
   ...patternSlice(set, get),
   ...flyModeSlice(set, get),
   ...calibrationSlice(set, get),
+  ...followMeSlice(set, get),
 
   // === Multi-drone state ===
   drones: {},          // { [droneId]: INITIAL_DRONE_STATE }
@@ -219,6 +221,11 @@ const useDroneStore = create((set, get) => ({
         },
       },
     });
+
+    // Auto-stop follow-me if drone disarms or link degrades
+    if (droneId === get().activeDroneId) {
+      get()._checkFollowMeSafety?.();
+    }
   },
 
   setDroneMission: (droneId, waypoints) => {

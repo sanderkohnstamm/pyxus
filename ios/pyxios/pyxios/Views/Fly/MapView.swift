@@ -61,6 +61,22 @@ struct DroneMapView: View {
                             }
                         }
 
+                        // Device location marker (GCS / Follow Me source)
+                        if let deviceLoc = droneManager.followMeService.deviceLocation {
+                            Annotation("", coordinate: deviceLoc.coordinate) {
+                                ZStack {
+                                    Circle()
+                                        .fill(.blue.opacity(0.2))
+                                        .frame(width: 28, height: 28)
+                                    Circle()
+                                        .fill(.blue)
+                                        .frame(width: 12, height: 12)
+                                        .overlay(Circle().stroke(.white, lineWidth: 2))
+                                }
+                            }
+                            .annotationTitles(.hidden)
+                        }
+
                         // Drone marker (on top)
                         if state.hasValidPosition {
                             Annotation("", coordinate: state.coordinate) {

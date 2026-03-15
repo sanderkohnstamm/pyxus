@@ -201,6 +201,52 @@ struct SettingsView: View {
             }
 
             Section {
+                HStack {
+                    Label("Height", systemImage: "arrow.up")
+                    Spacer()
+                    TextField("20", text: Binding(
+                        get: { String(format: "%.0f", settings.followMeHeight) },
+                        set: { if let v = Float($0), v > 0 { settings.followMeHeight = v } }
+                    ))
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 60)
+                    Text("m")
+                        .foregroundStyle(.secondary)
+                }
+                HStack {
+                    Label("Distance", systemImage: "arrow.left.and.right")
+                    Spacer()
+                    TextField("10", text: Binding(
+                        get: { String(format: "%.0f", settings.followMeDistance) },
+                        set: { if let v = Float($0), v > 0 { settings.followMeDistance = v } }
+                    ))
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 60)
+                    Text("m")
+                        .foregroundStyle(.secondary)
+                }
+                HStack {
+                    Label("Angle", systemImage: "angle")
+                    Spacer()
+                    TextField("0", text: Binding(
+                        get: { String(format: "%.0f", settings.followMeAngle) },
+                        set: { if let v = Float($0) { settings.followMeAngle = v } }
+                    ))
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 60)
+                    Text("°")
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Label("Follow Me", systemImage: "figure.walk.circle")
+            } footer: {
+                Text("Height above your position, horizontal distance, and angle (0° = behind).")
+            }
+
+            Section {
                 Picker("Units", selection: Binding(
                     get: { settings.unitSystem },
                     set: { settings.unitSystem = $0 }

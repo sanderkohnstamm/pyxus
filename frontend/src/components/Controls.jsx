@@ -5,6 +5,7 @@ import {
   MapPin,
   Download,
   Radio,
+  Crosshair,
 } from 'lucide-react';
 import useDroneStore, { INITIAL_TELEMETRY, EMPTY_ARRAY } from '../store/droneStore';
 import { droneApi } from '../utils/api';
@@ -156,6 +157,9 @@ export default function Controls() {
         )}
       </div>
 
+      {/* Follow Me Section */}
+      <FollowMeSection />
+
       {/* Manual Control Section */}
       <ManualControlSection
         keyboardEnabled={keyboardEnabled}
@@ -241,6 +245,60 @@ function ChannelBar({ value, label, color = 'gray' }) {
       <span className={`text-[9px] font-mono w-8 text-right ${isCenter ? 'text-gray-600' : c.text}`}>
         {value}
       </span>
+    </div>
+  );
+}
+
+function FollowMeSection() {
+  const followMeActive = useDroneStore((s) => s.followMeActive);
+  const startFollowMe = useDroneStore((s) => s.startFollowMe);
+  const stopFollowMe = useDroneStore((s) => s.stopFollowMe);
+  const gcsPosition = useDroneStore((s) => s.gcsPosition);
+  const activeDroneId = useDroneStore((s) => s.activeDroneId);
+  const telemetry = useDroneStore((s) => s.activeDroneId ? s.drones[s.activeDroneId]?.telemetry : null) || INITIAL_TELEMETRY;
+
+  const hasGps = !!gcsPosition;
+  const isArmed = telemetry.armed;
+  const isAirborne = telemetry.system_status >= 4;
+  const canStart = hasGps && isArmed && isAirborne && !!activeDroneId;
+
+  return (
+    <div className="bg-gray-800/40 rounded-lg p-3 border border-gray-800/50">
+      <div className="flex items-center gap-1.5 mb-2">
+        <Crosshair size={11} className="text-gray-600" />
+        <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Follow Me</span>
+        {followMeActive && (
+          <Radio size={10} className="text-emerald-400 animate-pulse ml-auto" />
+        )}
+      </div>
+
+      <button
+        onClick={() => followMeActive ? stopFollowMe() : startFollowMe()}
+        disabled={!followMeActive && !canStart}
+        className={`w-full py-2 rounded-lg text-xs font-semibold transition-all border ${
+          followMeActive
+            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25'
+            : canStart
+              ? 'bg-gray-500/10 border-gray-500/20 text-gray-300 hover:bg-gray-500/20'
+              : 'bg-gray-800/30 border-gray-800/30 text-gray-600 cursor-not-allowed'
+        }`}
+      >
+        {followMeActive ? 'Stop Following' : 'Start Follow Me'}
+      </button>
+
+      <div className="mt-1.5 text-[9px] text-gray-600">
+        {followMeActive ? (
+          <span className="text-emerald-400/70">Sending GCS position at 2 Hz</span>
+        ) : !hasGps ? (
+          'GCS location not available'
+        ) : !isArmed ? (
+          'Drone must be armed'
+        ) : !isAirborne ? (
+          'Drone must be airborne'
+        ) : (
+          'Ready — drone will follow this device'
+        )}
+      </div>
     </div>
   );
 }

@@ -365,6 +365,20 @@ final class MAVLinkDrone {
         connection.sendMessage(id: MsgSetPositionTargetGlobalInt.id, payload: msg.encode())
     }
 
+    // MARK: - Follow Me
+
+    /// Send FOLLOW_TARGET (144) with GCS position at the configured rate.
+    func sendFollowTarget(lat: Double, lon: Double, alt: Float) {
+        var msg = MsgFollowTarget()
+        msg.timestamp = UInt64(Date().timeIntervalSince1970 * 1000)
+        msg.est_capabilities = 1  // POS valid
+        msg.lat = Int32(lat * 1e7)
+        msg.lon = Int32(lon * 1e7)
+        msg.alt = alt
+        msg.attitude_q = [1, 0, 0, 0]  // identity quaternion
+        connection.sendMessage(id: MsgFollowTarget.id, payload: msg.encode())
+    }
+
     // MARK: - Motor & Servo Test
 
     /// MAV_CMD_DO_MOTOR_TEST (209)

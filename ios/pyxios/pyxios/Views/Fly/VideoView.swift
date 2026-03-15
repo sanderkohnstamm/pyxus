@@ -206,6 +206,18 @@ struct VideoView: View {
 
             // Toggles
             Button {
+                if droneManager.followMeService.isActive {
+                    droneManager.stopFollowMe()
+                } else {
+                    droneManager.startFollowMe()
+                }
+            } label: {
+                Label(droneManager.followMeService.isActive ? "Following Me" : "Follow Me",
+                      systemImage: droneManager.followMeService.isActive ? "figure.walk.circle.fill" : "figure.walk.circle")
+            }
+            .disabled(!droneManager.state.armed)
+
+            Button {
                 showJoysticks.toggle()
                 if showJoysticks {
                     droneManager.startManualControl()

@@ -130,6 +130,12 @@ class CalibrationRequest(BaseModel):
     type: str  # gyro | accel | level | compass | pressure
 
 
+class FollowMeRequest(BaseModel):
+    lat: float
+    lon: float
+    alt: float = 0
+
+
 # --- Drone Registry ---
 
 # drone_id -> {drone: DroneConnection, mission: MissionManager, name: str, connection_string: str}
@@ -529,6 +535,39 @@ async def api_mode(req: ModeRequest, drone_id: str = Query(...)):
         return {"status": "ok", "command": "mode", "standard_mode": req.standard_mode}
     drone.set_mode(req.mode)
     return {"status": "ok", "command": "mode", "mode": req.mode}
+
+
+# --- Follow Me ---
+
+
+@app.post("/api/follow_me/start")
+async def api_follow_me_start(req: FollowMeRequest, drone_id: str = Query(...)):
+    drone, _ = get_drone(drone_id)
+    if err := check_drone_link(drone):
+        return err
+    tel = drone.get_telemetry()
+    if not tel.get("armed"):
+        return {"status": "error", "error": "Drone must be armed"}
+    if tel.get("system_status", 0) < 4:
+        return {"status": "error", "error": "Drone must be airborne"}
+    drone.start_follow_me(req.lat, req.lon, req.alt)
+    return {"status": "ok", "command": "follow_me_start"}
+
+
+@app.post("/api/follow_me/stop")
+async def api_follow_me_stop(drone_id: str = Query(...)):
+    drone, _ = get_drone(drone_id)
+    drone.stop_follow_me()
+    return {"status": "ok", "command": "follow_me_stop"}
+
+
+@app.post("/api/follow_me/update")
+async def api_follow_me_update(req: FollowMeRequest, drone_id: str = Query(...)):
+    drone, _ = get_drone(drone_id)
+    if not drone.follow_me_active:
+        return {"status": "error", "error": "Follow-me not active"}
+    drone.update_follow_position(req.lat, req.lon, req.alt)
+    return {"status": "ok"}
 
 
 @app.get("/api/modes")

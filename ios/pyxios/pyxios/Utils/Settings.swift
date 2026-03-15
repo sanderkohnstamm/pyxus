@@ -138,6 +138,17 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(autoConnectOnLaunch, forKey: "autoConnectOnLaunch") }
     }
 
+    // Follow Me settings
+    var followMeHeight: Float {
+        didSet { UserDefaults.standard.set(followMeHeight, forKey: "followMeHeight") }
+    }
+    var followMeDistance: Float {
+        didSet { UserDefaults.standard.set(followMeDistance, forKey: "followMeDistance") }
+    }
+    var followMeAngle: Float {
+        didSet { UserDefaults.standard.set(followMeAngle, forKey: "followMeAngle") }
+    }
+
     /// Shared PiP (mini map / mini video) offset from default position (top-right).
     var pipOffsetX: CGFloat {
         didSet { UserDefaults.standard.set(Double(pipOffsetX), forKey: "pipOffsetX") }
@@ -171,6 +182,12 @@ final class AppSettings {
         throttleCenter = ThrottleCenter(rawValue: throttleRaw) ?? .mid
 
         autoConnectOnLaunch = UserDefaults.standard.bool(forKey: "autoConnectOnLaunch")
+
+        let fmh = UserDefaults.standard.float(forKey: "followMeHeight")
+        followMeHeight = fmh > 0 ? fmh : 20
+        let fmd = UserDefaults.standard.float(forKey: "followMeDistance")
+        followMeDistance = fmd > 0 ? fmd : 10
+        followMeAngle = UserDefaults.standard.float(forKey: "followMeAngle")
 
         pipOffsetX = CGFloat(UserDefaults.standard.double(forKey: "pipOffsetX"))
         pipOffsetY = CGFloat(UserDefaults.standard.double(forKey: "pipOffsetY"))

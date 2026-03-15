@@ -130,6 +130,7 @@ ARDUPILOT_COPTER_MODES = {
     9: "LAND", 11: "DRIFT", 13: "SPORT", 14: "FLIP",
     15: "AUTOTUNE", 16: "POSHOLD", 17: "BRAKE", 18: "THROW",
     19: "AVOID_ADSB", 20: "GUIDED_NOGPS", 21: "SMART_RTL",
+    23: "FOLLOW",
 }
 ARDUPILOT_PLANE_MODES = {
     0: "MANUAL", 1: "CIRCLE", 2: "STABILIZE", 3: "TRAINING",
@@ -245,6 +246,12 @@ class DroneConnection:
         self._cal_events: deque = deque(maxlen=50)  # Structured calibration events
         self._cal_lock = threading.Lock()
 
+        # Follow-me state
+        self._follow_me_active: bool = False
+        self._follow_me_position: Optional[dict] = None  # {lat, lon, alt}
+        self._follow_me_lock = threading.Lock()
+        self._follow_me_thread: Optional[threading.Thread] = None
+
         # Available modes (MAVLink standard modes protocol)
         self._available_modes: list = []
         self._available_modes_count: int = 0
@@ -268,6 +275,7 @@ class DroneConnection:
         with self._lock:
             data = self._telemetry.to_dict()
         data["capabilities"] = get_profile(self._mav_type)
+        data["follow_me_active"] = self._follow_me_active
         return data
 
     def connect(self, connection_string: str) -> bool:
@@ -374,6 +382,10 @@ class DroneConnection:
             return False
 
     def disconnect(self):
+        self._follow_me_active = False  # Stop follow-me immediately (no mode switch)
+        if self._follow_me_thread:
+            self._follow_me_thread.join(timeout=2)
+            self._follow_me_thread = None
         self._running = False
         self._connected = False
         if self._thread:
@@ -471,6 +483,10 @@ class DroneConnection:
                     if self._missed_heartbeats >= HEARTBEAT_MISS_THRESHOLD:
                         self._link_lost = True
                         self._link_lost_time = time.time()
+                        # Stop follow-me on link loss
+                        if self._follow_me_active:
+                            self._follow_me_active = False
+                            logger.warning("Follow-me stopped due to link loss")
                         with self._lock:
                             self._telemetry.link_lost = True
                             self._telemetry_generation += 1
@@ -1212,6 +1228,78 @@ class DroneConnection:
 
     def set_mode(self, mode: str):
         self._enqueue_cmd("set_mode", mode=mode)
+
+    # --- Follow Me ---
+
+    @property
+    def follow_me_active(self) -> bool:
+        return self._follow_me_active
+
+    def start_follow_me(self, lat: float, lon: float, alt: float):
+        """Start follow-me mode. Switches flight mode and begins sending FOLLOW_TARGET."""
+        if self._follow_me_active:
+            return
+        # Switch to follow mode
+        if self._is_ardupilot:
+            self._enqueue_cmd("set_mode", mode="FOLLOW")
+        else:
+            self._enqueue_cmd("set_mode", mode="AUTO_FOLLOW")
+        # Set initial position and start thread
+        with self._follow_me_lock:
+            self._follow_me_position = {"lat": lat, "lon": lon, "alt": alt}
+        self._follow_me_active = True
+        self._follow_me_thread = threading.Thread(
+            target=self._follow_me_loop, daemon=True, name="follow-me"
+        )
+        self._follow_me_thread.start()
+        logger.info("Follow-me started (lat=%.6f, lon=%.6f, alt=%.1f)", lat, lon, alt)
+
+    def stop_follow_me(self):
+        """Stop follow-me mode. Switches to loiter/hold."""
+        if not self._follow_me_active:
+            return
+        self._follow_me_active = False
+        if self._follow_me_thread:
+            self._follow_me_thread.join(timeout=2)
+            self._follow_me_thread = None
+        # Switch to hold mode
+        if self._connected:
+            if self._is_ardupilot:
+                self._enqueue_cmd("set_mode", mode="LOITER")
+            else:
+                self._enqueue_cmd("set_mode", mode="AUTO_LOITER")
+        logger.info("Follow-me stopped")
+
+    def update_follow_position(self, lat: float, lon: float, alt: float):
+        """Update the GCS position for follow-me (thread-safe)."""
+        with self._follow_me_lock:
+            self._follow_me_position = {"lat": lat, "lon": lon, "alt": alt}
+
+    def _follow_me_loop(self):
+        """Background thread: send FOLLOW_TARGET at 2Hz."""
+        while self._follow_me_active and self._running:
+            with self._follow_me_lock:
+                pos = self._follow_me_position
+            if pos:
+                with self._mav_lock:
+                    if self._mav:
+                        try:
+                            self._mav.mav.follow_target_send(
+                                int(time.time() * 1000),  # timestamp ms
+                                1,                          # est_capabilities (POS)
+                                int(pos["lat"] * 1e7),      # lat degE7
+                                int(pos["lon"] * 1e7),      # lon degE7
+                                pos["alt"],                  # alt meters
+                                [0, 0, 0],                   # vel (unknown)
+                                [0, 0, 0],                   # acc (unknown)
+                                [1, 0, 0, 0],                # attitude_q (identity)
+                                [0, 0, 0],                   # rates (unknown)
+                                [0, 0, 0],                   # position_cov (unknown)
+                                0,                           # custom_state
+                            )
+                        except Exception as e:
+                            logger.debug("follow_target_send error: %s", e)
+            time.sleep(0.5)  # 2 Hz
 
     @staticmethod
     def _validate_rc_channels(channels: list) -> list[int]:

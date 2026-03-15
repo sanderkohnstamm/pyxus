@@ -30,6 +30,12 @@ export default function SettingsPanel() {
   const setDefaultSpeed = useDroneStore((s) => s.setDefaultSpeed);
   const takeoffAlt = useDroneStore((s) => s.takeoffAlt);
   const setTakeoffAlt = useDroneStore((s) => s.setTakeoffAlt);
+  const followMeHeight = useDroneStore((s) => s.followMeHeight);
+  const setFollowMeHeight = useDroneStore((s) => s.setFollowMeHeight);
+  const followMeDistance = useDroneStore((s) => s.followMeDistance);
+  const setFollowMeDistance = useDroneStore((s) => s.setFollowMeDistance);
+  const followMeAngle = useDroneStore((s) => s.followMeAngle);
+  const setFollowMeAngle = useDroneStore((s) => s.setFollowMeAngle);
 
   return (
     <div className="p-4 space-y-4">
@@ -68,6 +74,37 @@ export default function SettingsPanel() {
               type="number"
               value={takeoffAlt}
               onChange={(e) => setTakeoffAlt(Number(e.target.value))}
+              className="w-16 bg-gray-800/60 border border-white/[0.06] rounded-lg px-2 py-1 text-[10px] text-gray-300 text-right focus:outline-none focus:border-white/[0.15]"
+            />
+          </SettingRow>
+        </div>
+      </div>
+
+      {/* Follow Me */}
+      <div>
+        <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Follow Me</div>
+        <div className="bg-gray-800/30 rounded-xl p-3 border border-white/[0.04] space-y-0">
+          <SettingRow label="Height (m)">
+            <input
+              type="number"
+              value={followMeHeight}
+              onChange={(e) => setFollowMeHeight(Number(e.target.value))}
+              className="w-16 bg-gray-800/60 border border-white/[0.06] rounded-lg px-2 py-1 text-[10px] text-gray-300 text-right focus:outline-none focus:border-white/[0.15]"
+            />
+          </SettingRow>
+          <SettingRow label="Distance (m)">
+            <input
+              type="number"
+              value={followMeDistance}
+              onChange={(e) => setFollowMeDistance(Number(e.target.value))}
+              className="w-16 bg-gray-800/60 border border-white/[0.06] rounded-lg px-2 py-1 text-[10px] text-gray-300 text-right focus:outline-none focus:border-white/[0.15]"
+            />
+          </SettingRow>
+          <SettingRow label="Angle (°)">
+            <input
+              type="number"
+              value={followMeAngle}
+              onChange={(e) => setFollowMeAngle(Number(e.target.value))}
               className="w-16 bg-gray-800/60 border border-white/[0.06] rounded-lg px-2 py-1 text-[10px] text-gray-300 text-right focus:outline-none focus:border-white/[0.15]"
             />
           </SettingRow>

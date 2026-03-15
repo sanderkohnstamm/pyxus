@@ -61,6 +61,7 @@ final class DroneManager {
     let alertService = TelemetryAlertService()
     let calibrationService = CalibrationService()
     let cameraService = CameraService()
+    let followMeService = FollowMeService()
 
     // MARK: - Published State
 
@@ -103,6 +104,7 @@ final class DroneManager {
         paramService.update(drone: mav)
         calibrationService.update(drone: mav)
         cameraService.update(drone: mav)
+        followMeService.update(drone: mav)
 
         mav.onConnectionStateChanged = { [weak self] connState in
             guard let self else { return }
@@ -302,6 +304,7 @@ final class DroneManager {
         alertService.reset()
         calibrationService.reset()
         cameraService.reset()
+        followMeService.reset()
     }
 
     // MARK: - Flight Actions
@@ -371,6 +374,19 @@ final class DroneManager {
         drone.setMode(mode)
         statusMessage = "Setting \(mode)"
         HapticManager.shared.trigger(style: "success")
+    }
+
+    // MARK: - Follow Me
+
+    func startFollowMe() {
+        followMeService.start()
+        statusMessage = "Follow Me active"
+        HapticManager.shared.trigger(style: "success")
+    }
+
+    func stopFollowMe() {
+        followMeService.stop()
+        statusMessage = "Follow Me stopped"
     }
 
     // MARK: - Manual Control
